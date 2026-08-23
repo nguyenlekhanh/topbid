@@ -1,32 +1,99 @@
 ﻿TASK ID: 1.14
 PHASE: 1
 TITLE: Responsive mobile design
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Refine and audit the existing UI for mobile usability at 320/375/390/430px and desktop, fixing overflow, spacing, typography, touch targets, and component readability without rebuilding UI.
 
 SCOPE:
+- Audit existing pages/components at 320px, 375px, 390px, 430px
+- Fix horizontal overflow via overflow-x hidden and containment
+- Increase mobile touch targets (Navbar button, menu links, CTAs, BidButton)
+- Ensure Leaderboard table scrolls instead of overflowing
+- Make CategoryCards readable without clipping (p-4 sm:p-6)
+- Make Hero CTAs stack full-width on mobile (w-full sm:w-auto, min-h-11)
+- Make BidModal usable on small screens (px-4 sm:px-6, full-width buttons)
+- Ensure SuccessState, EmptyState, ErrorState, Skeleton respect mobile
+- Preserve visual design and design tokens
+- No new design system, no backend
 
 OUT OF SCOPE:
+- Rebuilding UI
+- New design system / dependencies
+- Supabase / Stripe / auth / bidding logic
 
 INPUTS / DEPENDENCIES:
+- Tasks 1.1-1.13 completed
 
 IMPLEMENTATION REQUIREMENTS:
+- Widths 320,375,390,430 + tablet/desktop
+- No horizontal overflow
+- Touch targets >=44px
+- Tables/lists/cards readable
+- BidModal usable small
+- Preserve design tokens
 
 FILES EXPECTED TO CHANGE:
+- src/app/globals.css
+- src/components/Navbar.tsx
+- src/components/Hero.tsx
+- src/components/CategoryCards.tsx
+- src/components/Leaderboard.tsx
+- src/components/BidModal.tsx
+- src/components/BidButton.tsx
+- src/components/SuccessState.tsx
+- docs/1.14.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Manual responsive verify 320/375/390/430/tablet/desktop
 
 DEFINITION OF DONE:
+- Audit done, fixes applied, no overflow, touch targets >=44px, tables/cards/lists readable, modal usable, all checks pass
 
 IMPLEMENTATION NOTES:
+Audit found: html/body no overflow-x hidden, Leaderboard table w-full no scroll wrapper caused overflow >320, Navbar p-2 button ~40px <44, mobile menu links py-2 ~40px, CategoryCards p-6 cramped at 320 (240 content), Hero CTAs not full-width, BidModal px-6 tight + buttons not full-width, SuccessState buttons not full-width, View All/Category links not full-width.
+Fixes applied:
+- globals.css: html/body overflow-x hidden max-w 100vw
+- Navbar: button p-2.5 min-h-11 min-w-11, mobile links py-3 min-h-11 flex items-center
+- Hero: container flex-col sm:flex-row items-stretch gap-3, buttons w-full sm:w-auto min-h-11 py-3.5
+- CategoryCards: article p-4 sm:p-6
+- Leaderboard: outer div overflow-x-auto, table min-w-[640px]
+- BidModal: sticky header px-4 sm:px-6, content px-4 sm:px-6, footer buttons w-full sm:w-auto
+- BidButton: base min-h-11 added for all variants
+- SuccessState: actions flex-col sm:flex-row w-full, buttons w-full sm:w-auto min-h-11 py-3
+- CategoryCards View All + Leaderboard View Full: w-full sm:w-auto py-3.5 min-h-11
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Manual responsive verification at 320/375/390/430/tablet/desktop shows no overflow, cramped layouts fixed, buttons usable.
 
 FILES ACTUALLY CHANGED:
+- src/app/globals.css
+- src/components/Navbar.tsx
+- src/components/Hero.tsx
+- src/components/CategoryCards.tsx
+- src/components/Leaderboard.tsx
+- src/components/BidModal.tsx
+- src/components/BidButton.tsx
+- src/components/SuccessState.tsx
+- docs/1.14.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.15 - UI polish (animations, transitions)

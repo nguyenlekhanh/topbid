@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**1.13 completed** — Next recommended: 1.14
+**1.14 completed** — Next recommended: 1.15
 
 ## Completed Tasks
 
@@ -33,6 +33,7 @@
 - 1.11: Loading states ✓
 - 1.12: Error states ✓
 - 1.13: Success state (post-bid) ✓
+- 1.14: Responsive mobile design ✓
 
 ## Tasks in Progress
 
@@ -77,6 +78,7 @@ _None_
 - Loading states implemented (reusable Skeleton + 5 variants matching loaded layouts, motion-safe, aria-busy)
 - Error states implemented (reusable ErrorState + 6 variants, card/inline, user-friendly, Retry, alert live)
 - Success state implemented (reusable SuccessState with amount/category/reference, mock demo disclaimer, View Leaderboard/Continue Browsing, motion-safe)
+- Responsive mobile design audited and refined (320/375/390/430 verified, overflow fixed, touch targets 44px, tables/cards/modals readable)
 
 ## Current Environment/Setup Status
 
@@ -94,8 +96,8 @@ _None_
 
 ## Next Recommended Task
 
-**1.14 — Responsive mobile design**
+**1.15 — UI polish (animations, transitions)**
 
 ## Notes
 
-Task 1.13 completed successfully. SuccessState created with mock bid info, demo disclaimer, View Leaderboard/Continue Browsing actions, motion-safe animation, integrated into BidModal success view.
+Task 1.14 completed successfully. Responsive audit at 320/375/390/430/tablet/desktop found and fixed overflow, cramped p-6, Leaderboard scroll, touch targets, Hero CTA stacking, BidModal padding — all verified.

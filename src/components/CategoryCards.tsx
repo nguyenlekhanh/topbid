@@ -121,7 +121,7 @@ export default function CategoryCards() {
               {mockCategories.map((category) => (
                 <article
                   key={category.id}
-                  className="group relative flex flex-col rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                  className="group relative flex flex-col rounded-xl border border-border bg-background p-4 sm:p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
                   role="listitem"
                 >
                   <div
@@ -190,7 +190,7 @@ export default function CategoryCards() {
           <div className="mt-12 text-center">
             <a
               href="/categories"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-11"
             >
               View All Categories
               <svg

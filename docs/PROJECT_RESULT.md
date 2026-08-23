@@ -723,6 +723,45 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.14 - Responsive mobile design
 
+### Task 1.14
+
+- **Date**: 2026-08-23
+- **Objective**: Responsive mobile design refinement/audit for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - Audited existing pages/components at 320, 375, 390, 430, tablet, desktop before changes — no rebuild
+  - Fixed horizontal overflow: globals.css html/body overflow-x hidden max-w 100vw
+  - Fixed Leaderboard table overflow via overflow-x-auto + min-w-[640px]
+  - Increased touch targets to >=44px: Navbar hamburger p-2.5 min-h-11 min-w-11, mobile menu links py-3 min-h-11 flex items-center, Hero CTAs w-full sm:w-auto min-h-11 py-3.5 gap-3, BidButton base min-h-11, SuccessState actions w-full sm:w-auto, CategoryCards/Leaderboard View All links w-full sm:w-auto
+  - Improved readability: CategoryCards cards p-4 sm:p-6, Hero CTAs stack items-stretch, Leaderboard scrollable, BidModal header/content px-4 sm:px-6, modal buttons w-full sm:w-auto
+  - Preserved visual design and design tokens, no new dependencies, no backend
+- **Files changed**:
+  - src/app/globals.css
+  - src/components/Navbar.tsx
+  - src/components/Hero.tsx
+  - src/components/CategoryCards.tsx
+  - src/components/Leaderboard.tsx
+  - src/components/BidModal.tsx
+  - src/components/BidButton.tsx
+  - src/components/SuccessState.tsx
+  - docs/1.14.txt
+  - docs/PROJECT_PROGRESS.md
+  - docs/PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual responsive verification at 320/375/390/430/tablet/desktop: no overflow, cramped layouts fixed, typography readable, spacing appropriate, buttons touch-usable, modal scrolls, tables/lists/cards readable, navbar menu usable, keyboard focus preserved
+- **Important technical decisions**:
+  - Minimal targeted fixes only where audit found issues, preserved design
+  - Global overflow-x hidden prevents accidental horizontal scroll from 100vw rounding
+  - Table min-width + overflow-x-auto maintains readability without breaking page layout
+  - Touch targets via min-h-11 (44px) per Apple/Google guidelines
+  - w-full sm:w-auto pattern for CTAs preserves desktop inline while mobile full-width for thumb reach
+- **Known limitations**: None
+- **Follow-up work**: Task 1.15 - UI polish (animations, transitions)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

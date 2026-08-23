@@ -103,8 +103,8 @@ export default function Leaderboard() {
           </p>
         </header>
 
-        <div className="rounded-xl border border-border bg-background overflow-hidden">
-          <table className="w-full" role="table" aria-label="Top bidders leaderboard">
+        <div className="rounded-xl border border-border bg-background overflow-hidden overflow-x-auto">
+          <table className="w-full min-w-[640px]" role="table" aria-label="Top bidders leaderboard">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th
@@ -202,7 +202,7 @@ export default function Leaderboard() {
         <div className="mt-8 text-center">
           <a
             href="/leaderboard"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-11"
           >
             View Full Leaderboard
             <svg

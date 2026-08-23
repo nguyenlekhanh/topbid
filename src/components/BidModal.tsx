@@ -93,7 +93,7 @@ export default function BidModal({ category, isOpen, onClose }: BidModalProps) {
       />
 
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-border bg-background px-6 py-4">
+        <div className="sticky top-0 flex items-center justify-between border-b border-border bg-background px-4 sm:px-6 py-4">
           <h2 id="bid-modal-title" className="text-lg font-semibold text-foreground">
             {isSuccess ? 'Success! (demo)' : `Bid on ${category.name}`}
           </h2>
@@ -121,7 +121,7 @@ export default function BidModal({ category, isOpen, onClose }: BidModalProps) {
           </button>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        <div className="px-4 sm:px-6 py-6 space-y-6">
           {isSuccess ? (
             <SuccessState
               amount={formatCurrency(minimumBid)}
@@ -217,10 +217,20 @@ export default function BidModal({ category, isOpen, onClose }: BidModalProps) {
               </div>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <BidButton variant="outline" size="md" onClick={onClose}>
+                <BidButton
+                  variant="outline"
+                  size="md"
+                  onClick={onClose}
+                  className="w-full sm:w-auto"
+                >
                   Cancel
                 </BidButton>
-                <BidButton variant="primary" size="md" onClick={() => setIsSuccess(true)}>
+                <BidButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => setIsSuccess(true)}
+                  className="w-full sm:w-auto"
+                >
                   Continue to mock payment
                 </BidButton>
               </div>

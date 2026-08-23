@@ -17,7 +17,7 @@ export default function BidButton({
   ...props
 }: BidButtonProps) {
   const baseStyles =
-    'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-in-out ' +
+    'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-in-out min-h-11 ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:hover:text-primary-foreground ' +
     'active:scale-[0.98]';
