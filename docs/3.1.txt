@@ -1,32 +1,71 @@
 ﻿TASK ID: 3.1
 PHASE: 3
 TITLE: Calculate minimum bid (no existing bids)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Implement server-side minimum-bid calculation for a category with no existing paid bids: minimum = category.starting_bid (integer cents), per the non-negotiable business rule in AGENTS.md and PROJECT_PLAN.md.
 
 SCOPE:
+- Extend src/lib/bids.ts (existing bid module; no new files/deps)
+- New server-side function getInitialMinimumBid(categorySlug): Promise<number | null>
+- Composes existing Phase 2 queries only: getCategoryBySlug (Task 2.7) + getHighestBidForCategory (Task 2.8, the plan-declared dependency)
+- Null contract: null when category missing/inactive OR when paid bids already exist
 
 OUT OF SCOPE:
+- Existing-bids branch minimum = highest_bid + increment (Task 3.2), amount validation (3.3), deeper category validation (3.4), pending bid records (3.5), concurrency/locking (3.6), duplicate prevention (3.7), test infrastructure (3.8), Stripe/UI wiring, schema/migration/RLS changes, Phase 1 mock UI (src/components/BidModal.tsx mock getMinimumBid untouched)
 
 INPUTS / DEPENDENCIES:
+- Task 2.4 constraints (starting_bid INTEGER cents >= 0) — value comes from DB, never from client
+- Task 2.7 getCategoryBySlug (active-category lookup by slug via server client)
+- Task 2.8 getHighestBidForCategory (paid-bid existence check, RLS-compliant)
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only via supabase-server anon client chain; service-role never imported; respects RLS
+- Authoritative minimum derived exclusively from DB values; never trusts client-provided amounts
+- No valid/paid bids -> return category.starting_bid
+- Category not found / inactive -> null (caller can render appropriate state)
+- Category already has paid bids -> null (explicitly deferred to Task 3.2, documented in JSDoc)
+- Deterministic, no side effects beyond the two read queries
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- docs/3.1.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Code inspection: delegation correctness, null contract branches, RLS compliance, integer-cents handling
 
 DEFINITION OF DONE:
+- Reusable server-side initial-minimum-bid function exists per business rule, all checks pass, prior task code untouched
 
 IMPLEMENTATION NOTES:
+Added getInitialMinimumBid to src/lib/bids.ts after getRecentBids; imports getCategoryBySlug from @/lib/categories (no circular import — categories.ts does not import bids.ts). Flow: resolve active category by slug -> null if absent; getHighestBidForCategory(category.id) -> null if any paid bid exists (existing-bid minimums are Task 3.2's contract; returning null here keeps 3.1 honest without prematurely implementing 3.2 math); otherwise return category.starting_bid (guaranteed non-negative integer cents by Task 2.4 CHECK constraint). Input sanitation for slug is delegated to getCategoryBySlug (already guards empty/non-string). A pure identity helper was deliberately NOT added — starting_bid already satisfies the rule and a passthrough function would be an unnecessary abstraction; unit-testable composition arrives with Tasks 3.2/3.8.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED on first run. Inspection confirmed: server-only data access, authoritative value sourced from categories.starting_bid, correct null contract for missing/inactive/existing-paid-bids cases, no changes to Tasks 2.1-2.10 code.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (extended - getInitialMinimumBid + one import line)
+- docs/3.1.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-2.10
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Task 3.2 — Calculate minimum bid (existing bids)

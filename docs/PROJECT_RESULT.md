@@ -1113,6 +1113,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Phase 2 complete — Task 3.1 — Calculate minimum bid (no existing bids)
 
+### Task 3.1
+
+- **Date**: 2026-08-23
+- **Objective**: Server-side minimum-bid calculation for a category with no existing paid bids (minimum = starting_bid)
+- **Status**: Completed
+- **What was implemented**:
+  - Added getInitialMinimumBid(categorySlug): Promise<number | null> to src/lib/bids.ts, composing existing queries only: getCategoryBySlug (2.7) + getHighestBidForCategory (2.8, the plan-declared dependency)
+  - Business rule enforced: no valid/paid bids -> returns category.starting_bid (integer cents, non-negative per Task 2.4 CHECK)
+  - Null contract: null when category missing/inactive; null when paid bids already exist (existing-bid minimum explicitly deferred to Task 3.2 — not implemented prematurely)
+  - Server-side only via supabase-server anon client chain; respects RLS; value sourced exclusively from DB, never from client input
+- **Files changed**:
+  - src/lib/bids.ts (extended — one import line + getInitialMinimumBid; Tasks 2.1-2.10 code untouched)
+  - docs/3.1.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (delegation correctness, null contract branches, RLS compliance, integer-cents handling, no circular imports)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-2.10
+- **Important technical decisions**:
+  - Returned null (documented) rather than throwing when paid bids exist — keeps Task 3.1's contract honest and lets Task 3.2 own that branch without premature math
+  - Delegated slug sanitation to getCategoryBySlug instead of duplicating guards
+  - No pure passthrough helper added — starting_bid already satisfies the rule; unit-testable composition arrives with Tasks 3.2/3.8
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 3.2 — Calculate minimum bid (existing bids)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

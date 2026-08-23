@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server';
+import { getCategoryBySlug } from '@/lib/categories';
 
 export type Bid = {
   id: string;
@@ -161,4 +162,28 @@ export async function getRecentBids(options: { limit?: number } = {}): Promise<R
       category: categories,
     })
   );
+}
+
+/**
+ * Calculate the minimum valid bid for a category with no existing paid bids.
+ * Business rule: no valid bids -> minimum = category.starting_bid (server-side only).
+ * - Resolves the active category by slug via the existing category query (RLS public read)
+ * - Returns null when the category does not exist or is inactive
+ * - Returns null when the category already has paid bids (existing-bid minimum is Task 3.2)
+ * - Server-side only (uses supabase-server anon client; respects RLS; never trusts client input)
+ */
+export async function getInitialMinimumBid(categorySlug: string): Promise<number | null> {
+  const category = await getCategoryBySlug(categorySlug);
+
+  if (!category) {
+    return null;
+  }
+
+  const highestBid = await getHighestBidForCategory(category.id);
+
+  if (highestBid) {
+    return null;
+  }
+
+  return category.starting_bid;
 }

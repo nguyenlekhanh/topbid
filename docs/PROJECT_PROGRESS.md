@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.10 completed** — Next recommended: 3.1
+**3.1 completed** — Next recommended: 3.2
 
 ## Completed Tasks
 
@@ -45,6 +45,7 @@
 - 2.8: Highest bid query ✓
 - 2.9: Leaderboard query ✓
 - 2.10: Recent bids query ✓
+- 3.1: Calculate minimum bid (no existing bids) ✓
 
 ## Tasks in Progress
 
@@ -101,6 +102,7 @@ _None_
 - Highest bid query created (getHighestBidForCategory via server client, RLS paid-only, amount DESC limit 1)
 - Leaderboard query created (getLeaderboard: paid bids ranked amount DESC + created_at tie-breaker, embedded category info, optional limit default 10)
 - Recent bids query created (getRecentBids: newest-first paid bids, created_at DESC + amount tie-breaker, bidder and embedded category info, optional limit default 10)
+- Minimum bid calculation created (getInitialMinimumBid: no-existing-paid-bids rule minimum = starting_bid, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/existing-bid cases)
 
 ## Current Environment/Setup Status
 
@@ -118,7 +120,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.1 — Calculate minimum bid (no existing bids)**
+**3.2 — Calculate minimum bid (existing bids)**
 
 ## Notes
 
@@ -130,3 +132,5 @@ Task 2.8 completed successfully. Highest-bid query created in src/lib/bids.ts vi
 Task 2.9 completed successfully. Leaderboard query added to src/lib/bids.ts returning paid bids ranked amount DESC with created_at tie-breaker, embedded category info, and optional limit (default 10).
 
 Task 2.10 completed successfully. Recent-bids query added to src/lib/bids.ts returning newest-first paid bids with created_at DESC + amount tie-breaker, bidder and embedded category info, and optional limit (default 10). Purely additive to Task 2.9 code.
+
+Task 3.1 completed successfully. getInitialMinimumBid added to src/lib/bids.ts: server-side minimum = starting_bid for categories with no paid bids; composes getCategoryBySlug + getHighestBidForCategory; returns null for missing/inactive categories and defers existing-bid minimums to Task 3.2.
