@@ -424,6 +424,50 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.6 - Leaderboard
 
+### Task 1.6
+
+- **Date**: 2026-08-23
+- **Objective**: Create a leaderboard component for the Topbid.lol homepage displaying top bidders across all categories
+- **Status**: Completed
+- **What was implemented**:
+  - Leaderboard component (src/components/Leaderboard.tsx) with semantic table element
+  - Mock data for 6 leaderboard entries across different categories
+  - Rank badges: #1 (gold/warning), #2 (silver), #3 (bronze), others (muted)
+  - #1 position: highlighted row with bg-primary/5 and border-l-4 border-warning, gold rank badge, "Highest Bid" badge, warning-colored amount
+  - Currency formatting using Intl.NumberFormat (cents to dollars)
+  - Bidder info with avatar initial, name, and email
+  - Category tags with muted styling
+  - Time ago column
+  - "View Full Leaderboard" link at bottom
+  - Focus-visible states on links
+  - Uses design system tokens: warning, primary, foreground, muted-foreground, border, background, muted, ring, transitions
+  - Updated page.tsx to include Leaderboard after CategoryCards
+- **Files changed**:
+  - src/components/Leaderboard.tsx (created)
+  - src/app/page.tsx (updated to include Leaderboard)
+  - docs/1.6.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual UI verification: Leaderboard displays correctly at desktop, tablet, and mobile widths. #1 position has gold styling, highlighted row, "Highest Bid" badge. Currency formatting correct. Hover states on rows. Focus states visible. No horizontal overflow (table scrolls on mobile).
+- **Important technical decisions**:
+  - Semantic <table> with thead/tbody and proper scope attributes
+  - Rank badges: #1 (gold/warning), #2 (silver), #3 (bronze), others (muted)
+  - #1 position: highlighted row, gold rank badge, "Highest Bid" badge, warning-colored amount
+  - Currency formatting using Intl.NumberFormat (cents to dollars)
+  - Bidder info with avatar initial, name, and email
+  - Category tags with muted styling
+  - Time ago column
+  - "View Full Leaderboard" link at bottom
+  - Focus-visible states on links
+  - Uses design system tokens: warning, primary, foreground, muted-foreground, border, background, muted, ring, transitions
+- **Known limitations**: None
+- **Follow-up work**: Task 1.7 - Bid button
+
 ---
 
 *This file will be updated after each completed task with actual implementation details.*

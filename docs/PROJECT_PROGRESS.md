@@ -4,7 +4,7 @@
 **Phase 1 — UI / Design**
 
 ## Current Task
-**1.5 completed** — Next recommended: 1.6
+**1.6 completed** — Next recommended: 1.7
 
 ## Completed Tasks
 - 0.1: Create Next.js project with TypeScript ✓
@@ -22,6 +22,7 @@
 - 1.3: Navbar ✓
 - 1.4: Hero section ✓
 - 1.5: Category cards grid ✓
+- 1.6: Leaderboard ✓
 
 ## Tasks in Progress
 *None*
@@ -53,6 +54,7 @@
 - Navbar component implemented (responsive, accessible, sticky with backdrop blur)
 - Hero section implemented (headline, CTAs, value props, responsive)
 - Category cards grid implemented (6 mock categories, responsive grid, hover/focus states)
+- Leaderboard implemented (top bidders table, #1 emphasis, currency formatting)
 
 ## Current Environment/Setup Status
 - Node.js: v20.18.3 ✓
@@ -68,7 +70,7 @@
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-**1.6 — Leaderboard**
+**1.7 — Bid button**
 
 ## Notes
-Task 1.5 completed successfully. Category cards grid created with 6 mock categories, responsive grid (1/2/3 columns), hover/focus states, keyboard accessibility, and currency formatting.
+Task 1.6 completed successfully. Leaderboard component created with 6 mock entries, table layout, special #1 emphasis (gold styling, "Highest Bid" badge), currency formatting, and responsive table.

@@ -1,32 +1,113 @@
 ﻿TASK ID: 1.6
 PHASE: 1
 TITLE: Leaderboard component
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a leaderboard component for the Topbid.lol homepage displaying top bidders across all categories with special visual emphasis on the #1 position.
 
 SCOPE:
+- Leaderboard component with mock data (6 entries)
+- Table-based layout with rank, bidder info, category, bid amount, time
+- Special visual emphasis for #1 position (gold styling, "Highest Bid" badge, highlighted row)
+- Currency formatting for bid amounts
+- "View Full Leaderboard" link at bottom
+- Responsive table with horizontal scroll on mobile
+- Keyboard accessible interactive elements
+- Uses design system tokens
 
 OUT OF SCOPE:
+- Real-time updates (Task 5.1+)
+- Real database queries (Task 2.9)
+- Real bidding logic
+- Database integration
+- User authentication
 
 INPUTS / DEPENDENCIES:
+- Task 1.1 completed (global app shell)
+- Task 1.2 completed (design system tokens)
+- Task 1.3 completed (Navbar)
+- Task 1.4 completed (Hero)
+- Task 1.5 completed (CategoryCards)
 
 IMPLEMENTATION REQUIREMENTS:
+- Semantic table element with proper thead/tbody
+- Mock data for 6 leaderboard entries
+- Rank badges with different colors for 1st (gold), 2nd (silver), 3rd (bronze)
+- #1 position: highlighted row, gold badge, "Highest Bid" badge, warning color for amount
+- Currency formatting using Intl.NumberFormat
+- "View Full Leaderboard" link at bottom
+- Responsive: horizontal scroll on mobile, full table on desktop
+- Focus-visible states on interactive elements
+- Uses design system tokens: warning, primary, foreground, muted-foreground, border, background, muted, ring, transitions
 
 FILES EXPECTED TO CHANGE:
+- src/components/Leaderboard.tsx (created)
+- src/app/page.tsx (updated to include Leaderboard)
+- docs/1.6.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TEST PLAN:
+1. Run npm run typecheck - TypeScript compilation should pass
+2. Run npm run lint - ESLint should pass
+3. Run npm run format:check - Prettier should verify formatting
+4. Run npm run build - Production build should succeed
+5. Manual UI verification at desktop, tablet, mobile widths
+6. Verify ranking order is visually clear
+7. Verify #1 position has special emphasis
+8. Verify currency formatting
+9. Verify hover and focus states
+9. Verify keyboard accessibility
+10. Verify no horizontal overflow
 
 DEFINITION OF DONE:
+- Leaderboard component created and integrated
+- Special emphasis on #1 position
+- Responsive at all breakpoints
+- Keyboard accessible
+- Uses design system tokens
+- All validation checks pass
 
 IMPLEMENTATION NOTES:
+Created src/components/Leaderboard.tsx with:
+- Semantic <table> with thead/tbody and proper scope attributes
+- Mock data for 6 leaderboard entries across different categories
+- Rank badges: #1 (gold/warning), #2 (silver), #3 (bronze), others (muted)
+- #1 position: highlighted row with bg-primary/5 and border-l-4 border-warning, gold rank badge, "Highest Bid" badge, warning-colored amount
+- Currency formatting using Intl.NumberFormat (cents to dollars)
+- Bidder info with avatar initial, name, and email
+- Category tags with muted styling
+- Time ago column
+- "View Full Leaderboard" link at bottom
+- Focus-visible states on links
+- Uses design system tokens: warning, primary, foreground, muted-foreground, border, background, muted, ring, transitions
+
+Updated src/app/page.tsx to include Leaderboard after CategoryCards.
 
 RESULT:
+Task 1.6 completed successfully. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Manual UI verification: Leaderboard displays correctly at desktop, tablet, and mobile widths. #1 position has gold styling, highlighted row, "Highest Bid" badge. Currency formatting correct. Hover states on rows. Focus states visible. No horizontal overflow (table scrolls on mobile).
 
 FILES ACTUALLY CHANGED:
+- src/components/Leaderboard.tsx (created)
+- src/app/page.tsx (updated to include Leaderboard)
+- docs/1.6.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.7: Bid button
