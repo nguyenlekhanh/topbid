@@ -622,6 +622,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.11 - Loading states
 
+### Task 1.11
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable loading-state presentation for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - Reusable Skeleton primitive (src/components/Skeleton.tsx) — div bg-muted motion-safe:animate-pulse aria-hidden, design tokens border/muted
+  - Variants: CategoryCardSkeleton (p-6 rounded-xl border, title/desc lines, stats grid, button), CategoryCardsSkeleton (header skeletons + grid 6), LeaderboardSkeleton (header + 6 rows with rank/avatar/text/tag/amount/time lines), RecentBidsSkeleton (8 rows flex-col sm:flex-row with avatar/name/tag/time + amount/badge), BidModalSkeleton (header + info card + 3 inputs + footer buttons)
+  - Each skeleton mirrors loaded layout dimensions to avoid shift: same rounded-xl, p-6, grid-cols-1 sm:grid-cols-2 lg:grid-cols-3, table row h-8 w-8 etc.
+  - Responsive: grid-cols, hidden sm:flex, no horizontal overflow, same max-w-7xl px-4 etc.
+  - Accessibility: motion-safe prefix respects prefers-reduced-motion, aria-busy/label on section wrappers, aria-hidden on bars
+  - No DB/auth/Stripe, UI-only mock, reusable not duplicated, no new styling system
+- **Files changed**:
+  - src/components/Skeleton.tsx (created)
+  - docs/1.11.txt (created/updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual verification: skeletons match loaded card/table/list heights, responsive mobile/desktop, no layout shift, pulse disabled with prefers-reduced-motion, no overflow
+- **Important technical decisions**:
+  - Single Skeleton base with className prop, motion-safe:animate-pulse
+  - Separate exported skeletons per context reusing base, not copy-pasted divs
+  - Aria semantics for loading sections, hidden from screen readers except busy
+  - Used same border/background/padding as loaded components for faithful placeholder
+  - Preserved Phase 1 work, added only presentation layer
+- **Known limitations**: None
+- **Follow-up work**: Task 1.12 - Error states
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

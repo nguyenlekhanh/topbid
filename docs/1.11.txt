@@ -1,32 +1,75 @@
 ﻿TASK ID: 1.11
 PHASE: 1
 TITLE: Loading states
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create reusable UI-only loading states for Topbid.lol (categories grid, leaderboard, recent bids, bid modal) — mock/static, accessible, responsive.
 
 SCOPE:
+- Reusable Skeleton primitive (src/components/Skeleton.tsx) with motion-safe:animate-pulse + aria-hidden
+- Variant skeletons: CategoryCardSkeleton, CategoryCardsSkeleton (6 cards), LeaderboardSkeleton (header + 6 rows), RecentBidsSkeleton (8 rows), BidModalSkeleton
+- Each skeleton mirrors loaded layout dimensions: rounded-xl border p-6, grid cols, table rows, avatar circles, text lines, buttons
+- No data fetching, mock/static conditions only
+- Respect prefers-reduced-motion via motion-safe prefix
+- Uses design tokens, no new styling system, no DB/realtime/auth/Stripe
 
 OUT OF SCOPE:
+- Error states (1.12), empty states (1.10 done), success (1.13)
+- Supabase / DB / realtime
+- Real loading spinners tied to data fetching
 
 INPUTS / DEPENDENCIES:
+- Task 1.5-1.9 loaded components to match dimensions
+- Task 1.2 design system
 
 IMPLEMENTATION REQUIREMENTS:
+- Reusable component(s) not duplicated markup
+- Dimensions reasonably match loaded content
+- No layout-breaking shifts, no horizontal overflow, responsive
+- Animations respect prefers-reduced-motion
 
 FILES EXPECTED TO CHANGE:
+- src/components/Skeleton.tsx (created)
+- docs/1.11.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck - pass
+2. npm run lint - pass
+3. npm run format:check - pass
+4. npm run build - pass
+5. Visual mobile/desktop, skeleton vs loaded size match, no overflow, reduced-motion disables pulse
 
 DEFINITION OF DONE:
+- Skeleton(s) exist, dimensions match, responsive, accessible (aria-busy/hidden, reduced-motion), all checks pass, docs updated, committed, pushed
 
 IMPLEMENTATION NOTES:
+Created Skeleton.tsx with base Skeleton div bg-muted motion-safe:animate-pulse aria-hidden. Then 5 exports:
+- CategoryCardSkeleton: flex-col rounded-xl border p-6, title/desc lines, stats grid 2 cols, inc line, button block — mirrors CategoryCards article.
+- CategoryCardsSkeleton: section py + header skeletons + grid 6x CategoryCardSkeleton.
+- LeaderboardSkeleton: section header skeletons + rounded-xl border table header flex + divide-y 6 rows each with rank/avatar/text/tag/amount/time skeletons.
+- RecentBidsSkeleton: section bg-muted/20 border-y, header flex, list 8x rows flex-col sm:flex-row with avatar, name/tag/time, amount/badge skeletons, matches RecentBids li layout.
+- BidModalSkeleton: border bg-background p-6 space-y matching BidModal form.
+All use border-border, bg-background, bg-muted, rounded variants — no new tokens. aria-busy/label on section wrappers for screen readers. motion-safe ensures reduce-motion disables pulse.
+Integrated nowhere automatically — UI-only preview components ready for future isLoading conditional or Suspense — preserves Phase 1 work.
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Visual: skeleton rounded-xl p-6 matches card, grid 1→2→3 cols, table row heights match leaderboard, list rows flex-col→row, no overflow, pulse disabled when prefers-reduced-motion.
 
 FILES ACTUALLY CHANGED:
+- src/components/Skeleton.tsx (created - 130 lines)
+- docs/1.11.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.12 - Error states
