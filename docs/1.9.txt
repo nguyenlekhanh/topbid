@@ -1,32 +1,81 @@
 ﻿TASK ID: 1.9
 PHASE: 1
 TITLE: Recent bids feed
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a UI-only recent bids feed that communicates live bidding activity with strong visual hierarchy for amount, bidder, category and time, responsive and accessible.
 
 SCOPE:
+- RecentBids component (src/components/RecentBids.tsx) — Client? Server — uses mock static data
+- Header with title + "View all" link
+- Feed list of 8 mock recent bids (newest first)
+- Visual hierarchy: bid amount (xl bold primary on hover), bidder name (medium), category pill (muted), relative time (xs muted), email (xs)
+- Avatar initials circle (primary/10)
+- "New" badge with success/animate-pulse
+- Empty state: dashed border card when no bids
+- Loading-friendly structure (list ready for skeleton, empty case handled)
+- Responsive: stacked column on mobile, row flex on sm+, no horizontal overflow
+- Accessible: section aria-labelledby, ul role list, li items, time element, focus-visible on View all link
 
 OUT OF SCOPE:
+- Supabase queries / realtime subscription (Phase 5)
+- Database writes
+- Authentication / Stripe
+- Real relative time calculation / live updates
+- Infinite scroll / pagination
 
 INPUTS / DEPENDENCIES:
+- Task 1.2 design system
+- Task 1.6 Leaderboard style reference
 
 IMPLEMENTATION REQUIREMENTS:
+- Use design tokens: foreground, muted-foreground, muted, border, background, primary, success, ring
+- Mock data with id, bidderName, bidderEmail, category, amount (cents), timeAgo
+- Currency via Intl.NumberFormat cents->dollars
+- No secrets, no extra deps
 
 FILES EXPECTED TO CHANGE:
+- src/components/RecentBids.tsx (created)
+- src/app/page.tsx (updated to include RecentBids)
+- docs/1.9.txt (created/updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TEST PLAN:
+1. npm run typecheck - pass
+2. npm run lint - pass
+3. npm run format:check - pass
+4. npm run build - pass
+5. Visual: mobile stacked vs desktop row, amount prominent, no overflow, success New badge, hover bg-muted/50
+6. Accessibility: heading hierarchy, list semantics, time element, View all focus ring
 
 DEFINITION OF DONE:
+- Feed renders mock bids with hierarchy, responsive, accessible, all checks pass, docs updated, commit pushed
 
 IMPLEMENTATION NOTES:
+Created RecentBids.tsx with 8 mock bids sorted newest first. Helper formatCurrency and getInitials. Empty state branch returns dashed card. Main branch: section bg-muted/20 border-y, header flex-col sm:flex-row, h2 + View all link with focus-visible. List: rounded-xl border bg-background, ul divide-y, li flex-col sm:flex-row, avatar hidden on mobile, bidder/category/time inline, amount text-lg sm:text-xl font-bold group-hover:text-primary, New badge success/10. Footer note about mock.
+Integrated into page.tsx after Leaderboard. Keeps UI-only, no data fetching.
+Fixes: lint:fix for prettier on multiline attrs.
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Visual: responsive stacked→row, amount hierarchy clear, category pill + time muted, New badge visible, hover transition, no overflow, keyboard focus on View all.
 
 FILES ACTUALLY CHANGED:
+- src/components/RecentBids.tsx (created - 210 lines)
+- src/app/page.tsx (updated - added RecentBids import + jsx)
+- docs/1.9.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.10 - Empty states

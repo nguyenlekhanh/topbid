@@ -550,6 +550,43 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.9 - Recent bids feed
 
+### Task 1.9
+
+- **Date**: 2026-08-23
+- **Objective**: Create UI-only recent bids feed for Topbid.lol homepage
+- **Status**: Completed
+- **What was implemented**:
+  - RecentBids component (src/components/RecentBids.tsx) with section aria-labelledby
+  - Mock 8 recent bids (newest first) with id, bidderName, bidderEmail, category, amount (cents), timeAgo
+  - Visual hierarchy: amount text-lg sm:text-xl font-bold (primary on hover), bidderName medium, category pill muted, time xs muted, email xs muted
+  - Avatar initials circle hidden on mobile, success New badge with animate-pulse
+  - Empty state: dashed border card when mock array empty
+  - Responsive layout: flex-col on mobile, flex-row sm:items-center sm:justify-between, no horizontal overflow
+  - Header with title + View all link (focus-visible)
+  - List: rounded-xl border divide-y, li hover:bg-muted/50
+  - Uses design tokens: foreground, muted-foreground, muted, border, background, primary, success, ring
+  - Integrated into page.tsx after Leaderboard
+- **Files changed**:
+  - src/components/RecentBids.tsx (created)
+  - src/app/page.tsx (updated to import + render RecentBids)
+  - docs/1.9.txt (created/updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual verification: feed displays at desktop (row) and mobile (stacked), amount hierarchy clear, category pill/time readable, New badge visible, hover, View all focus ring, no overflow
+- **Important technical decisions**:
+  - Mock static data, newest first sort already
+  - Currency via Intl.NumberFormat, initials via getInitials helper
+  - ul role list + time element for semantics, empty branch handled
+  - Reuse design system, no extra deps, no realtime
+  - Section bg-muted/20 border-y for visual separation from Leaderboard
+- **Known limitations**: None
+- **Follow-up work**: Task 1.10 - Empty states
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

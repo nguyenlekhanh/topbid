@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**1.8 completed** — Next recommended: 1.9
+**1.9 completed** — Next recommended: 1.10
 
 ## Completed Tasks
 
@@ -28,6 +28,7 @@
 - 1.6: Leaderboard ✓
 - 1.7: Bid button ✓
 - 1.8: Bid modal (email + amount) ✓
+- 1.9: Recent bids feed ✓
 
 ## Tasks in Progress
 
@@ -67,6 +68,7 @@ _None_
 - Leaderboard implemented (top bidders table, #1 emphasis, currency formatting)
 - Bid button component implemented (reusable, variants, sizes, loading state, accessible)
 - Bid modal implemented (email + amount, mock calculation, accessible dialog, focus trap)
+- Recent bids feed implemented (mock 8 bids, amount hierarchy, category pill, time ago, responsive, empty state)
 
 ## Current Environment/Setup Status
 
@@ -84,8 +86,8 @@ _None_
 
 ## Next Recommended Task
 
-**1.9 — Recent bids feed**
+**1.10 — Empty states**
 
 ## Notes
 
-Task 1.8 completed successfully. BidModal created with email/name/amount fields, mock minimum bid calculation, backdrop click + Escape to close, auto-focus, body scroll lock, and responsive accessible dialog. CategoryCards now opens modal instead of navigating.
+Task 1.9 completed successfully. RecentBids feed created with 8 mock bids, strong amount hierarchy, category pill + time, responsive stacked→row, empty-state handling, and accessible list markup.
