@@ -52,9 +52,23 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.3 - Configure Tailwind CSS
 
 ### Task 0.3
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure Tailwind CSS
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Verified Tailwind CSS v4 is already correctly configured by create-next-app. Uses new @import "tailwindcss" syntax with @theme directive for design tokens.
+- **Files changed**: None (configuration already correct)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run build`: PASSED (Tailwind classes processed successfully)
+- **Important technical decisions**: 
+  - Tailwind v4 with @import syntax (no tailwind.config.js needed)
+  - PostCSS plugin: @tailwindcss/postcss
+  - Design tokens in globals.css using @theme inline
+  - Dark mode via prefers-color-scheme media query
+  - Geist fonts via CSS variables
+- **Known limitations**: None
+- **Follow-up work**: Task 0.4 - Configure ESLint + Prettier
 
 ### Task 0.4
 - **Date**: Not started
