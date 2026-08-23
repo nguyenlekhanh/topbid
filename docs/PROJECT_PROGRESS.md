@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.8 completed** — Next recommended: 2.9
+**2.9 completed** — Next recommended: 2.10
 
 ## Completed Tasks
 
@@ -43,6 +43,7 @@
 - 2.6: Seed categories ✓
 - 2.7: Category queries (list, get) ✓
 - 2.8: Highest bid query ✓
+- 2.9: Leaderboard query ✓
 
 ## Tasks in Progress
 
@@ -96,6 +97,8 @@ _None_
 - RLS migration created (RLS enabled on categories/bids, public SELECT active categories and paid bids only, no public writes, service_role bypass)
 - Seed categories migration created (6 active MVP categories, idempotent ON CONFLICT DO NOTHING, integer cents, preserved UI slugs)
 - Category queries created (typed listCategories/getCategoryBySlug via server client, RLS active-only, is_active enforced, not-found handled)
+- Highest bid query created (getHighestBidForCategory via server client, RLS paid-only, amount DESC limit 1)
+- Leaderboard query created (getLeaderboard: paid bids ranked amount DESC + created_at tie-breaker, embedded category info, optional limit default 10)
 
 ## Current Environment/Setup Status
 
@@ -113,10 +116,12 @@ _None_
 
 ## Next Recommended Task
 
-**2.8 — Highest bid query**
+**2.10 — Recent bids query**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.7 completed successfully. Category queries created in src/lib/categories.ts with typed server-client access, RLS active-only enforcement, maybeSingle not-found handling, and predictable error throwing.
+Task 2.8 completed successfully. Highest-bid query created in src/lib/bids.ts via server client, RLS paid-only, amount DESC limit 1, maybeSingle null handling.
+
+Task 2.9 completed successfully. Leaderboard query added to src/lib/bids.ts returning paid bids ranked amount DESC with created_at tie-breaker, embedded category info, and optional limit (default 10).

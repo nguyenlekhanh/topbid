@@ -1,32 +1,67 @@
 ﻿TASK ID: 2.9
 PHASE: 2
 TITLE: Leaderboard query
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a reusable server-side leaderboard query returning paid bids ranked by amount DESC, with bidder/category info for the leaderboard UI.
 
 SCOPE:
+- Extend src/lib/bids.ts (existing bid data-access module, no new files/deps)
+- New types: LeaderboardCategory (id, slug, name), LeaderboardEntry (rank, bid, category)
+- getLeaderboard(options?: { limit?: number }): server client, status='paid' filter, amount DESC + created_at DESC deterministic tie-breaker, optional limit default 10, embeds related category via FK relationship, maps rank 1..n
 
 OUT OF SCOPE:
+- Recent-bids query (2.10), bid engine/Stripe/realtime/auth/UI wiring, schema/migration/RLS changes, dedup-per-category business rules (not specified in plan)
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1-2.8 (schema, indexes incl. idx_bids_category_status, RLS bids_public_select_paid, seed, category/bid queries)
+- src/lib/supabase-server.ts conventions from categories.ts/bids.ts
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only via supabase-server anon client; service-role never imported
+- Respect RLS: only paid bids publicly visible; app-level .eq('status','paid') as defense in depth
+- Include bidder/category info needed by UI (bidder_name/email on Bid, embedded category name/slug)
+- Deterministic ordering; clean empty result []; predictable error throwing
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- docs/2.9.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Inspect server-client usage, RLS paid-only, join/embed typing, rank mapping, limit handling
 
 DEFINITION OF DONE:
+- Typed reusable query exists, RLS-compliant, ranked DESC, includes category info, all checks pass
 
 IMPLEMENTATION NOTES:
+Extended src/lib/bids.ts following existing conventions (async createClient, field allowlist). Query: .from('bids').select(`${BID_FIELDS}, categories (id, slug, name)`).eq('status','paid').order('amount',{ascending:false}).order('created_at',{ascending:false}).limit(limit). Embedded rows cast via `as unknown as` because generated DB types are absent (Supabase infers embeds as arrays). Rank assigned by array position (1-based) after sorting. Default limit 10; invalid/non-finite limits fall back to 10. No per-category dedup — plan does not specify it; consumers may pass any limit.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED after fixing embed cast and Prettier formatting. Inspection confirmed server client, RLS paid-only boundary preserved, category embed present for UI, deterministic ranking.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (extended - LeaderboardCategory/LeaderboardEntry types + getLeaderboard)
+- docs/2.9.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, documented as limitation
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.10 — Recent bids query

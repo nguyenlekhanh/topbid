@@ -1053,6 +1053,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live DB verification requires supabase db push + Docker; Phase 1 UI still mock-driven until wiring tasks later)
 - **Follow-up work**: Task 2.9 — Leaderboard query
 
+### Task 2.9
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable server-side leaderboard query (paid bids ranked amount DESC)
+- **Status**: Completed
+- **What was implemented**:
+  - Extended src/lib/bids.ts with LeaderboardCategory type (id, slug, name), LeaderboardEntry type (rank, bid, category), and getLeaderboard(options?: { limit?: number })
+  - Query: .from('bids').select(`${BID_FIELDS}, categories (id, slug, name)`).eq('status','paid').order('amount',{ascending:false}).order('created_at',{ascending:false}).limit(limit)
+  - Default limit 10; invalid/non-finite limit values fall back to 10; returns [] when no paid bids
+  - Rank assigned 1..n by sorted array position; embedded category via FK relationship for UI display
+  - Server client only (supabase-server anon); RLS bids_public_select_paid preserved plus app-level .eq('status','paid') defense in depth; no service_role import, no schema/migration changes
+- **Files changed**:
+  - src/lib/bids.ts (extended — new types + getLeaderboard)
+  - docs/2.9.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED (after casting embed via `as unknown as` — Supabase infers embeds as arrays without generated DB types)
+  - `npm run lint`: PASSED (after Prettier auto-fix on formatting)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (server client, RLS boundary, deterministic ordering, rank mapping, limit handling)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, documented as limitation
+- **Important technical decisions**:
+  - Added created_at DESC secondary sort so equal-amount ties are deterministic rather than DB-order-dependent
+  - No per-category dedup — plan specifies "paid bids ranked by amount DESC" and no such rule exists; consumers control result size via limit
+  - Kept leaderboard query in the existing bids module (no new files/deps) consistent with categories.ts/bids.ts conventions
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 2.10 — Recent bids query
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
