@@ -212,3 +212,90 @@ export async function getIncrementedMinimumBid(categorySlug: string): Promise<nu
 
   return highestBid.amount + category.increment;
 }
+
+export type MinimumBidBasis = 'starting_bid' | 'highest_bid_plus_increment';
+
+export type MinimumBidInfo = {
+  categoryId: string;
+  categorySlug: string;
+  minimumBid: number;
+  basis: MinimumBidBasis;
+};
+
+/**
+ * Determine the current minimum valid bid for a category from authoritative DB data.
+ * - No paid bids -> minimum = category.starting_bid
+ * - Existing paid highest bid -> minimum = highest_bid.amount + category.increment
+ * - Returns null when the category does not exist or is inactive
+ * - Server-side only (uses supabase-server anon client; respects RLS); never trusts
+ *   client-provided minimums or category data
+ */
+export async function getMinimumBidForCategory(
+  categorySlug: string
+): Promise<MinimumBidInfo | null> {
+  const category = await getCategoryBySlug(categorySlug);
+
+  if (!category) {
+    return null;
+  }
+
+  const highestBid = await getHighestBidForCategory(category.id);
+
+  if (!highestBid) {
+    return {
+      categoryId: category.id,
+      categorySlug: category.slug,
+      minimumBid: category.starting_bid,
+      basis: 'starting_bid',
+    };
+  }
+
+  return {
+    categoryId: category.id,
+    categorySlug: category.slug,
+    minimumBid: highestBid.amount + category.increment,
+    basis: 'highest_bid_plus_increment',
+  };
+}
+
+export type BidAmountValidationFailureReason =
+  'invalid_amount' | 'category_not_found' | 'amount_below_minimum';
+
+export type BidAmountValidation =
+  | { valid: true; minimumBid: number; basis: MinimumBidBasis }
+  | { valid: false; reason: BidAmountValidationFailureReason; minimumBid: number | null };
+
+/**
+ * Validate a proposed bid amount against the server-calculated current minimum.
+ * - The amount parameter is typed `unknown` deliberately: it originates from the client,
+ *   so its shape is validated at runtime regardless of any upstream typing
+ * - The minimum is always recomputed from authoritative DB data via getMinimumBidForCategory;
+ *   client-supplied minimums are never used
+ * - Amount equal to the minimum is valid (it is exactly the required next bid)
+ * - Deeper category validation is Task 3.4; pending-bid creation is Task 3.5
+ */
+export async function validateBidAmount(
+  categorySlug: string,
+  amount: unknown
+): Promise<BidAmountValidation> {
+  if (
+    typeof amount !== 'number' ||
+    !Number.isFinite(amount) ||
+    !Number.isInteger(amount) ||
+    amount <= 0
+  ) {
+    return { valid: false, reason: 'invalid_amount', minimumBid: null };
+  }
+
+  const minimum = await getMinimumBidForCategory(categorySlug);
+
+  if (!minimum) {
+    return { valid: false, reason: 'category_not_found', minimumBid: null };
+  }
+
+  if (amount < minimum.minimumBid) {
+    return { valid: false, reason: 'amount_below_minimum', minimumBid: minimum.minimumBid };
+  }
+
+  return { valid: true, minimumBid: minimum.minimumBid, basis: minimum.basis };
+}

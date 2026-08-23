@@ -1,32 +1,71 @@
 ﻿TASK ID: 3.3
 PHASE: 3
 TITLE: Validate bid amount server-side
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Validate a proposed (untrusted) bid amount against the server-calculated current minimum valid bid. The minimum is always recomputed from authoritative DB data; client-supplied minimums or category data are never trusted.
 
 SCOPE:
+- Extend src/lib/bids.ts (existing bid module; no new files/deps), purely additive to Tasks 3.1/3.2
+- New getMinimumBidForCategory(categorySlug): Promise<MinimumBidInfo | null> - unified authoritative minimum resolver composing the two business rules in one query pass
+- New validateBidAmount(categorySlug, amount: unknown): Promise<BidAmountValidation> - discriminated-union validation result
+- Runtime shape validation of the amount parameter (typeof number, finite, integer, > 0)
 
 OUT OF SCOPE:
+- Deeper category validation beyond existence/active lookup (Task 3.4), pending bid record creation (3.5), concurrency/locking (3.6), duplicate transaction prevention (3.7), test infrastructure (3.8), Stripe/checkout/API-route wiring, Zod schema layering (Phase 9 hardening), schema/migration/RLS changes
 
 INPUTS / DEPENDENCIES:
+- Tasks 3.1/3.2 rules (starting_bid; highest_paid_bid.amount + category.increment) - now composed in a single resolver
+- Task 2.7 getCategoryBySlug, Task 2.8 getHighestBidForCategory (authoritative reads)
+- Task 2.4 constraints (amount/increment INTEGER cents >= 0)
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only via supabase-server anon client chain; respects RLS; no service-role import
+- Minimum determined exclusively from DB values; never from client input
+- amount typed `unknown` deliberately so runtime guards are enforced regardless of upstream typing
+- Validation outcomes: invalid_amount (non-number/non-finite/non-integer/<= 0), category_not_found (missing/inactive category; deeper checks deferred to 3.4), amount_below_minimum (amount < computed minimum, with minimum echoed for UX)
+- amount === minimum is valid (it is exactly the required next bid); over-bidding allowed by plan
+- Discriminated union return type for exhaustive, type-safe consumer handling
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- docs/3.3.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Code inspection: both minimum branches, boundary equality, invalid-shape rejection, null-contract handling, RLS compliance
 
 DEFINITION OF DONE:
+- Reusable server-side amount validator exists that recomputes the authoritative minimum per business rule and never trusts client data; all checks pass; prior task code untouched
 
 IMPLEMENTATION NOTES:
+Added three exports to src/lib/bids.ts after getIncrementedMinimumBid: MinimumBidBasis ('starting_bid' | 'highest_bid_plus_increment'), MinimumBidInfo, and BidAmountValidation plus failure-reason type. getMinimumBidForCategory performs ONE category fetch + ONE highest-bid fetch and applies both rules directly (deliberately not implemented by calling getInitialMinimumBid/getIncrementedMinimumBid, which would double-query; those two functions remain untouched as public API from Tasks 3.1/3.2). validateBidAmount(categorySlug, amount) validates amount shape first (rejects non-numbers, NaN/Infinity, non-integers, <= 0 -> 'invalid_amount'), then resolves the minimum (null -> 'category_not_found'), then compares (amount < minimum -> 'amount_below_minimum' echoing the required minimum; equality passes). One Prettier union-formatting fix was applied via npm run lint:fix during validation.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED. Inspection confirmed: authoritative recomputation on every call, untrusted-amount runtime guards, boundary equality accepted, discriminated-union result enables exhaustive handling, no changes to Tasks 1.1-3.2 code.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (extended - MinimumBidBasis/MinimumBidInfo/BidAmountValidation types + getMinimumBidForCategory + validateBidAmount)
+- docs/3.3.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED (after one Prettier union-format auto-fix)
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-3.2; NOT claimed as passing
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Task 3.4 — Validate category server-side

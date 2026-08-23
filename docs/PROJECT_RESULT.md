@@ -1171,6 +1171,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.3 — Validate bid amount server-side
 
+### Task 3.3
+
+- **Date**: 2026-08-23
+- **Objective**: Server-side validation of a proposed bid amount against the current minimum valid bid, recomputed from authoritative DB data (never trusting client-provided minimums/category data)
+- **Status**: Completed
+- **What was implemented**:
+  - getMinimumBidForCategory(categorySlug): Promise<MinimumBidInfo | null> — unified authoritative minimum resolver: no paid bids -> starting_bid; existing paid highest -> highest_bid.amount + category.increment; single category fetch + single highest-bid fetch per call
+  - validateBidAmount(categorySlug, amount: unknown): Promise<BidAmountValidation> — validates untrusted amount shape at runtime (number, finite, integer, > 0), resolves the authoritative minimum, compares; equality to the minimum passes
+  - Discriminated-union result: { valid: true, minimumBid, basis } | { valid: false, reason: 'invalid_amount' | 'category_not_found' | 'amount_below_minimum', minimumBid }
+  - Server-side only via supabase-server anon client chain; respects RLS; no service-role import
+- **Files changed**:
+  - src/lib/bids.ts (extended — new types + two functions; Tasks 1.1-3.2 code untouched)
+  - docs/3.3.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (after one Prettier union-format auto-fix via lint:fix)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (both minimum branches, boundary equality, invalid-shape rejection, RLS compliance)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-3.2; NOT claimed as passing
+- **Important technical decisions**:
+  - Unified resolver implemented directly over getCategoryBySlug + getHighestBidForCategory rather than calling getInitialMinimumBid/getIncrementedMinimumBid, avoiding double queries; those remain untouched public API from Tasks 3.1/3.2
+  - amount typed `unknown` deliberately so runtime guards are enforced regardless of upstream typing ("never trust client input")
+  - Failure reasons are stable string literals for later API-route mapping; Zod layering deferred to Phase 9 hardening
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 3.4 — Validate category server-side
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
