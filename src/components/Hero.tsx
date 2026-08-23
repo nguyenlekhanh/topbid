@@ -3,23 +3,23 @@ export default function Hero() {
     <section className="relative py-16 sm:py-24 lg:py-32 overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground tracking-tight text-pretty">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground tracking-tight text-pretty motion-safe:animate-[fadeInUp_400ms_ease-out] motion-reduce:animate-none">
             Bid to Lead. <span className="text-primary">Win the Spotlight.</span>
           </h1>
-          <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty">
+          <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty motion-safe:animate-[fadeInUp_400ms_ease-out_100ms_both] motion-reduce:animate-none">
             Pick a category. Place your bid. Become the #1. Real-time leaderboards, instant outbid
             notifications, and viral share moments.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 motion-safe:animate-[fadeInUp_400ms_ease-out_200ms_both] motion-reduce:animate-none">
             <a
               href="/categories"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-primary-foreground font-medium text-base transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-primary-foreground font-medium text-base transition-all will-change-transform hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11 motion-reduce:transform-none motion-reduce:shadow-none"
             >
               Start Bidding
             </a>
             <a
               href="/leaderboard"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-all hover:bg-muted hover:border-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11"
             >
               View Leaderboard
             </a>

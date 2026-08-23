@@ -87,12 +87,12 @@ export default function BidModal({ category, isOpen, onClose }: BidModalProps) {
       aria-labelledby="bid-modal-title"
     >
       <div
-        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm motion-safe:animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl motion-safe:animate-[scaleIn_200ms_ease-out] motion-reduce:animate-none will-change-transform">
         <div className="sticky top-0 flex items-center justify-between border-b border-border bg-background px-4 sm:px-6 py-4">
           <h2 id="bid-modal-title" className="text-lg font-semibold text-foreground">
             {isSuccess ? 'Success! (demo)' : `Bid on ${category.name}`}

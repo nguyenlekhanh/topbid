@@ -30,7 +30,7 @@ export default function Navbar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md px-2 py-1"
+                className="relative text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md px-2 py-1 after:absolute after:bottom-0 after:left-2 after:right-2 after:h-px after:bg-foreground after:scale-x-0 after:transition-transform after:duration-200 hover:after:scale-x-100 motion-reduce:after:transition-none"
               >
                 {item.name}
               </Link>
@@ -82,13 +82,16 @@ export default function Navbar() {
         </div>
 
         {mobileMenuOpen && (
-          <div id="mobile-menu" className="md:hidden py-4 border-t border-border">
+          <div
+            id="mobile-menu"
+            className="md:hidden py-4 border-t border-border motion-safe:animate-[slideDown_200ms_ease-out] motion-reduce:animate-none"
+          >
             <div className="flex flex-col gap-2">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-base font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md px-3 py-3 min-h-11 flex items-center"
+                  className="text-base font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground hover:translate-x-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md px-3 py-3 min-h-11 flex items-center motion-reduce:transform-none"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.name}

@@ -17,16 +17,18 @@ export default function BidButton({
   ...props
 }: BidButtonProps) {
   const baseStyles =
-    'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-in-out min-h-11 ' +
+    'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-in-out min-h-11 will-change-transform ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
-    'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:hover:text-primary-foreground ' +
-    'active:scale-[0.98]';
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:hover:text-primary-foreground disabled:hover:shadow-none ' +
+    'active:scale-[0.98] active:shadow-none';
 
   const variantStyles = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary',
+    primary:
+      'bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-md hover:-translate-y-px active:bg-primary active:translate-y-0 active:shadow-none shadow-sm',
+    secondary:
+      'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-sm active:bg-secondary active:shadow-none',
     outline:
-      'bg-transparent border border-border text-foreground hover:bg-muted active:bg-muted/50',
+      'bg-transparent border border-border text-foreground hover:bg-muted hover:border-foreground/10 active:bg-muted/50',
   };
 
   const sizeStyles = {

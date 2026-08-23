@@ -125,11 +125,11 @@ export default function RecentBids() {
           </div>
           <a
             href="/bids"
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md self-start sm:self-auto"
+            className="group inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md self-start sm:self-auto"
           >
             View all
             <svg
-              className="h-4 w-4"
+              className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -145,7 +145,7 @@ export default function RecentBids() {
             {mockRecentBids.map((bid) => (
               <li
                 key={bid.id}
-                className="group flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 hover:bg-muted/50 transition-colors focus-within:bg-muted/50"
+                className="group flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 hover:bg-muted/50 transition-colors duration-200 ease-out focus-within:bg-muted/50 motion-reduce:transition-none"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div

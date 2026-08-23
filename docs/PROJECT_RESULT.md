@@ -762,6 +762,48 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.15 - UI polish (animations, transitions)
 
+### Task 1.15
+
+- **Date**: 2026-08-23
+- **Objective**: UI polish (animations and transitions) for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - Globals: kept scaleIn, added fadeIn, fadeInUp (8px), slideDown (-4px) keyframes — all motion-safe, reduced-motion disables via existing media query
+  - Navbar: desktop links underline scale-x 0→100 hover 200ms, mobile menu slideDown 200ms, links hover translate-x-1 200ms
+  - Hero: h1 fadeInUp 400ms, p fadeInUp 100ms delay, CTA container 200ms delay, Start Bidding hover -translate-y-px shadow-md, View Leaderboard hover border 10%
+  - BidButton: base will-change-transform, hover shadow-md/lift, active translate-y-0 shadow-none, transition-all 200ms
+  - CategoryCards: article hover -translate-y-1 shadow-xl duration 200 ease-out will-change-transform motion-reduce none
+  - Leaderboard: tr duration 150 ease-out motion-reduce none
+  - RecentBids: li duration 200 ease-out, View all arrow translate-x-1 group-hover
+  - BidModal: backdrop fadeIn 200ms, dialog scaleIn 200ms will-change-transform, both motion-reduce none
+  - Preserved hierarchy, layout, colors, no redesign, no new deps, subtle purposeful fast
+- **Files changed**:
+  - src/app/globals.css
+  - src/components/Navbar.tsx
+  - src/components/Hero.tsx
+  - src/components/BidButton.tsx
+  - src/components/CategoryCards.tsx
+  - src/components/Leaderboard.tsx
+  - src/components/RecentBids.tsx
+  - src/components/BidModal.tsx
+  - docs/1.15.txt
+  - docs/PROJECT_PROGRESS.md
+  - docs/PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual UI verification: hover lifts/shadows fast subtle, navbar underline grows, mobile slideDown, Hero fades staggered, modal fades/scales, arrow slides, no shift/overflow, 320px usable
+  - Reduced-motion verification: prefers-reduced-motion disables scale/fade/slide via global 0.01ms and motion-safe/motion-reduce classes
+- **Important technical decisions**:
+  - Use existing transition tokens and Tailwind utilities, no animation library
+  - Prefer opacity/transform/color/shadow, small scale, duration 150-400ms
+  - motion-safe prefix + global reduce-motion ensures accessibility
+  - No layout dimension animations, no bouncing/flashing, will-change-transform only where hover transform used
+- **Known limitations**: None
+- **Follow-up work**: Phase 1 complete — next Phase 2 Database (2.1 Categories schema)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

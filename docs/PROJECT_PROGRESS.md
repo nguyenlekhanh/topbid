@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-**Phase 1 — UI / Design**
+**Phase 1 — UI / Design (complete)** → **Phase 2 — Database**
 
 ## Current Task
 
-**1.14 completed** — Next recommended: 1.15
+**1.15 completed** — Next recommended: 2.1
 
 ## Completed Tasks
 
@@ -34,6 +34,7 @@
 - 1.12: Error states ✓
 - 1.13: Success state (post-bid) ✓
 - 1.14: Responsive mobile design ✓
+- 1.15: UI polish (animations, transitions) ✓
 
 ## Tasks in Progress
 
@@ -79,6 +80,7 @@ _None_
 - Error states implemented (reusable ErrorState + 6 variants, card/inline, user-friendly, Retry, alert live)
 - Success state implemented (reusable SuccessState with amount/category/reference, mock demo disclaimer, View Leaderboard/Continue Browsing, motion-safe)
 - Responsive mobile design audited and refined (320/375/390/430 verified, overflow fixed, touch targets 44px, tables/cards/modals readable)
+- UI polish applied (subtle animations: fadeInUp, slideDown, scaleIn, lift/shadow, underline, motion-safe)
 
 ## Current Environment/Setup Status
 
@@ -96,8 +98,10 @@ _None_
 
 ## Next Recommended Task
 
-**1.15 — UI polish (animations, transitions)**
+**2.1 — Categories schema**
 
 ## Notes
 
-Task 1.14 completed successfully. Responsive audit at 320/375/390/430/tablet/desktop found and fixed overflow, cramped p-6, Leaderboard scroll, touch targets, Hero CTA stacking, BidModal padding — all verified.
+Task 1.15 completed successfully. Subtle polish added: Navbar underline + slideDown, Hero fadeInUp staggered, CategoryCards lift, Leaderboard/RecentBids hover, BidButton shadow/lift, BidModal fade+scale, all motion-safe and verified 320px usable.
+
+Phase 1 (UI/Design) is now complete.

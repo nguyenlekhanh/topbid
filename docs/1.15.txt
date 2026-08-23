@@ -1,32 +1,89 @@
 ﻿TASK ID: 1.15
 PHASE: 1
 TITLE: UI polish (animations, transitions)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add subtle, purposeful, fast animations/transitions to polish existing UI without redesign, respecting design system and prefers-reduced-motion.
 
 SCOPE:
+- Audit existing components for motion polish
+- Enhance Navbar underline + mobile slideDown, BidButton hover shadow/lift, CategoryCards lift shadow, Leaderboard/RecentBids hover transitions, Hero fadeInUp, BidModal backdrop fadeIn + dialog scaleIn, link arrow translates
+- Use existing transition tokens and Tailwind utilities, no new animation library, no new components, preserve hierarchy
+- Keep animations subtle (opacity, transform, color, shadow, small scale, 150-400ms)
+- Respect prefers-reduced-motion for non-essential motion
+- No backend, no new design system
 
 OUT OF SCOPE:
+- Redesign / new colors
+- New animation library / deps
+- Large layout dimension animations, bouncing/flashing
+- Supabase / Stripe / auth
 
 INPUTS / DEPENDENCIES:
+- Tasks 1.1-1.14 completed
+- Existing design tokens and components
 
 IMPLEMENTATION REQUIREMENTS:
+- Subtle fast purposeful, prefer opacity/transform/color/shadow/scale
+- Preserve accessibility, respect reduced-motion
+- No layout shift/overflow, no excessive motion
 
 FILES EXPECTED TO CHANGE:
+- src/app/globals.css
+- src/components/Navbar.tsx
+- src/components/Hero.tsx
+- src/components/BidButton.tsx
+- src/components/CategoryCards.tsx
+- src/components/Leaderboard.tsx
+- src/components/RecentBids.tsx
+- src/components/BidModal.tsx
+- docs/1.15.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck - pass
+2. npm run lint - pass
+3. npm run format:check - pass
+4. npm run build - pass
+5. Manual desktop/mobile hover/active/focus, no shift/overflow, reduced-motion disables
 
 DEFINITION OF DONE:
+- Subtle polish applied where appropriate, no redesign, all checks pass, 320px usable, docs updated
 
 IMPLEMENTATION NOTES:
+- globals.css: keep scaleIn (0.95→1), add fadeIn, fadeInUp (8px translate), slideDown (-4px). Existing reduced-motion media query already disables animations.
+- Navbar: desktop links added after pseudo scale-x 0→100 on hover with 200ms, mobile menu animate slideDown 200ms, links hover translate-x-1.
+- Hero: h1 fadeInUp 400ms, p fadeInUp 400ms 100ms delay both, CTA container fadeInUp 200ms delay, Start Bidding button hover -translate-y-px shadow-md, View Leaderboard hover border 10% — motion-reduce disables.
+- BidButton: base added will-change-transform, disabled shadow none, primary hover shadow-md -translate-y-px active translate-y-0, secondary hover shadow-sm, outline hover border 10% — all 200ms ease.
+- CategoryCards: article hover -translate-y-1 shadow-xl duration 200 ease-out will-change-transform motion-reduce none.
+- Leaderboard: tr transition-colors duration 150 ease-out motion-reduce none.
+- RecentBids: li transition 200 ease-out, View all group hover translate-x-1.
+- BidModal: backdrop motion-safe fadeIn 200ms, dialog motion-safe scaleIn 200ms will-change-transform — both disabled reduce.
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Manual: hover lifts/shadows fast subtle, navbar underline grows, mobile menu slides, Hero fades up staggered, modal fades/scales, links arrow slides, no shift/overflow, reduced-motion disables via media query, 320px remains usable.
 
 FILES ACTUALLY CHANGED:
+- src/app/globals.css (added fadeIn/fadeInUp/slideDown)
+- src/components/Navbar.tsx (underline + slideDown + translate)
+- src/components/Hero.tsx (fadeInUp staggered + CTA lift)
+- src/components/BidButton.tsx (shadow/lift will-change)
+- src/components/CategoryCards.tsx (lift shadow)
+- src/components/Leaderboard.tsx (duration ease)
+- src/components/RecentBids.tsx (duration + arrow translate)
+- src/components/BidModal.tsx (backdrop fadeIn + dialog scaleIn)
+- docs/1.15.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Phase 1 complete. Next: Phase 2 Database (2.1)

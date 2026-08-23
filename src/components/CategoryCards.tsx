@@ -121,7 +121,7 @@ export default function CategoryCards() {
               {mockCategories.map((category) => (
                 <article
                   key={category.id}
-                  className="group relative flex flex-col rounded-xl border border-border bg-background p-4 sm:p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                  className="group relative flex flex-col rounded-xl border border-border bg-background p-4 sm:p-6 transition-all duration-200 ease-out will-change-transform hover:-translate-y-1 hover:shadow-xl hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 motion-reduce:transform-none"
                   role="listitem"
                 >
                   <div

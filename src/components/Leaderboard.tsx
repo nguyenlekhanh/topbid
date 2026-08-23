@@ -143,7 +143,7 @@ export default function Leaderboard() {
               {mockLeaderboard.map((entry) => (
                 <tr
                   key={entry.rank}
-                  className={`transition-colors hover:bg-muted/50 ${
+                  className={`transition-colors duration-150 ease-out hover:bg-muted/50 motion-reduce:transition-none ${
                     entry.rank === 1 ? 'bg-primary/5 border-l-4 border-warning' : ''
                   }`}
                 >
