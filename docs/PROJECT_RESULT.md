@@ -468,6 +468,52 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.7 - Bid button
 
+### Task 1.7
+
+- **Date**: 2026-08-23
+- **Objective**: Create a reusable Bid button component with clear primary visual hierarchy and all interactive states
+- **Status**: Completed
+- **What was implemented**:
+  - BidButton component (src/components/BidButton.tsx) as a Client Component
+  - Variants: primary (bg-primary), secondary (bg-secondary), outline (border-border)
+  - Sizes: sm (px-3 py-1.5), md (px-4 py-2.5), lg (px-6 py-3)
+  - Loading state with animated spinner
+  - Disabled state with opacity-50 and cursor-not-allowed
+  - Focus-visible state using design system ring tokens
+  - Active state with scale-[0.98] transform
+  - Transition duration-200 ease-in-out
+  - Uses design system tokens: primary, primary-foreground, secondary, secondary-foreground, border, ring, muted, transitions, rounded-lg
+  - CategoryCards updated to use BidButton component (replaces inline anchor button)
+  - CategoryCards made Client Component to support interactive BidButton
+  - BidButton made Client Component with 'use client' directive
+- **Files changed**:
+  - src/components/BidButton.tsx (created)
+  - src/components/CategoryCards.tsx (updated to use BidButton, added 'use client')
+  - docs/1.7.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual UI verification: Bid button displays with proper hover, active, disabled, focus states. Works on desktop and mobile. Keyboard accessible with visible focus rings. Loading state works. No horizontal overflow.
+- **Important technical decisions**:
+  - BidButton as Client Component with 'use client' directive
+  - Variants: primary, secondary, outline using design system color tokens
+  - Sizes: sm, md, lg with appropriate padding and text sizes
+  - Loading state with animated spinner SVG
+  - Disabled state with opacity-50 and cursor-not-allowed
+  - Focus-visible state using design system ring tokens
+  - Active state with scale-[0.98] transform
+  - Transition duration-200 ease-in-out
+  - Uses design system tokens: primary, primary-foreground, secondary, secondary-foreground, border, ring, muted, transitions, rounded-lg
+  - CategoryCards made Client Component to support interactive BidButton
+  - BidButton made Client Component with 'use client' directive
+- **Known limitations**:
+  - Warning about window.location.href for navigation (acceptable for mock UI-only task)
+- **Follow-up work**: Task 1.8 - Bid modal
+
 ---
 
-*This file will be updated after each completed task with actual implementation details.*
+_This file will be updated after each completed task with actual implementation details._

@@ -1,3 +1,7 @@
+'use client';
+
+import BidButton from '@/components/BidButton';
+
 interface Category {
   id: string;
   slug: string;
@@ -139,10 +143,13 @@ export default function CategoryCards() {
                     {formatCurrency(category.increment)}
                   </div>
 
-                  <a
-                    href={`/category/${category.slug}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-primary-foreground font-medium text-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:bg-primary/100"
-                    aria-label={`Bid on ${category.name}`}
+                  <BidButton
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      window.location.href = `/category/${category.slug}`;
+                    }}
+                    aria-label={`Place bid on ${category.name}`}
                   >
                     Place Bid
                     <svg
@@ -159,7 +166,7 @@ export default function CategoryCards() {
                         d="M17 8l4 4m0 0l-4 4m4-4H3"
                       />
                     </svg>
-                  </a>
+                  </BidButton>
                 </div>
               </div>
             </article>

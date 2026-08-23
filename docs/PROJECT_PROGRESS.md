@@ -1,12 +1,15 @@
 # PROJECT_PROGRESS.md — Current Project State
 
 ## Current Phase
+
 **Phase 1 — UI / Design**
 
 ## Current Task
-**1.6 completed** — Next recommended: 1.7
+
+**1.7 completed** — Next recommended: 1.8
 
 ## Completed Tasks
+
 - 0.1: Create Next.js project with TypeScript ✓
 - 0.2: Configure TypeScript (strict mode) ✓
 - 0.3: Configure Tailwind CSS ✓
@@ -23,20 +26,26 @@
 - 1.4: Hero section ✓
 - 1.5: Category cards grid ✓
 - 1.6: Leaderboard ✓
+- 1.7: Bid button ✓
 
 ## Tasks in Progress
-*None*
+
+_None_
 
 ## Blocked Tasks
-*None*
+
+_None_
 
 ## Known Bugs
-*None*
+
+_None_
 
 ## Known Technical Debt
-*None*
+
+_None_
 
 ## Current Architecture Status
+
 - Repository initialized with .git
 - Documentation structure created
 - Next.js project created with TypeScript, App Router, src/ directory
@@ -55,8 +64,10 @@
 - Hero section implemented (headline, CTAs, value props, responsive)
 - Category cards grid implemented (6 mock categories, responsive grid, hover/focus states)
 - Leaderboard implemented (top bidders table, #1 emphasis, currency formatting)
+- Bid button component implemented (reusable, variants, sizes, loading state, accessible)
 
 ## Current Environment/Setup Status
+
 - Node.js: v20.18.3 ✓
 - npm: 11.19.0 ✓
 - Next.js: 16.3.2 ✓
@@ -70,7 +81,9 @@
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-**1.7 — Bid button**
+
+**1.8 — Bid modal**
 
 ## Notes
-Task 1.6 completed successfully. Leaderboard component created with 6 mock entries, table layout, special #1 emphasis (gold styling, "Highest Bid" badge), currency formatting, and responsive table.
+
+Task 1.7 completed successfully. BidButton component created with variants (primary/secondary/outline), sizes (sm/md/lg), loading state, disabled state, and full keyboard accessibility. CategoryCards updated to use BidButton.
