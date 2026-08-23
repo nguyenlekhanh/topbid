@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.6 completed** — Next recommended: 2.7
+**2.7 completed** — Next recommended: 2.8
 
 ## Completed Tasks
 
@@ -41,6 +41,7 @@
 - 2.4: Constraints ✓
 - 2.5: RLS / security policies ✓
 - 2.6: Seed categories ✓
+- 2.7: Category queries (list, get) ✓
 
 ## Tasks in Progress
 
@@ -93,6 +94,7 @@ _None_
 - Constraints migration created (4 CHECKs: starting_bid/increment/amount >=0, status IN, justified, allow 0)
 - RLS migration created (RLS enabled on categories/bids, public SELECT active categories and paid bids only, no public writes, service_role bypass)
 - Seed categories migration created (6 active MVP categories, idempotent ON CONFLICT DO NOTHING, integer cents, preserved UI slugs)
+- Category queries created (typed listCategories/getCategoryBySlug via server client, RLS active-only, is_active enforced, not-found handled)
 
 ## Current Environment/Setup Status
 
@@ -110,10 +112,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.7 — Category queries (list, get)**
+**2.8 — Highest bid query**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.6 completed successfully. Seed migration created at supabase/migrations/20260823000006_seed_categories.sql with six deterministic MVP categories, idempotent via slug, compatible with constraints and RLS.
+Task 2.7 completed successfully. Category queries created in src/lib/categories.ts with typed server-client access, RLS active-only enforcement, maybeSingle not-found handling, and predictable error throwing.

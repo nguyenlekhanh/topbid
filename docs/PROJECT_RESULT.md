@@ -992,6 +992,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply)
 - **Follow-up work**: Task 2.7 — Category queries (list, get)
 
+### Task 2.7
+
+- **Date**: 2026-08-23
+- **Objective**: Create typed Supabase query layer for active categories
+- **Status**: Completed
+- **What was implemented**:
+  - New file src/lib/categories.ts with Category type matching public.categories schema and CATEGORY_FIELDS allowlist
+  - listCategories(): server client (supabase-server anon key, no service_role), selects CATEGORY_FIELDS where is_active=true order created_at asc, throws with message on error, returns [] on no data
+  - getCategoryBySlug(slug): normalizes trim/lowercase, returns null for empty/invalid, server client selects where slug=normalized and is_active=true via maybeSingle, returns null on not-found, throws on other errors
+  - Respects RLS public can read active only + app-level is_active filter (defense in depth, do not trust client filters), no service_role import, no client component exposure, DB access isolated in lib not presentational components, only needed fields queried
+- **Files changed**:
+  - src/lib/categories.ts (created)
+  - docs/2.7.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (server/client usage correct, RLS active-only, fields restricted, not-found via maybeSingle, errors thrown predictably)
+  - DB integration checks (active returned, inactive not returned, slug found/not-found): SKIPPED — local Supabase Docker unavailable, clearly documented, no fake results
+- **Important technical decisions**:
+  - Used supabase-server createClient (async, anon key) as required for server-side queries, never imported service-role key
+  - maybeSingle for clean not-found (null) instead of single throwing PGRST116
+  - Normalized slug to prevent case/whitespace bypass of active check
+  - Kept queries out of components per task, reusable lib
+- **Known limitations**: None (DB integration requires supabase db push + Docker; Phase 1 UI still uses mockCategories until real data wiring later)
+- **Follow-up work**: Task 2.8 — Highest bid query
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

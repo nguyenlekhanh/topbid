@@ -1,32 +1,69 @@
 ﻿TASK ID: 2.7
 PHASE: 2
 TITLE: Category queries (list, get)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Replace mock category dependency with typed Supabase query layer for active categories using server client and RLS.
 
 SCOPE:
+- Create src/lib/categories.ts with Category type matching public.categories
+- listCategories(): returns only is_active = true, ordered created_at asc, selects only needed fields, uses server client
+- getCategoryBySlug(slug): returns only active category by normalized slug, handles not-found via maybeSingle returning null, validates slug, throws on other errors
+- Keep DB access in lib, not presentational components
+- Respect RLS (public can read active only), do not bypass via service_role, do not trust client filters
 
 OUT OF SCOPE:
+- Highest-bid (2.8), leaderboard (2.9), recent bids (2.10), bid creation/payment/realtime/auth, no UI redesign, no migration/RLS changes
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1-2.6 migrations/seed/RLS
+- src/lib/supabase-server.ts (server client via anon key) and categories mock in CategoryCards
 
 IMPLEMENTATION REQUIREMENTS:
+- Server client via await createClient() from supabase-server (NEXT_PUBLIC_SUPABASE_ANON_KEY, not service_role)
+- is_active = true enforced in both queries (defense in depth, not trusting client filters), RLS also restricts inactive
+- Query only needed fields via CATEGORY_FIELDS, TypeScript Category type, handle not-found cleanly (null), report other errors predictably (throw with message), reusable lib
 
 FILES EXPECTED TO CHANGE:
+- src/lib/categories.ts (created)
+- docs/2.7.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Inspect lib respects RLS, types, server/client usage
+6. If local DB available: verify active returned, inactive not returned, existing slug returns, nonexistent returns null (if Docker unavailable, document limitation, do not fake)
 
 DEFINITION OF DONE:
+- Typed query layer exists, RLS-compliant, server-side, not-found handled, errors reported, all checks pass
 
 IMPLEMENTATION NOTES:
+Inspected supabase-server (async cookies, anon key), categories migration (is_active boolean default true), seed (six slugs), and Phase 1 Category type (startingBid/increment cents, bidCount mock). Created lib/categories.ts with Category type matching DB columns (id, slug, name, description, starting_bid, increment, image_url, is_active, created_at, updated_at). CATEGORY_FIELDS lists only needed fields. Both functions use await createClient() (server, anon, no service_role import). is_active filter applied explicitly. getCategoryBySlug normalizes trim/lowercase, returns null for empty/invalid, uses maybeSingle for clean not-found. Errors thrown with message, not swallowed.
 
 RESULT:
+Implementation complete, typecheck/lint/format:check/build all PASSED. Inspection confirmed server client usage, RLS is_active compliance, correct fields, not-found handling, no service_role. Local Supabase Docker not running so DB integration tests (active vs inactive, slug) not executed — documented as limitation, not faked.
 
 FILES ACTUALLY CHANGED:
+- src/lib/categories.ts (created - 60 lines)
+- docs/2.7.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED (server/client, RLS, types, not-found)
+- DB integration: SKIPPED - local Docker unavailable, documented as limitation
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.8 — Highest bid query
