@@ -1,32 +1,72 @@
 ﻿TASK ID: 3.2
 PHASE: 3
 TITLE: Calculate minimum bid (existing bids)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Implement server-side minimum-bid calculation for a category that already has a paid highest bid: minimum = highest_paid_bid.amount + category.increment (integer cents), per the non-negotiable business rule in AGENTS.md and the Task 3.2 requirement in PROJECT_PLAN.md.
 
 SCOPE:
+- Extend src/lib/bids.ts (existing bid module; no new files/deps)
+- New server-side function getIncrementedMinimumBid(categorySlug): Promise<number | null>, mirroring Task 3.1's getInitialMinimumBid conventions
+- Composes existing queries only: getCategoryBySlug (Task 2.7) + getHighestBidForCategory (Task 2.8)
+- Null contract: null when category missing/inactive OR when no paid bids exist yet
 
 OUT OF SCOPE:
+- Amount validation against the minimum (Task 3.3), deeper category validation (3.4), pending bid records (3.5), concurrency/locking (3.6), duplicate prevention (3.7), test infrastructure (3.8), unified minimum-bid selector composition, Stripe/UI wiring, schema/migration/RLS changes, Phase 1 mock UI
 
 INPUTS / DEPENDENCIES:
+- Task 2.4 constraints (amount/increment INTEGER cents >= 0; increment 0 allowed per plan)
+- Task 2.7 getCategoryBySlug (active-category lookup by slug via server client)
+- Task 2.8 getHighestBidForCategory (authoritative highest paid bid, amount DESC limit 1)
+- Task 3.1 getInitialMinimumBid (complementary no-existing-bids rule; untouched)
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only via supabase-server anon client chain; service-role never imported; respects RLS
+- Authoritative inputs sourced exclusively from DB rows (highest paid bid amount + category.increment); never trusts client-provided amounts
+- Existing paid highest bid -> return highestBid.amount + category.increment
+- Category not found / inactive -> null
+- No paid bids -> null (initial-minimum branch belongs to Task 3.1's getInitialMinimumBid)
+- Deterministic reads only; no writes; no side effects
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- docs/3.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Code inspection: delegation correctness, complementary null contract vs 3.1, increment arithmetic, RLS compliance, integer-cents handling
 
 DEFINITION OF DONE:
+- Reusable server-side existing-bids minimum function exists per business rule, all checks pass, prior task code untouched
 
 IMPLEMENTATION NOTES:
+Added getIncrementedMinimumBid directly after getInitialMinimumBid in src/lib/bids.ts, mirroring its shape exactly (slug -> active category -> highest paid bid -> arithmetic). Flow: getCategoryBySlug -> null if absent/inactive; getHighestBidForCategory(category.id) -> null if absent (documented pointer to getInitialMinimumBid for that branch); otherwise highestBid.amount + category.increment. Both addends are DB-sourced integers guarded non-negative by Task 2.4 CHECKs, so no additional clamping is applied and no client input participates. Deliberately NOT added in this task: a unified selector choosing between initial and incremented minimums (composition belongs with Task 3.3 server-side validation, which will compare a submitted amount against the applicable minimum).
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED on first run. Inspection confirmed: complementary null contracts between getInitialMinimumBid (no bids) and getIncrementedMinimumBid (has bids), authoritative DB-sourced arithmetic, RLS compliance, no changes to Tasks 1.1-3.1 code.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (extended - getIncrementedMinimumBid; Tasks 1.1-3.1 code untouched)
+- docs/3.2.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-3.1; documented honestly as limitation
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Task 3.3 — Validate bid amount server-side

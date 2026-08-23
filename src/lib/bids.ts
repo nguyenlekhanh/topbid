@@ -187,3 +187,28 @@ export async function getInitialMinimumBid(categorySlug: string): Promise<number
 
   return category.starting_bid;
 }
+
+/**
+ * Calculate the minimum valid bid for a category that already has a paid highest bid.
+ * Business rule: existing valid bids -> minimum = highest_paid_bid.amount + category.increment
+ * (server-side only; never trusts client-provided amounts).
+ * - Resolves the active category by slug via the existing category query (RLS public read)
+ * - Returns null when the category does not exist or is inactive
+ * - Returns null when no paid bids exist yet (initial minimum is Task 3.1's getInitialMinimumBid)
+ * - Server-side only (uses supabase-server anon client; respects RLS; never trusts client input)
+ */
+export async function getIncrementedMinimumBid(categorySlug: string): Promise<number | null> {
+  const category = await getCategoryBySlug(categorySlug);
+
+  if (!category) {
+    return null;
+  }
+
+  const highestBid = await getHighestBidForCategory(category.id);
+
+  if (!highestBid) {
+    return null;
+  }
+
+  return highestBid.amount + category.increment;
+}

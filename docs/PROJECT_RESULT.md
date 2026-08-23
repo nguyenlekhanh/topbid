@@ -1142,6 +1142,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.2 — Calculate minimum bid (existing bids)
 
+### Task 3.2
+
+- **Date**: 2026-08-23
+- **Objective**: Server-side minimum-bid calculation for a category with an existing paid highest bid (minimum = highest_paid_bid.amount + category.increment)
+- **Status**: Completed
+- **What was implemented**:
+  - Added getIncrementedMinimumBid(categorySlug): Promise<number | null> to src/lib/bids.ts, mirroring Task 3.1's getInitialMinimumBid conventions exactly
+  - Business rule enforced: existing paid highest bid -> returns highestBid.amount + category.increment (integer cents); both addends sourced exclusively from DB rows guarded non-negative by Task 2.4 CHECKs; no client-provided amounts participate
+  - Composes existing queries only: getCategoryBySlug (2.7) + getHighestBidForCategory (2.8)
+  - Null contract complementary to Task 3.1: null when category missing/inactive; null when no paid bids exist yet (that branch belongs to getInitialMinimumBid)
+- **Files changed**:
+  - src/lib/bids.ts (extended — getIncrementedMinimumBid; Tasks 1.1-3.1 code untouched)
+  - docs/3.2.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (complementary null contracts, increment arithmetic, RLS compliance, integer-cents handling, no circular imports)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-3.1; documented honestly as limitation
+- **Important technical decisions**:
+  - Mirrored the Task 3.1 function shape (slug -> active category -> highest paid bid -> arithmetic) instead of introducing a new abstraction or a premature unified selector — composition of the two rules is left for Task 3.3 server-side validation
+  - No clamping/normalization applied: increment >= 0 is enforced by the database (increment = 0 legitimately yields minimum equal to the current highest bid, per plan)
+  - Null-vs-throw kept consistent with Task 3.1 so both functions compose cleanly later
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 3.3 — Validate bid amount server-side
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

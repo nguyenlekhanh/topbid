@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.1 completed** — Next recommended: 3.2
+**3.2 completed** — Next recommended: 3.3
 
 ## Completed Tasks
 
@@ -46,6 +46,7 @@
 - 2.9: Leaderboard query ✓
 - 2.10: Recent bids query ✓
 - 3.1: Calculate minimum bid (no existing bids) ✓
+- 3.2: Calculate minimum bid (existing bids) ✓
 
 ## Tasks in Progress
 
@@ -103,6 +104,7 @@ _None_
 - Leaderboard query created (getLeaderboard: paid bids ranked amount DESC + created_at tie-breaker, embedded category info, optional limit default 10)
 - Recent bids query created (getRecentBids: newest-first paid bids, created_at DESC + amount tie-breaker, bidder and embedded category info, optional limit default 10)
 - Minimum bid calculation created (getInitialMinimumBid: no-existing-paid-bids rule minimum = starting_bid, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/existing-bid cases)
+- Existing-bid minimum calculation created (getIncrementedMinimumBid: minimum = highest paid bid amount + category increment, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/no-paid-bid cases)
 
 ## Current Environment/Setup Status
 
@@ -120,7 +122,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.2 — Calculate minimum bid (existing bids)**
+**3.3 — Validate bid amount server-side**
 
 ## Notes
 
@@ -134,3 +136,5 @@ Task 2.9 completed successfully. Leaderboard query added to src/lib/bids.ts retu
 Task 2.10 completed successfully. Recent-bids query added to src/lib/bids.ts returning newest-first paid bids with created_at DESC + amount tie-breaker, bidder and embedded category info, and optional limit (default 10). Purely additive to Task 2.9 code.
 
 Task 3.1 completed successfully. getInitialMinimumBid added to src/lib/bids.ts: server-side minimum = starting_bid for categories with no paid bids; composes getCategoryBySlug + getHighestBidForCategory; returns null for missing/inactive categories and defers existing-bid minimums to Task 3.2.
+
+Task 3.2 completed successfully. getIncrementedMinimumBid added to src/lib/bids.ts: server-side minimum = highest paid bid amount + category.increment for categories with existing paid bids; mirrors Task 3.1 conventions with complementary null contract; all amounts sourced from DB, never client input.
