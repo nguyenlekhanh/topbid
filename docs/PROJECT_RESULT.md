@@ -514,6 +514,42 @@ This file records what has actually been built, not what was planned.
   - Warning about window.location.href for navigation (acceptable for mock UI-only task)
 - **Follow-up work**: Task 1.8 - Bid modal
 
+### Task 1.8
+
+- **Date**: 2026-08-23
+- **Objective**: Create UI-only bid modal (email + amount) for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - BidModal component (src/components/BidModal.tsx) as Client Component with overlay, dialog semantics, backdrop-blur
+  - Header with title and X close button, sticky top
+  - Info card showing current highest bid and calculated minimum bid (currentHighestBid + increment or startingBid)
+  - Form: email (required, auto-focused), display name (optional), amount (readOnly mock)
+  - Footer: Cancel (outline BidButton) + Continue to mock payment (primary BidButton)
+  - Accessibility: role="dialog", aria-modal, aria-labelledby, focus trap via auto-focus, Escape to close, backdrop click to close
+  - Body scroll lock while open, max-h-[90vh] overflow, responsive centered max-w-lg
+  - Uses design tokens: primary, foreground, muted, border, ring, destructive, warning
+  - CategoryCards updated with useState<Category | null>, renders BidModal via fragment, BidButton now opens modal instead of window.location.href
+- **Files changed**:
+  - src/components/BidModal.tsx (created)
+  - src/components/CategoryCards.tsx (updated with modal state + integration)
+  - docs/1.8.txt (created/updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual verification: Modal opens via Place Bid, displays correctly at desktop/mobile, no overflow, backdrop + Escape + X + Cancel close, email auto-focused, tab navigation works, focus-visible states
+- **Important technical decisions**:
+  - BidModal as Client Component with useRef for overlay/close/email, useEffect for Escape + overflow lock, auto-focus
+  - Clear state on close via useEffect, eslint-disable for set-state-in-effect
+  - Minimum bid calculation helper, Intl.NumberFormat for currency
+  - Reuse BidButton, no new dependencies, mock-only (no Stripe/Supabase)
+  - CategoryCards fragment wrapper to include BidModal sibling to section
+- **Known limitations**: None
+- **Follow-up work**: Task 1.9 - Recent bids feed
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**1.7 completed** — Next recommended: 1.8
+**1.8 completed** — Next recommended: 1.9
 
 ## Completed Tasks
 
@@ -27,6 +27,7 @@
 - 1.5: Category cards grid ✓
 - 1.6: Leaderboard ✓
 - 1.7: Bid button ✓
+- 1.8: Bid modal (email + amount) ✓
 
 ## Tasks in Progress
 
@@ -65,6 +66,7 @@ _None_
 - Category cards grid implemented (6 mock categories, responsive grid, hover/focus states)
 - Leaderboard implemented (top bidders table, #1 emphasis, currency formatting)
 - Bid button component implemented (reusable, variants, sizes, loading state, accessible)
+- Bid modal implemented (email + amount, mock calculation, accessible dialog, focus trap)
 
 ## Current Environment/Setup Status
 
@@ -82,8 +84,8 @@ _None_
 
 ## Next Recommended Task
 
-**1.8 — Bid modal**
+**1.9 — Recent bids feed**
 
 ## Notes
 
-Task 1.7 completed successfully. BidButton component created with variants (primary/secondary/outline), sizes (sm/md/lg), loading state, disabled state, and full keyboard accessibility. CategoryCards updated to use BidButton.
+Task 1.8 completed successfully. BidModal created with email/name/amount fields, mock minimum bid calculation, backdrop click + Escape to close, auto-focus, body scroll lock, and responsive accessible dialog. CategoryCards now opens modal instead of navigating.
