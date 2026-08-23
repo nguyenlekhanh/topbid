@@ -1,32 +1,84 @@
 ﻿TASK ID: 0.5
 PHASE: 0
 TITLE: Configure Supabase client
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Configure Supabase client for both client-side and server-side usage in the Next.js application.
 
 SCOPE:
+- Install @supabase/supabase-js and @supabase/ssr packages
+- Create client-side Supabase client (src/lib/supabase.ts)
+- Create server-side Supabase client (src/lib/supabase-server.ts) for API routes and Server Components
+- Create .env.example with required environment variables
+- Verify TypeScript compilation, linting, and build pass
 
 OUT OF SCOPE:
+- Creating database schema (Phase 2)
+- Setting up Supabase project (done externally)
+- Configuring RLS policies (Phase 2)
+- Creating middleware for auth (not needed for MVP - no user accounts)
 
 INPUTS / DEPENDENCIES:
+- Task 0.1-0.4 completed
+- Next.js 16.3.2 with App Router
+- Environment variables will be provided via .env.local at runtime
 
 IMPLEMENTATION REQUIREMENTS:
+- Client-side client uses createBrowserClient from @supabase/ssr
+- Server-side client uses createServerClient from @supabase/ssr with Next.js cookies
+- Both clients use NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+- Server client handles cookies properly for session management
+- No hardcoded secrets - all via environment variables
 
 FILES EXPECTED TO CHANGE:
+- src/lib/supabase.ts (new)
+- src/lib/supabase-server.ts (new)
+- .env.example (new)
+- package.json (dependencies added)
 
 TEST PLAN:
+1. Run `npm run typecheck` - TypeScript compilation should pass
+2. Run `npm run lint` - ESLint should pass
+3. Run `npm run format:check` - Prettier should verify formatting
+4. Run `npm run build` - Production build should succeed
 
 DEFINITION OF DONE:
+- Supabase client packages installed
+- Client and server clients created and typed
+- Environment variables documented in .env.example
+- All checks pass
 
 IMPLEMENTATION NOTES:
+Installed @supabase/supabase-js and @supabase/ssr packages.
+Created two client utilities:
+- src/lib/supabase.ts: Client-side browser client using createBrowserClient
+- src/lib/supabase-server.ts: Server-side client using createServerClient with async cookies() from Next.js 15
+Created .env.example with all required environment variables for Supabase and Stripe.
+Note: Next.js 15's cookies() returns a Promise, so the server client is async.
 
 RESULT:
+Supabase client successfully configured. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 FILES ACTUALLY CHANGED:
+- package.json (added @supabase/supabase-js, @supabase/ssr)
+- package-lock.json
+- src/lib/supabase.ts (created)
+- src/lib/supabase-server.ts (created)
+- .env.example (created)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to task 0.6: Configure Stripe SDK

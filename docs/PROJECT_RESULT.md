@@ -95,9 +95,29 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.5 - Configure Supabase client
 
 ### Task 0.5
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure Supabase client
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Installed @supabase/supabase-js and @supabase/ssr packages. Created client-side (src/lib/supabase.ts) and server-side (src/lib/supabase-server.ts) Supabase clients using @supabase/ssr. Created .env.example with all required environment variables.
+- **Files changed**:
+  - package.json (added @supabase/supabase-js, @supabase/ssr)
+  - package-lock.json
+  - src/lib/supabase.ts (created - client-side browser client)
+  - src/lib/supabase-server.ts (created - server-side client with async cookies)
+  - .env.example (created - all required env vars documented)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**: 
+  - Use @supabase/ssr for Next.js 15+ compatibility (cookies() is async)
+  - Client-side: createBrowserClient for browser usage
+  - Server-side: createServerClient with cookie handling for Server Components/API routes
+  - All credentials via environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  - Service role key (SUPABASE_SERVICE_ROLE_KEY) documented for admin operations
+- **Known limitations**: None
+- **Follow-up work**: Task 0.6 - Configure Stripe SDK
 
 ### Task 0.6
 - **Date**: Not started
