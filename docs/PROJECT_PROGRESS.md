@@ -4,7 +4,7 @@
 **Phase 1 — UI / Design**
 
 ## Current Task
-**1.4 completed** — Next recommended: 1.5
+**1.5 completed** — Next recommended: 1.6
 
 ## Completed Tasks
 - 0.1: Create Next.js project with TypeScript ✓
@@ -21,6 +21,7 @@
 - 1.2: Typography and design system ✓
 - 1.3: Navbar ✓
 - 1.4: Hero section ✓
+- 1.5: Category cards grid ✓
 
 ## Tasks in Progress
 *None*
@@ -51,6 +52,7 @@
 - Typography and design system implemented (colors, typography, spacing, shadows, transitions)
 - Navbar component implemented (responsive, accessible, sticky with backdrop blur)
 - Hero section implemented (headline, CTAs, value props, responsive)
+- Category cards grid implemented (6 mock categories, responsive grid, hover/focus states)
 
 ## Current Environment/Setup Status
 - Node.js: v20.18.3 ✓
@@ -66,7 +68,7 @@
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-**1.5 — Category cards**
+**1.6 — Leaderboard**
 
 ## Notes
-Task 1.4 completed successfully. Hero component created with headline, subheadline, dual CTAs, and value props. Uses design system tokens throughout. Responsive at all breakpoints.
+Task 1.5 completed successfully. Category cards grid created with 6 mock categories, responsive grid (1/2/3 columns), hover/focus states, keyboard accessibility, and currency formatting.

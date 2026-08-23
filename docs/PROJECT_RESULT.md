@@ -381,6 +381,49 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.5 - Category cards
 
+### Task 1.5
+
+- **Date**: 2026-08-23
+- **Objective**: Create a responsive category cards grid component for the Topbid.lol homepage
+- **Status**: Completed
+- **What was implemented**:
+  - CategoryCards component (src/components/CategoryCards.tsx) with semantic section element
+  - Mock data for 6 categories (Art, Tech, Fashion, Sports, Automotive, Digital Assets)
+  - Currency formatting using Intl.NumberFormat (cents to dollars)
+  - Responsive grid: 1 column mobile, 2 columns tablet, 3 columns desktop
+  - Each card: article with role="listitem", shows name, description, current bid, bid count, starting bid, increment
+  - Hover effects: shadow-lg, border-primary/50, gradient overlay animation
+  - "Place Bid" button with animated arrow icon on hover
+  - "View All Categories" link at bottom
+  - Focus-visible states on all interactive elements using design system ring tokens
+  - Currency formatting (cents to dollars) using Intl.NumberFormat
+  - Uses design system tokens: primary, foreground, muted-foreground, border, background, muted, success, ring, transitions
+  - Updated page.tsx to include CategoryCards after Hero
+- **Files changed**:
+  - src/components/CategoryCards.tsx (created)
+  - src/app/page.tsx (updated to include CategoryCards)
+  - docs/1.5.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual UI verification: Category cards display correctly at desktop (3 cols), tablet (2 cols), mobile (1 col). Hover effects show shadow, border color change, gradient overlay. Focus states visible on all interactive elements. Keyboard navigation works. No horizontal overflow. Currency formatting correct.
+- **Important technical decisions**:
+  - Semantic <section> with aria-labelledby pointing to heading
+  - Mock data for 6 categories with realistic bid data
+  - Currency formatting using Intl.NumberFormat (cents to dollars)
+  - Responsive CSS grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+  - Hover effects: shadow-lg, border-primary/50, gradient overlay with opacity transition
+  - "Place Bid" button with animated arrow (translate-x on hover)
+  - "View All Categories" link at bottom with arrow icon
+  - Focus-visible states on all links/buttons using design system ring
+  - Currency formatting in cents to dollars with Intl.NumberFormat
+- **Known limitations**: None
+- **Follow-up work**: Task 1.6 - Leaderboard
+
 ---
 
 *This file will be updated after each completed task with actual implementation details.*

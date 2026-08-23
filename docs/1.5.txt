@@ -1,32 +1,106 @@
 ﻿TASK ID: 1.5
 PHASE: 1
 TITLE: Category cards grid
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a responsive category cards grid component for the Topbid.lol homepage using the design system from Task 1.2.
 
 SCOPE:
+- CategoryCards component with mock category data (6 categories)
+- Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop
+- Each card shows: name, description, current highest bid, bid count, starting bid, increment
+- "Place Bid" CTA button with hover/focus states
+- "View All Categories" link at bottom
+- Keyboard accessible interactive elements
+- Hover/focus/active states using design system tokens
 
 OUT OF SCOPE:
+- Real database queries (Task 2.7)
+- Leaderboard component (Task 1.6)
+- Bid button/modal (Tasks 1.7, 1.8)
+- Real bidding logic
+- Database integration
 
 INPUTS / DEPENDENCIES:
+- Task 1.1 completed (global app shell)
+- Task 1.2 completed (design system tokens)
+- Task 1.3 completed (Navbar)
+- Task 1.4 completed (Hero)
 
 IMPLEMENTATION REQUIREMENTS:
+- Semantic section with aria-labelledby
+- Responsive grid using CSS grid (1/2/3 columns)
+- Mock category data with 6 categories
+- Currency formatting for bid amounts
+- "Place Bid" links with arrow icon and hover animation
+- Hover effects: shadow, border color, background gradient
+- Focus-visible states on all interactive elements
+- Uses design system tokens: primary, foreground, muted-foreground, border, background, muted, success, ring, transitions
 
 FILES EXPECTED TO CHANGE:
+- src/components/CategoryCards.tsx (created)
+- src/app/page.tsx (updated to include CategoryCards)
+- docs/1.5.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TEST PLAN:
+1. Run npm run typecheck - TypeScript compilation should pass
+2. Run npm run lint - ESLint should pass
+3. Run npm run format:check - Prettier should verify formatting
+4. Run npm run build - Production build should succeed
+5. Manual UI verification at desktop, tablet, mobile widths
+6. Verify hover, focus, active states on cards and buttons
+7. Verify keyboard accessibility for interactive elements
+8. Verify no horizontal overflow
 
 DEFINITION OF DONE:
+- CategoryCards component created and integrated
+- Responsive grid at all breakpoints
+- Hover/focus/active states working
+- Keyboard accessible
+- Uses design system tokens
+- All validation checks pass
 
 IMPLEMENTATION NOTES:
+Created src/components/CategoryCards.tsx with:
+- Semantic <section> with aria-labelledby pointing to heading
+- Mock data for 6 categories (Art, Tech, Fashion, Sports, Automotive, Crypto)
+- Currency formatting using Intl.NumberFormat
+- Responsive grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+- Each card: article with role="listitem", relative positioning for hover effects
+- Hover effects: shadow-lg, border-primary/50, gradient overlay
+- "Place Bid" button with animated arrow icon on hover
+- "View All Categories" link at bottom
+- Focus-visible states on all links/buttons using design system ring tokens
+- Currency formatting in cents to dollars
+
+Updated src/app/page.tsx to include CategoryCards after Hero.
 
 RESULT:
+Task 1.5 completed successfully. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Manual UI verification: Category cards display correctly at desktop (3 cols), tablet (2 cols), mobile (1 col). Hover effects show shadow, border color change, and gradient overlay. Focus states visible on all interactive elements. Keyboard navigation works. No horizontal overflow. Currency formatting correct.
 
 FILES ACTUALLY CHANGED:
+- src/components/CategoryCards.tsx (created)
+- src/app/page.tsx (updated to include CategoryCards)
+- docs/1.5.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.6: Leaderboard
