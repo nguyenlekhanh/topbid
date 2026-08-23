@@ -343,6 +343,44 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.4 - Hero section
 
+### Task 1.4
+
+- **Date**: 2026-08-23
+- **Objective**: Create a hero section component for the Topbid.lol homepage
+- **Status**: Completed
+- **What was implemented**:
+  - Hero component (src/components/Hero.tsx) with semantic section element
+  - h1 headline with primary color accent on "Win the Spotlight"
+  - Descriptive subheadline explaining the value proposition
+  - Two CTAs: primary "Start Bidding" (primary button style) and secondary "View Leaderboard" (outline style)
+  - Three value prop cards showing Starting Bid ($0), Top Position (#1), Real-time Updates (Live)
+  - Gradient fade at top of value props for visual polish
+  - Uses design system tokens throughout: text-foreground, text-primary, text-muted-foreground, text-success, bg-primary, bg-muted/50, border-border, rounded-xl, transitions
+  - Responsive typography: text-4xl sm:text-5xl lg:text-6xl for headline, text-lg sm:text-xl for subheadline
+  - Updated page.tsx to use Hero component
+- **Files changed**:
+  - src/components/Hero.tsx (created)
+  - src/app/page.tsx (updated to use Hero)
+  - docs/1.4.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual UI verification: Hero displays correctly at desktop, tablet, and mobile widths. Proper spacing, typography, contrast. No horizontal overflow. CTA buttons have visible focus states for keyboard navigation. Value prop cards render correctly.
+- **Important technical decisions**:
+  - Semantic <section> element with proper heading hierarchy (h1)
+  - Primary and secondary CTA buttons using design system button styles
+  - Three value prop cards with key metrics in responsive grid
+  - Gradient fade at top of value props for visual polish
+  - Uses design system tokens: primary, foreground, muted-foreground, success, border, muted, background, transitions
+  - Responsive typography scaling at sm and lg breakpoints
+  - All interactive elements have focus-visible states
+- **Known limitations**: None
+- **Follow-up work**: Task 1.5 - Category cards
+
 ---
 
 *This file will be updated after each completed task with actual implementation details.*
