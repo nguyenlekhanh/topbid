@@ -1083,6 +1083,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 2.10 — Recent bids query
 
+### Task 2.10
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable server-side recent-bids query (newest paid bids first) for the Recent Bids UI
+- **Status**: Completed
+- **What was implemented**:
+  - Extended src/lib/bids.ts with RecentBidEntry type (bid, category) and getRecentBids(options?: { limit?: number }); reuses Bid and LeaderboardCategory types
+  - Query: .from('bids').select(`${BID_FIELDS}, categories (id, slug, name)`).eq('status','paid').order('created_at',{ascending:false}).order('amount',{ascending:false}).limit(limit)
+  - Default limit 10; invalid/non-finite limit values fall back to 10; returns [] when no paid bids exist; throws descriptive Error on DB failure
+  - Embedded category via FK relationship for UI display; bidder fields included on Bid (bidder_name/bidder_email available)
+  - Server client only (supabase-server anon); RLS bids_public_select_paid preserved plus app-level .eq('status','paid') defense in depth; no service_role import, no schema/migration changes
+- **Files changed**:
+  - src/lib/bids.ts (extended — new type + getRecentBids; purely additive, Task 2.9 code untouched)
+  - docs/2.10.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (after one Prettier signature-format fix on the new function)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (server client, RLS paid-only boundary, newest-first ordering, embed mapping, limit handling, empty/error behavior)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-2.9
+- **Important technical decisions**:
+  - Added amount DESC secondary sort so equal-timestamp paid bids are deterministic rather than DB-order-dependent
+  - No rank field — recency feed unlike LeaderboardEntry; entries kept flat (bid + embedded category)
+  - Reused BID_FIELDS/LEADERBOARD_CATEGORY_FIELDS allowlists and the `as unknown as` embed cast pattern from Task 2.9; small limit-guard duplicated rather than refactoring the committed 2.9 function to keep this change purely additive
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Phase 2 complete — Task 3.1 — Calculate minimum bid (no existing bids)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

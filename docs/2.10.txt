@@ -1,32 +1,69 @@
 ﻿TASK ID: 2.10
 PHASE: 2
 TITLE: Recent bids query
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a reusable server-side query returning the most recent paid bids (newest first) with bidder and embedded category info for the Recent Bids UI.
 
 SCOPE:
+- Extend src/lib/bids.ts (existing bid data-access module, no new files/deps), purely additive to Task 2.9 code
+- New type: RecentBidEntry (bid: Bid, category: LeaderboardCategory | null); reuses Bid and LeaderboardCategory types
+- getRecentBids(options?: { limit?: number }): server client, status='paid' filter, created_at DESC + amount DESC deterministic tie-breaker, optional limit default 10, embeds related category via FK relationship
 
 OUT OF SCOPE:
+- Bid engine/Stripe/realtime/auth/UI wiring, schema/migration/RLS/index changes, new dependencies, refactoring Task 2.9 functions, Phase 3+ tasks
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1-2.9 (schema, indexes incl. idx_bids_category_status, RLS bids_public_select_paid, seed, category/bid queries, leaderboard query conventions)
+- src/lib/supabase-server.ts createClient conventions from categories.ts/bids.ts
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only via supabase-server anon client; service-role never imported; respects RLS
+- Filter .eq('status','paid') at application query level as defense in depth
+- Include bidder information (Bid fields incl. bidder_name/bidder_email) and embedded category (id, slug, name)
+- Ordered created_at DESC (newest first); amount DESC as deterministic tie-breaker for equal timestamps
+- Optional limit defaulting to 10; invalid/non-finite/non-positive values fall back to 10
+- Return [] when there are no results; throw descriptive Error on database errors
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- docs/2.10.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Inspect server-client usage, RLS paid-only boundary, embed typing, ordering, limit handling, empty/error behavior
 
 DEFINITION OF DONE:
+- Typed reusable recent-bids query exists, RLS-compliant, newest-first with bidder/category info, all checks pass, no changes to prior task code
 
 IMPLEMENTATION NOTES:
+Appended after getLeaderboard in src/lib/bids.ts following existing conventions (async createClient, field allowlist BID_FIELDS + LEADERBOARD_CATEGORY_FIELDS). Query mirrors the leaderboard embed pattern: .from('bids').select(`${BID_FIELDS}, categories (id, slug, name)`).eq('status','paid').order('created_at',{ascending:false}).order('amount',{ascending:false}).limit(limit). Rows cast via `as unknown as` because generated DB types are absent (Supabase infers embeds as arrays); mapped via rest destructure ({ categories, ...bid }) so bid contains exactly the Bid fields and category carries the embedded summary. The small limit-guard block is duplicated from getLeaderboard instead of extracted/refactoring the committed 2.9 function, keeping this change purely additive. No rank field on entries (recency feed, unlike LeaderboardEntry).
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED (one Prettier signature-format fix during lint). Inspection confirmed server client usage, app-level status='paid' defense in depth under RLS, newest-first deterministic ordering, bidder + category info present, [] on empty, predictable error throwing.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (extended - RecentBidEntry type + getRecentBids; Task 2.9 code untouched)
+- docs/2.10.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-2.9
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Phase 2 complete. Proceed to Task 3.1 — Calculate minimum bid (no existing bids)

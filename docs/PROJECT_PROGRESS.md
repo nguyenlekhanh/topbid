@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-**Phase 2 — Database**
+**Phase 3 — Bid Engine** (Phase 2 complete)
 
 ## Current Task
 
-**2.9 completed** — Next recommended: 2.10
+**2.10 completed** — Next recommended: 3.1
 
 ## Completed Tasks
 
@@ -44,6 +44,7 @@
 - 2.7: Category queries (list, get) ✓
 - 2.8: Highest bid query ✓
 - 2.9: Leaderboard query ✓
+- 2.10: Recent bids query ✓
 
 ## Tasks in Progress
 
@@ -99,6 +100,7 @@ _None_
 - Category queries created (typed listCategories/getCategoryBySlug via server client, RLS active-only, is_active enforced, not-found handled)
 - Highest bid query created (getHighestBidForCategory via server client, RLS paid-only, amount DESC limit 1)
 - Leaderboard query created (getLeaderboard: paid bids ranked amount DESC + created_at tie-breaker, embedded category info, optional limit default 10)
+- Recent bids query created (getRecentBids: newest-first paid bids, created_at DESC + amount tie-breaker, bidder and embedded category info, optional limit default 10)
 
 ## Current Environment/Setup Status
 
@@ -116,12 +118,15 @@ _None_
 
 ## Next Recommended Task
 
-**2.10 — Recent bids query**
+**3.1 — Calculate minimum bid (no existing bids)**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
+Phase 2 (Database queries) is now complete.
 
 Task 2.8 completed successfully. Highest-bid query created in src/lib/bids.ts via server client, RLS paid-only, amount DESC limit 1, maybeSingle null handling.
 
 Task 2.9 completed successfully. Leaderboard query added to src/lib/bids.ts returning paid bids ranked amount DESC with created_at tie-breaker, embedded category info, and optional limit (default 10).
+
+Task 2.10 completed successfully. Recent-bids query added to src/lib/bids.ts returning newest-first paid bids with created_at DESC + amount tie-breaker, bidder and embedded category info, and optional limit (default 10). Purely additive to Task 2.9 code.

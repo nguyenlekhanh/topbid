@@ -119,3 +119,46 @@ export async function getLeaderboard(
     }))
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
+
+export type RecentBidEntry = {
+  bid: Bid;
+  category: LeaderboardCategory | null;
+};
+
+/**
+ * Get the most recent paid bids (newest first) for the Recent Bids feed.
+ * - Only considers status = 'paid' (RLS public read + app-level defense in depth)
+ * - Ordered created_at DESC, then amount DESC as a deterministic tie-breaker
+ * - Embeds the related category (id, slug, name) via the FK relationship
+ * - Optional limit (default 10); returns [] when no paid bids exist
+ * - Server-side only (uses supabase-server anon client, respects RLS)
+ */
+export async function getRecentBids(options: { limit?: number } = {}): Promise<RecentBidEntry[]> {
+  const requestedLimit = options.limit;
+
+  const limit =
+    typeof requestedLimit === 'number' && Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.floor(requestedLimit)
+      : 10;
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('bids')
+    .select(`${BID_FIELDS}, categories (${LEADERBOARD_CATEGORY_FIELDS})`)
+    .eq('status', 'paid')
+    .order('created_at', { ascending: false })
+    .order('amount', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to fetch recent bids: ${error.message}`);
+  }
+
+  return ((data as unknown as Array<Bid & { categories: LeaderboardCategory | null }>) ?? []).map(
+    ({ categories, ...bid }) => ({
+      bid,
+      category: categories,
+    })
+  );
+}
