@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import BidButton from '@/components/BidButton';
 import BidModal from '@/components/BidModal';
+import { EmptyCategories } from '@/components/EmptyState';
 
 interface Category {
   id: string;
@@ -113,74 +114,78 @@ export default function CategoryCards() {
             </p>
           </header>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" role="list">
-            {mockCategories.map((category) => (
-              <article
-                key={category.id}
-                className="group relative flex flex-col rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-                role="listitem"
-              >
-                <div
-                  className="absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl pointer-events-none"
-                  aria-hidden="true"
-                />
+          {mockCategories.length === 0 ? (
+            <EmptyCategories />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" role="list">
+              {mockCategories.map((category) => (
+                <article
+                  key={category.id}
+                  className="group relative flex flex-col rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                  role="listitem"
+                >
+                  <div
+                    className="absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl pointer-events-none"
+                    aria-hidden="true"
+                  />
 
-                <div className="relative flex flex-col flex-1">
-                  <div className="mb-4">
-                    <h3 className="text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {category.name}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                      {category.description}
-                    </p>
-                  </div>
+                  <div className="relative flex flex-col flex-1">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {category.name}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                        {category.description}
+                      </p>
+                    </div>
 
-                  <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-border">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <div className="text-muted-foreground">Current Bid</div>
-                        <div className="font-semibold text-foreground">
-                          {formatCurrency(category.currentHighestBid ?? category.startingBid)}
+                    <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-border">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-muted-foreground">Current Bid</div>
+                          <div className="font-semibold text-foreground">
+                            {formatCurrency(category.currentHighestBid ?? category.startingBid)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Total Bids</div>
+                          <div className="font-semibold text-primary">{category.bidCount}</div>
                         </div>
                       </div>
-                      <div>
-                        <div className="text-muted-foreground">Total Bids</div>
-                        <div className="font-semibold text-primary">{category.bidCount}</div>
+
+                      <div className="text-xs text-muted-foreground">
+                        Starting: {formatCurrency(category.startingBid)} • Increment:{' '}
+                        {formatCurrency(category.increment)}
                       </div>
-                    </div>
 
-                    <div className="text-xs text-muted-foreground">
-                      Starting: {formatCurrency(category.startingBid)} • Increment:{' '}
-                      {formatCurrency(category.increment)}
-                    </div>
-
-                    <BidButton
-                      variant="primary"
-                      size="md"
-                      onClick={() => setSelectedCategory(category)}
-                      aria-label={`Place bid on ${category.name}`}
-                    >
-                      Place Bid
-                      <svg
-                        className="h-4 w-4 transition-transform group-hover:translate-x-1"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
+                      <BidButton
+                        variant="primary"
+                        size="md"
+                        onClick={() => setSelectedCategory(category)}
+                        aria-label={`Place bid on ${category.name}`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 8l4 4m0 0l-4 4m4-4H3"
-                        />
-                      </svg>
-                    </BidButton>
+                        Place Bid
+                        <svg
+                          className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"
+                          />
+                        </svg>
+                      </BidButton>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          )}
 
           <div className="mt-12 text-center">
             <a

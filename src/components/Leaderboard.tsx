@@ -75,7 +75,19 @@ function getRankBadge(rank: number) {
   return 'bg-muted text-muted-foreground';
 }
 
+import { EmptyLeaderboard } from '@/components/EmptyState';
+
 export default function Leaderboard() {
+  if (mockLeaderboard.length === 0) {
+    return (
+      <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <EmptyLeaderboard />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

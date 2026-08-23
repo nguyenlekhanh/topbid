@@ -1,32 +1,74 @@
 ﻿TASK ID: 1.10
 PHASE: 1
 TITLE: Empty states
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create reusable empty-state presentation components for Topbid.lol (categories, leaderboard, recent bids) — UI-only, mock/static.
 
 SCOPE:
+- EmptyState generic component (src/components/EmptyState.tsx) with icon, title, description, optional action (Link or button)
+- Variants: EmptyCategories, EmptyLeaderboard, EmptyRecentBids, EmptySearchResults
+- Integration: CategoryCards shows EmptyCategories when mockCategories empty, Leaderboard shows EmptyLeaderboard when mockLeaderboard empty, RecentBids already used empty but now uses EmptyRecentBids
+- Uses design tokens, no new styling system
+- Preserves all Phase 1 work (Navbar, Hero, cards, leaderboard, BidButton, BidModal, RecentBids)
 
 OUT OF SCOPE:
+- Loading states (1.11), error states (1.12), success (1.13)
+- Supabase / DB / realtime / auth / Stripe
 
 INPUTS / DEPENDENCIES:
+- Task 1.5 category cards, 1.6 leaderboard, 1.9 recent bids
+- Task 1.2 design system
 
 IMPLEMENTATION REQUIREMENTS:
+- UI/presentation only, mock/static
+- Reuse design tokens (border, muted, foreground, primary, ring)
+- Responsive (centered, padded, max-w-md), no horizontal overflow
+- Accessible: role status aria-live, heading, focus-visible on action
+- Icons with aria-hidden
 
 FILES EXPECTED TO CHANGE:
+- src/components/EmptyState.tsx (created)
+- src/components/CategoryCards.tsx (updated — added EmptyCategories import, conditional grid)
+- src/components/Leaderboard.tsx (updated — added EmptyLeaderboard early return)
+- src/components/RecentBids.tsx (updated — replace inline dashed card with EmptyRecentBids)
+- docs/1.10.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck - pass
+2. npm run lint - pass
+3. npm run format:check - pass
+4. npm run build - pass
+5. Visual mobile/desktop, focus states, no overflow
 
 DEFINITION OF DONE:
+- EmptyState components exist, integrated, responsive, accessible, all checks pass, docs updated, committed, pushed
 
 IMPLEMENTATION NOTES:
+Created EmptyState.tsx with props icon/title/description/actionLabel/actionHref/onAction, role status, centered dashed border bg-muted/30, icon circle, title/description, action as Link or button with primary styles focus-visible. Helper icons CategoriesIcon/LeaderboardIcon/BidsIcon. Exported EmptyCategories, EmptyLeaderboard, EmptyRecentBids, EmptySearchResults.
+Updated RecentBids to import EmptyRecentBids, Leaderboard to import EmptyLeaderboard with early return, CategoryCards to import EmptyCategories and conditional {mockCategories.length===0 ? <EmptyCategories/> : <div grid>}. Preserved mock data flows.
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Visual: empty states centered, dashed border muted/30, icons 12x12 muted circle, text hierarchy foreground/muted-foreground, action primary button focus ring, responsive padding 6→8, no overflow.
 
 FILES ACTUALLY CHANGED:
+- src/components/EmptyState.tsx (created - 120 lines)
+- src/components/CategoryCards.tsx (updated - EmptyCategories conditional)
+- src/components/Leaderboard.tsx (updated - EmptyLeaderboard early return)
+- src/components/RecentBids.tsx (updated - EmptyRecentBids)
+- docs/1.10.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.11 - Loading states

@@ -587,6 +587,41 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.10 - Empty states
 
+### Task 1.10
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable empty-state presentation components for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - EmptyState generic component (src/components/EmptyState.tsx) with icon, title, description, action (Link/button), role status aria-live, centered dashed border bg-muted/30
+  - Helper icons: CategoriesIcon, LeaderboardIcon, BidsIcon
+  - Variant wrappers: EmptyCategories, EmptyLeaderboard, EmptyRecentBids, EmptySearchResults
+  - Integrated: CategoryCards conditional EmptyCategories when mockCategories empty, Leaderboard early return EmptyLeaderboard when mockLeaderboard empty, RecentBids replaced inline dashed card with EmptyRecentBids import
+  - Uses design tokens: border, muted, foreground, muted-foreground, primary, ring, transitions
+  - Responsive: px-6 py-12 sm:px-8 sm:py-16, max-w-md, no horizontal overflow, focus-visible on actions
+  - Preserved all Phase 1 work, no DB/Stripe/auth/realtime
+- **Files changed**:
+  - src/components/EmptyState.tsx (created)
+  - src/components/CategoryCards.tsx (updated with EmptyCategories)
+  - src/components/Leaderboard.tsx (updated with EmptyLeaderboard)
+  - src/components/RecentBids.tsx (updated to use EmptyRecentBids)
+  - docs/1.10.txt (created/updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual verification: empty states centered dashed border, icons 12x12 muted circle, title/description hierarchy, action primary button with focus ring, responsive mobile→desktop, empty branches render without overflow
+- **Important technical decisions**:
+  - Generic EmptyState with optional actionHref vs onAction branch (Link vs button)
+  - Dedicated icons per empty context, reusable across categories/leaderboard/bids/search
+  - Conditional rendering in each parent component when mock array length === 0
+  - No new dependencies, UI-only mock, reusable design system
+- **Known limitations**: None
+- **Follow-up work**: Task 1.11 - Loading states
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

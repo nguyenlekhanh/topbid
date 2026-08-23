@@ -92,17 +92,14 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
+import { EmptyRecentBids } from '@/components/EmptyState';
+
 export default function RecentBids() {
   if (mockRecentBids.length === 0) {
     return (
       <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="recent-bids-heading">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center">
-            <h2 id="recent-bids-heading" className="text-lg font-semibold text-foreground">
-              No recent bids yet
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">Be the first to place a bid.</p>
-          </div>
+          <EmptyRecentBids />
         </div>
       </section>
     );
