@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.3 completed** — Next recommended: 3.4
+**3.4 completed** — Next recommended: 3.5
 
 ## Completed Tasks
 
@@ -48,6 +48,7 @@
 - 3.1: Calculate minimum bid (no existing bids) ✓
 - 3.2: Calculate minimum bid (existing bids) ✓
 - 3.3: Validate bid amount server-side ✓
+- 3.4: Validate category server-side ✓
 
 ## Tasks in Progress
 
@@ -107,6 +108,7 @@ _None_
 - Minimum bid calculation created (getInitialMinimumBid: no-existing-paid-bids rule minimum = starting_bid, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/existing-bid cases)
 - Existing-bid minimum calculation created (getIncrementedMinimumBid: minimum = highest paid bid amount + category increment, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/no-paid-bid cases)
 - Server-side bid amount validation created (getMinimumBidForCategory unified authoritative minimum resolver + validateBidAmount with untrusted-amount runtime guards, discriminated-union result, equality-to-minimum accepted)
+- Server-side category validation created (validateCategory in categories.ts: untrusted slug runtime guards, authoritative DB-sourced row via getCategoryBySlug, active-only enforced by app filter + RLS, predictable invalid_slug/category_not_found reasons)
 
 ## Current Environment/Setup Status
 
@@ -124,7 +126,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.4 — Validate category server-side**
+**3.5 — Create pending bid record**
 
 ## Notes
 
@@ -142,3 +144,5 @@ Task 3.1 completed successfully. getInitialMinimumBid added to src/lib/bids.ts: 
 Task 3.2 completed successfully. getIncrementedMinimumBid added to src/lib/bids.ts: server-side minimum = highest paid bid amount + category.increment for categories with existing paid bids; mirrors Task 3.1 conventions with complementary null contract; all amounts sourced from DB, never client input.
 
 Task 3.3 completed successfully. Server-side amount validation added to src/lib/bids.ts: getMinimumBidForCategory resolves the authoritative minimum (starting_bid or highest+increment) in one query pass and validateBidAmount validates untrusted client amounts against it (runtime shape guards, below-minimum rejection, equality accepted).
+
+Task 3.4 completed successfully. validateCategory added to src/lib/categories.ts: authoritative DB-sourced category validation with untrusted-slug runtime guards; active-only enforced by app-level filter + RLS; predictable invalid_slug/category_not_found failure reasons; no service-role usage.

@@ -1200,6 +1200,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.4 — Validate category server-side
 
+### Task 3.4
+
+- **Date**: 2026-08-23
+- **Objective**: Authoritative server-side category validation — category must exist and be active, sourced exclusively from the DB; client-provided category fields are never trusted
+- **Status**: Completed
+- **What was implemented**:
+  - validateCategory(slug: unknown): Promise<CategoryValidation> added to src/lib/categories.ts, mirroring Task 3.3's validator conventions
+  - Runtime shape guards on the untrusted slug (non-string/blank -> 'invalid_slug'); authoritative resolution via getCategoryBySlug (2.7); null -> 'category_not_found'; success returns the full DB-sourced Category row
+  - Active-only enforced structurally: app-level .eq('is_active', true) plus RLS public-select-active policy (defense in depth)
+  - Missing vs inactive intentionally indistinguishable under RLS ('category_not_found' covers both — no information leak; distinguishing them would require service-role/RLS bypass, which is forbidden)
+- **Files changed**:
+  - src/lib/categories.ts (extended — CategoryValidation types + validateCategory; Tasks 1.1-3.3 code untouched)
+  - docs/3.4.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (untrusted-shape rejection, active-only path, RLS compliance, no service-role import, union exhaustiveness)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-3.3; NOT claimed as passing
+- **Important technical decisions**:
+  - Signature accepts only a slug identifier (`unknown`), never a caller-supplied Category object — client-provided starting_bid/increment/name can never enter validation
+  - Placed in src/lib/categories.ts (domain cohesion) rather than bids.ts; composes with Task 3.3's validateBidAmount for the bid flow without premature consolidation
+  - Stable string-literal failure reasons for later API-route mapping; Zod layering deferred to Phase 9
+- **Known limitations**: None (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 3.5 — Create pending bid record
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

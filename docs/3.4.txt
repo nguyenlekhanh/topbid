@@ -1,32 +1,68 @@
 ﻿TASK ID: 3.4
 PHASE: 3
 TITLE: Validate category server-side
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Authoritative server-side category validation for the bid flow: the category must exist and be active, and must always come from an authoritative DB query - client-provided category fields (name, slug metadata, starting_bid, increment, etc.) are never trusted.
 
 SCOPE:
+- Extend src/lib/categories.ts (category domain module; no new files/deps), purely additive
+- New validateCategory(slug: unknown): Promise<CategoryValidation> with discriminated-union result and stable failure reasons
+- Reuses getCategoryBySlug (Task 2.7) as the single authoritative source; composes cleanly with Task 3.3's validateBidAmount (which resolves its own minimum via getCategoryBySlug + getHighestBidForCategory)
 
 OUT OF SCOPE:
+- Pending bid record creation (Task 3.5), transactions/locking (3.6), duplicate prevention (3.7), test infrastructure (3.8), Stripe/rate limiting/payment logic, API-route wiring, Zod schema layering (Phase 9), any use of the service-role key or RLS bypass, schema/migration changes
 
 INPUTS / DEPENDENCIES:
+- Task 2.5 RLS (public SELECT restricted to active categories)
+- Task 2.7 getCategoryBySlug (app-level is_active = true filter, lowercase normalization, server anon client)
 
 IMPLEMENTATION REQUIREMENTS:
+- Category existence ensured via authoritative DB query only; no caller-supplied Category objects accepted (signature takes a slug identifier only)
+- Active check enforced structurally: app-level .eq('is_active', true) plus RLS public-select-active policy (defense in depth); inactive categories cannot pass validation
+- Missing vs inactive collapse into 'category_not_found' by design under RLS (no information leak about disabled categories)
+- Predictable outcomes: 'invalid_slug' for non-string/blank input; 'category_not_found' otherwise; success returns the full DB-sourced Category row
+- slug parameter typed `unknown` deliberately so runtime shape guards are enforced regardless of upstream typing
 
 FILES EXPECTED TO CHANGE:
+- src/lib/categories.ts
+- docs/3.4.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Code inspection: untrusted-shape rejection, active-only enforcement path, RLS compliance, no service-role import, discriminated-union exhaustiveness
 
 DEFINITION OF DONE:
+- Reusable server-side category validator exists that returns the DB-sourced category or a predictable failure reason; all checks pass; prior task code untouched
 
 IMPLEMENTATION NOTES:
+Added validateCategory to src/lib/categories.ts after getCategoryBySlug, mirroring Task 3.3's validator conventions (unknown-typed untrusted parameter, runtime guards first, discriminated union with stable string-literal reasons). Flow: reject non-string/blank slugs as 'invalid_slug'; delegate to getCategoryBySlug which normalizes case and filters is_active = true at the app level; null result -> 'category_not_found'; success -> { valid: true, category } carrying the authoritative row (id/slug/name/starting_bid/increment all DB-sourced). Distinguishing missing from inactive would require bypassing RLS or the service-role key - both explicitly forbidden - so both map to 'category_not_found', which is the secure behavior. Combined bid-flow usage is validateCategory(slug) + validateBidAmount(slug, amount); consolidation into one call is left for later tasks if needed.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED on first run. Inspection confirmed: authoritative source only, active-only enforcement (app filter + RLS), predictable failure reasons, RLS compliance with no service-role import, no changes to Tasks 1.1-3.3 code.
 
 FILES ACTUALLY CHANGED:
+- src/lib/categories.ts (extended - CategoryValidation types + validateCategory)
+- docs/3.4.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-3.3; NOT claimed as passing
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Task 3.5 — Create pending bid record
