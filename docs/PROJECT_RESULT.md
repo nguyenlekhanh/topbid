@@ -7,6 +7,7 @@ This file records what has actually been built, not what was planned.
 ## Phase 0 — Project Setup
 
 ### Task 0.1
+
 - **Date**: 2026-08-23
 - **Objective**: Create Next.js project with TypeScript
 - **Status**: Completed
@@ -36,6 +37,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.2 - Verify TypeScript strict mode configuration
 
 ### Task 0.2
+
 - **Date**: 2026-08-23
 - **Objective**: Configure TypeScript (strict mode)
 - **Status**: Completed
@@ -52,6 +54,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.3 - Configure Tailwind CSS
 
 ### Task 0.3
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Tailwind CSS
 - **Status**: Completed
@@ -71,6 +74,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.4 - Configure ESLint + Prettier
 
 ### Task 0.4
+
 - **Date**: 2026-08-23
 - **Objective**: Configure ESLint + Prettier
 - **Status**: Completed
@@ -95,6 +99,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.5 - Configure Supabase client
 
 ### Task 0.5
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Supabase client
 - **Status**: Completed
@@ -120,6 +125,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.6 - Configure Stripe SDK
 
 ### Task 0.6
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Stripe SDK
 - **Status**: Completed
@@ -144,6 +150,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.7 - Configure environment variables
 
 ### Task 0.7
+
 - **Date**: 2026-08-23
 - **Objective**: Configure environment variables
 - **Status**: Completed
@@ -166,6 +173,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.8 - Configure Git + initial commit
 
 ### Task 0.8
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Git + initial commit
 - **Status**: Completed
@@ -176,6 +184,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.9 - Configure Vercel deployment
 
 ### Task 0.9
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Vercel deployment
 - **Status**: Completed
@@ -200,6 +209,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.10 - Create AGENTS.md and documentation workflow
 
 ### Task 0.10
+
 - **Date**: 2026-08-23
 - **Objective**: Create AGENTS.md and documentation workflow
 - **Status**: Completed
@@ -230,10 +240,11 @@ This file records what has actually been built, not what was planned.
 ## Phase 1 — UI / Design
 
 ### Task 1.1
+
 - **Date**: 2026-08-23
 - **Objective**: Create the foundational global application shell for Topbid.lol
 - **Status**: Completed
-- **What was implemented**: 
+- **What was implemented**:
   - Root layout (src/app/layout.tsx) with semantic header, main, footer structure
   - Full-height flex layout with footer naturally at bottom
   - Responsive container with max-width constraint (max-w-7xl)
@@ -260,6 +271,41 @@ This file records what has actually been built, not what was planned.
   - No design system, typography, or color palette defined yet
 - **Known limitations**: None
 - **Follow-up work**: Task 1.2 - Typography and design system
+
+### Task 1.2
+
+- **Date**: 2026-08-23
+- **Objective**: Establish the Topbid.lol design system including color palette, typography scale, spacing, border radius, shadows, and transitions
+- **Status**: Completed
+- **What was implemented**:
+  - Color palette: background, foreground, muted, border, ring, primary, secondary, accent, destructive, success, warning (with light/dark modes)
+  - Typography: Geist Sans/Mono fonts, text sizes xs-5xl with line heights, font weights normal/bold
+  - Border radius: xs-2xl, full
+  - Shadows: xs-xl
+  - Transitions: fast, normal, slow
+  - Container utility, text-balance, text-pretty utilities
+  - Selection styling
+  - Dark mode support for all colors via prefers-color-scheme
+  - All tokens defined via Tailwind v4 @theme directive in globals.css
+- **Files changed**:
+  - src/app/globals.css (complete design system tokens)
+  - docs/1.2.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - All design tokens as CSS custom properties in :root
+  - Tailwind v4 @theme inline directive for token registration
+  - Dark mode via @media (prefers-color-scheme: dark)
+  - Geist Sans/Mono via next/font/google with CSS variables
+  - Semantic color naming (foreground, muted, border, ring, etc.)
+  - Minimal base styles - only design tokens and essential resets
+- **Known limitations**: None
+- **Follow-up work**: Task 1.3 - Navbar
 
 ---
 

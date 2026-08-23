@@ -1,32 +1,93 @@
 ﻿TASK ID: 1.2
 PHASE: 1
 TITLE: Typography and design system
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Establish the Topbid.lol design system including color palette, typography scale, spacing, border radius, shadows, and transitions using Tailwind v4's @theme directive.
 
 SCOPE:
+- Color palette: primary, secondary, muted, border, ring, destructive, success, warning
+- Typography: font families (Geist Sans/Mono), font sizes (xs-5xl), font weights, line heights
+- Border radius: xs-2xl, full
+- Shadows: xs-xl
+- Transitions: fast, normal, slow
+- Container utility
+- Text utilities (balance, pretty)
+- Dark mode support for all colors
+- Selection styling
+- CSS custom properties for all design tokens
 
 OUT OF SCOPE:
+- Navbar component (Task 1.3)
+- Hero section (Task 1.4)
+- Category cards (Task 1.5)
+- Leaderboard component (Task 1.6)
+- Bid button/modal (Tasks 1.7, 1.8)
+- Component-specific styling
 
 INPUTS / DEPENDENCIES:
+- Task 1.1 completed (global app shell)
+- Tailwind CSS v4 configured
+- Geist fonts via next/font/google
 
 IMPLEMENTATION REQUIREMENTS:
+- Use Tailwind v4 @theme directive for design tokens
+- Define all tokens as CSS custom properties in :root
+- Support dark mode via prefers-color-scheme media query
+- Minimal global CSS - only design tokens and base styles
 
 FILES EXPECTED TO CHANGE:
+- src/app/globals.css
+- docs/1.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Run npm run typecheck - TypeScript compilation should pass
+2. Run npm run lint - ESLint should pass
+3. Run npm run format:check - Prettier should verify formatting
+4. Run npm run build - Production build should succeed
 
 DEFINITION OF DONE:
+- Design tokens defined in globals.css via @theme
+- Color palette with light/dark modes
+- Typography scale with font sizes and weights
+- Spacing, border radius, shadows, transitions
+- All validation checks pass
 
 IMPLEMENTATION NOTES:
+Implemented the design system in globals.css using Tailwind v4's @theme inline directive. All design tokens are defined as CSS custom properties in :root with dark mode support via @media (prefers-color-scheme: dark). The system includes:
+- Complete color palette (background, foreground, muted, border, ring, primary, secondary, accent, destructive, success, warning)
+- Typography scale (text-xs through text-5xl with line heights)
+- Font weights (normal, medium, semibold, bold)
+- Border radius scale (xs through 2xl, full)
+- Shadow scale (xs through xl)
+- Transition durations (fast, normal, slow)
+- Utility classes for container, text-balance, text-pretty
+- Selection styling matching primary color
 
 RESULT:
+Task 1.2 completed successfully. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 FILES ACTUALLY CHANGED:
+- src/app/globals.css (design system tokens)
+- docs/1.2.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.3: Navbar

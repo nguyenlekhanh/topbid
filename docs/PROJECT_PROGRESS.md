@@ -4,7 +4,7 @@
 **Phase 1 — UI / Design**
 
 ## Current Task
-**1.1 completed** — Next recommended: 1.2
+**1.2 completed** — Next recommended: 1.3
 
 ## Completed Tasks
 - 0.1: Create Next.js project with TypeScript ✓
@@ -18,6 +18,7 @@
 - 0.9: Configure Vercel deployment ✓
 - 0.10: Create AGENTS.md and documentation workflow ✓
 - 1.1: Global layout (app shell) ✓
+- 1.2: Typography and design system ✓
 
 ## Tasks in Progress
 *None*
@@ -45,6 +46,7 @@
 - Vercel deployment prepared (repository ready)
 - AGENTS.md and documentation workflow established
 - Global app shell implemented (header/main/footer, full-height layout)
+- Typography and design system implemented (colors, typography, spacing, shadows, transitions)
 
 ## Current Environment/Setup Status
 - Node.js: v20.18.3 ✓
@@ -60,7 +62,7 @@
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-**1.2 — Typography and design system**
+**1.3 — Navbar**
 
 ## Notes
-Task 1.1 completed successfully. Global app shell implemented with semantic header/main/footer structure, full-height flex layout, responsive container, and minimal placeholder root page. Phase 1 (UI/Design) has begun.
+Task 1.2 completed successfully. Design system implemented with complete color palette (light/dark), typography scale, border radius, shadows, and transitions using Tailwind v4 @theme directive.
