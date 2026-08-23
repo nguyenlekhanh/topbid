@@ -1,32 +1,98 @@
 ﻿TASK ID: 0.9
 PHASE: 0
 TITLE: Configure Vercel deployment
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prepare the existing Next.js project for deployment on Vercel.
 
 SCOPE:
+- Inspect current project structure and configuration
+- Verify Next.js/Vercel compatibility
+- Add Vercel configuration only if necessary
+- Review and document environment variable requirements
+- Verify production build passes
+- Document manual steps required by project owner
 
 OUT OF SCOPE:
+- Actual Vercel account connection/deployment (requires project owner action)
+- Creating Vercel project via CLI
+- Setting up custom domains
+- Configuring Vercel-specific features (Edge Functions, etc.)
 
 INPUTS / DEPENDENCIES:
+- Tasks 0.1-0.8 completed
+- Next.js 16.3.2 with App Router
+- All environment variables documented in .env.example
 
 IMPLEMENTATION REQUIREMENTS:
+- No hardcoded secrets
+- Server-only variables not exposed via NEXT_PUBLIC_*
+- Production build must pass
+- Standard Next.js/Vercel setup preferred
 
 FILES EXPECTED TO CHANGE:
+- docs/0.9.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
+- (No code changes required - standard Next.js app is Vercel-ready)
 
 TEST PLAN:
+1. Run `npm run typecheck` - TypeScript compilation should pass
+2. Run `npm run lint` - ESLint should pass
+3. Run `npm run format:check` - Prettier should verify formatting
+4. Run `npm run build` - Production build should succeed
+5. Verify .env.example documents all required variables
 
 DEFINITION OF DONE:
+- Repository is prepared for Vercel deployment
+- Environment variable requirements documented
+- All checks pass
+- Documentation updated
 
 IMPLEMENTATION NOTES:
+The project is a standard Next.js 16.3.2 App Router application. Next.js apps are natively compatible with Vercel and require no additional configuration for basic deployment. The existing next.config.ts is minimal and sufficient.
+
+Environment variables that must be configured in Vercel (Project Settings → Environment Variables):
+
+Server-only (do NOT prefix with NEXT_PUBLIC_):
+- STRIPE_SECRET_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- STRIPE_WEBHOOK_SECRET
+
+Client-safe (MUST prefix with NEXT_PUBLIC_):
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+- NEXT_PUBLIC_APP_URL (set to production URL, e.g., https://your-domain.com)
 
 RESULT:
+Repository is prepared for Vercel deployment. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- No Vercel-specific configuration files needed (standard Next.js setup)
+- Environment variables documented in .env.example
 
 FILES ACTUALLY CHANGED:
+- docs/0.9.txt (created/updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+MANUAL STEPS REQUIRED BY PROJECT OWNER:
+1. Connect/import the Git repository in Vercel (vercel.com/new)
+2. Configure the environment variables listed above in Vercel Project Settings
+3. Deploy and verify the production deployment works
+4. (Optional) Configure custom domain in Vercel Project Settings
+5. (Optional) Update STRIPE_WEBHOOK_SECRET with production webhook endpoint URL after deployment

@@ -166,14 +166,38 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.8 - Configure Git + initial commit
 
 ### Task 0.8
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure Git + initial commit
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Repository already initialized with .git. All project files tracked. Initial commits made for each task.
+- **Files changed**: None (Git already configured)
+- **Tests performed**: 
+  - `git status`: Clean working tree after commits
+- **Follow-up work**: Task 0.9 - Configure Vercel deployment
 
 ### Task 0.9
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure Vercel deployment
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Verified the Next.js 16.3.2 App Router project is natively compatible with Vercel. No additional Vercel configuration files required. Documented environment variables that must be configured in Vercel.
+- **Files changed**:
+  - docs/0.9.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**: 
+  - Standard Next.js app requires no vercel.json or additional config
+  - next.config.ts is minimal and sufficient
+  - Environment variables clearly categorized as server-only vs client-safe
+- **Known limitations**: 
+  - Actual Vercel deployment requires manual action by project owner
+  - Vercel project must be created and connected to Git repository
+  - Environment variables must be manually configured in Vercel dashboard
+- **Follow-up work**: Task 0.10 - Create AGENTS.md and documentation workflow
 
 ### Task 0.10
 - **Date**: 2026-08-23

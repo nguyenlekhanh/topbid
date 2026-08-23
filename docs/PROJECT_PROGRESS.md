@@ -4,7 +4,7 @@
 **Phase 0 — Project Setup**
 
 ## Current Task
-**0.7 completed** — Next recommended: 0.8
+**0.9 completed** — Next recommended: 0.10
 
 ## Completed Tasks
 - 0.1: Create Next.js project with TypeScript ✓
@@ -14,6 +14,8 @@
 - 0.5: Configure Supabase client ✓
 - 0.6: Configure Stripe SDK ✓
 - 0.7: Configure environment variables ✓
+- 0.8: Configure Git + initial commit ✓
+- 0.9: Configure Vercel deployment ✓
 
 ## Tasks in Progress
 *None*
@@ -38,6 +40,7 @@
 - Supabase client configured (client & server)
 - Stripe SDK configured (client & server)
 - Environment variables configured (.env.example, .gitignore)
+- Vercel deployment prepared (repository ready)
 
 ## Current Environment/Setup Status
 - Node.js: v20.18.3 ✓
@@ -49,11 +52,11 @@
 - Prettier: 3.9.6 ✓
 - Supabase: Configured ✓
 - Stripe: Configured ✓
-- Vercel: Not configured
+- Vercel: Prepared (requires manual connection by owner)
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-**0.8 — Configure Git + initial commit**
+**0.10 — Create AGENTS.md and documentation workflow**
 
 ## Notes
-Task 0.7 completed successfully. Environment variable configuration verified: .env.example contains all required variables, .gitignore correctly excludes .env files, no secrets in repository.
+Task 0.9 completed successfully. Repository is prepared for Vercel deployment. Standard Next.js app requires no additional Vercel configuration. Environment variables documented for Vercel configuration. Project owner must manually connect repository to Vercel and set environment variables.
