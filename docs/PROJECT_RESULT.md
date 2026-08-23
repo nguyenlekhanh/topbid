@@ -7,9 +7,33 @@ This file records what has actually been built, not what was planned.
 ## Phase 0 — Project Setup
 
 ### Task 0.1
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Create Next.js project with TypeScript
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Created Next.js 16.3.2 project with TypeScript, App Router, src/ directory structure, and @/* path aliases using `create-next-app`
+- **Files created**:
+  - package.json (with added typecheck script)
+  - tsconfig.json (strict mode enabled)
+  - next.config.ts
+  - src/app/layout.tsx
+  - src/app/page.tsx
+  - src/app/globals.css
+  - next-env.d.ts
+  - .gitignore
+  - AGENTS.md (restored)
+  - README.md (restored)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+- **Important technical decisions**: 
+  - Used Next.js 16.3.2 (latest) with App Router
+  - TypeScript strict mode enabled by default
+  - Path aliases configured (@/*)
+  - ESLint with eslint-config-next
+- **Known limitations**: 
+  - Next.js generated its own AGENTS.md and README.md which were overwritten and restored
+  - npm warnings about eslint version and engine requirements (non-blocking)
+- **Follow-up work**: Task 0.2 - Verify TypeScript strict mode configuration
 
 ### Task 0.2
 - **Date**: Not started

@@ -4,10 +4,10 @@
 **Phase 0 — Project Setup**
 
 ## Current Task
-**Not started** — Next recommended: 0.1
+**0.1 completed** — Next recommended: 0.2
 
 ## Completed Tasks
-*None yet*
+- 0.1: Create Next.js project with TypeScript ✓
 
 ## Tasks in Progress
 *None*
@@ -24,18 +24,24 @@
 ## Current Architecture Status
 - Repository initialized with .git
 - Documentation structure created
-- No application code yet
+- Next.js project created with TypeScript, App Router, src/ directory
+- TypeScript strict mode enabled
+- ESLint configured
+- Path aliases (@/*) configured
 
 ## Current Environment/Setup Status
-- Node.js: Not verified
-- npm: Not verified
+- Node.js: v20.18.3 ✓
+- npm: 11.19.0 ✓
+- Next.js: 16.3.2 ✓
+- React: 19.2.8 ✓
+- TypeScript: 5.x ✓
 - Supabase: Not configured
 - Stripe: Not configured
 - Vercel: Not configured
 - Environment variables: Not created
 
 ## Next Recommended Task
-**0.1 — Create Next.js project with TypeScript**
+**0.2 — Configure TypeScript (strict mode)**
 
 ## Notes
-This is a fresh repository. All documentation has been initialized per AGENTS.md specifications. Ready to begin Phase 0 implementation.
+Task 0.1 completed successfully. Next.js project is set up with TypeScript, App Router, and basic configuration. TypeScript and lint checks pass.

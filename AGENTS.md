@@ -28,7 +28,7 @@ When asked to implement a task (e.g., "Implement task 3.1"):
 3. Implement ONLY the specified task
 4. Run relevant tests
 5. Run TypeScript checks (`npm run typecheck` or equivalent)
-6. Run linting (`npm run lint` or equivalent)
+5. Run linting (`npm run lint` or equivalent)
 7. Fix any issues caused by your implementation
 8. Update task documentation:
    - `docs/<TASK_ID>.txt` (with actual results)
