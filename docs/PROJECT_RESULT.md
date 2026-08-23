@@ -7,6 +7,7 @@ This file records what has actually been built, not what was planned.
 ## Phase 0 — Project Setup
 
 ### Task 0.1
+
 - **Date**: 2026-08-23
 - **Objective**: Create Next.js project with TypeScript
 - **Status**: Completed
@@ -25,17 +26,18 @@ This file records what has actually been built, not what was planned.
 - **Tests performed**:
   - `npm run typecheck`: PASSED
   - `npm run lint`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Used Next.js 16.3.2 (latest) with App Router
   - TypeScript strict mode enabled by default
   - Path aliases configured (@/*)
   - ESLint with eslint-config-next
-- **Known limitations**: 
+- **Known limitations**:
   - Next.js generated its own AGENTS.md and README.md which were overwritten and restored
   - npm warnings about eslint version and engine requirements (non-blocking)
 - **Follow-up work**: Task 0.2 - Verify TypeScript strict mode configuration
 
 ### Task 0.2
+
 - **Date**: 2026-08-23
 - **Objective**: Configure TypeScript (strict mode)
 - **Status**: Completed
@@ -45,13 +47,14 @@ This file records what has actually been built, not what was planned.
   - `npm run typecheck`: PASSED
   - `npm run lint`: PASSED
   - `npm run build`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - tsconfig.json already has "strict": true (enables all strict checks)
   - No additional strict options needed
 - **Known limitations**: None
 - **Follow-up work**: Task 0.3 - Configure Tailwind CSS
 
 ### Task 0.3
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Tailwind CSS
 - **Status**: Completed
@@ -61,7 +64,7 @@ This file records what has actually been built, not what was planned.
   - `npm run typecheck`: PASSED
   - `npm run lint`: PASSED
   - `npm run build`: PASSED (Tailwind classes processed successfully)
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Tailwind v4 with @import syntax (no tailwind.config.js needed)
   - PostCSS plugin: @tailwindcss/postcss
   - Design tokens in globals.css using @theme inline
@@ -71,6 +74,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.4 - Configure ESLint + Prettier
 
 ### Task 0.4
+
 - **Date**: 2026-08-23
 - **Objective**: Configure ESLint + Prettier
 - **Status**: Completed
@@ -86,7 +90,7 @@ This file records what has actually been built, not what was planned.
   - `npm run format`: PASSED
   - `npm run format:check`: PASSED
   - `npm run build`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Prettier 3.9.6 with standard config (semi: true, singleQuote: true, tabWidth: 2)
   - eslint-plugin-prettier for ESLint integration
   - eslint-config-prettier to disable conflicting rules
@@ -95,6 +99,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.5 - Configure Supabase client
 
 ### Task 0.5
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Supabase client
 - **Status**: Completed
@@ -110,7 +115,7 @@ This file records what has actually been built, not what was planned.
   - `npm run lint`: PASSED
   - `npm run format:check`: PASSED
   - `npm run build`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Use @supabase/ssr for Next.js 15+ compatibility (cookies() is async)
   - Client-side: createBrowserClient for browser usage
   - Server-side: createServerClient with cookie handling for Server Components/API routes
@@ -120,6 +125,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.6 - Configure Stripe SDK
 
 ### Task 0.6
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Stripe SDK
 - **Status**: Completed
@@ -134,7 +140,7 @@ This file records what has actually been built, not what was planned.
   - `npm run lint`: PASSED
   - `npm run format:check`: PASSED
   - `npm run build`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Server-side: Stripe secret key (STRIPE_SECRET_KEY) used only in server-side code
   - Client-side: Stripe publishable key (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) used in browser
   - Current Stripe API version: 2026-07-29.dahlia
@@ -144,6 +150,7 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.7 - Configure environment variables
 
 ### Task 0.7
+
 - **Date**: 2026-08-23
 - **Objective**: Configure environment variables
 - **Status**: Completed
@@ -157,7 +164,7 @@ This file records what has actually been built, not what was planned.
   - Verified .env.example contains all required variables
   - Verified .gitignore ignores .env* files
   - Verified no .env.local or secret files in repository
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Server-only secrets: STRIPE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET (no NEXT_PUBLIC_ prefix)
   - Client-safe variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, NEXT_PUBLIC_APP_URL
   - .env.example committed as template (no real values)
@@ -166,16 +173,18 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.8 - Configure Git + initial commit
 
 ### Task 0.8
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Git + initial commit
 - **Status**: Completed
 - **What was implemented**: Repository already initialized with .git. All project files tracked. Initial commits made for each task.
 - **Files changed**: None (Git already configured)
-- **Tests performed**: 
+- **Tests performed**:
   - `git status`: Clean working tree after commits
 - **Follow-up work**: Task 0.9 - Configure Vercel deployment
 
 ### Task 0.9
+
 - **Date**: 2026-08-23
 - **Objective**: Configure Vercel deployment
 - **Status**: Completed
@@ -189,42 +198,43 @@ This file records what has actually been built, not what was planned.
   - `npm run lint`: PASSED
   - `npm run format:check`: PASSED
   - `npm run build`: PASSED
-- **Important technical decisions**: 
+- **Important technical decisions**:
   - Standard Next.js app requires no vercel.json or additional config
   - next.config.ts is minimal and sufficient
   - Environment variables clearly categorized as server-only vs client-safe
-- **Known limitations**: 
+- **Known limitations**:
   - Actual Vercel deployment requires manual action by project owner
   - Vercel project must be created and connected to Git repository
   - Environment variables must be manually configured in Vercel dashboard
 - **Follow-up work**: Task 0.10 - Create AGENTS.md and documentation workflow
 
 ### Task 0.10
+
 - **Date**: 2026-08-23
 - **Objective**: Create AGENTS.md and documentation workflow
-- **What was implemented**: Created README.md, AGENTS.md, docs/PROJECT_PLAN.md, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md, and all initial task files
-- **Files created**: 
-  - README.md
-  - AGENTS.md
-  - docs/PROJECT_PLAN.md
-  - docs/PROJECT_PROGRESS.md
-  - docs/PROJECT_RESULT.md
-  - docs/0.1.txt through docs/0.10.txt
-  - docs/1.1.txt through docs/1.15.txt
-  - docs/2.1.txt through docs/2.10.txt
-  - docs/3.1.txt through docs/3.8.txt
-  - docs/4.1.txt through docs/4.12.txt
-  - docs/5.1.txt through docs/5.7.txt
-  - docs/6.1.txt through docs/6.7.txt
-  - docs/7.1.txt through docs/7.7.txt
-  - docs/8.1.txt through docs/8.8.txt
-  - docs/9.1.txt through docs/9.11.txt
-  - docs/10.1.txt through docs/10.11.txt
-- **Tests performed**: None
-- **Important technical decisions**: Documentation-first approach; all task files pre-created with templates
-- **Known limitations**: None yet
-- **Follow-up work**: Begin Task 0.1 - Create Next.js project
+- **Status**: Completed
+- **What was implemented**: Updated AGENTS.md at repository root with comprehensive agent instructions including: Project Overview, Architecture, Security Rules, Environment Variables, Development Workflow, Task Scope Rules, Quality Checks, Documentation Workflow, Git Workflow, Critical Rules, Required Reading, Task Execution Workflow, Business Rules, Code Quality Standards, Environment Setup, Useful Commands. Created docs/0.10.txt with task documentation.
+- **Files changed**:
+  - AGENTS.md (updated with complete agent instructions)
+  - docs/0.10.txt (created)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Verified AGENTS.md exists at repository root
+  - Verified docs/0.10.txt exists
+  - Verified no secrets committed
+- **Important technical decisions**:
+  - AGENTS.md includes all required sections from specification
+  - Documentation workflow covers 3 files per task
+  - Git commit convention documented with examples
+  - Phase 0 complete
+- **Known limitations**: None
+- **Follow-up work**: Phase 1 — UI / Design (Task 1.1: Global layout)
 
 ---
 
-*This file will be updated after each completed task with actual implementation details.*
+_This file will be updated after each completed task with actual implementation details._

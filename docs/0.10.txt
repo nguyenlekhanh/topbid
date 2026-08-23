@@ -1,32 +1,100 @@
 ﻿TASK ID: 0.10
 PHASE: 0
 TITLE: Create AGENTS.md and documentation workflow
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a clear development workflow and AGENTS.md instructions so future coding agents can work consistently on the Topbid.lol project.
 
 SCOPE:
+- Update AGENTS.md at repository root with all required sections
+- Create docs/0.10.txt with task implementation details
+- Update docs/PROJECT_PROGRESS.md and docs/PROJECT_RESULT.md
 
 OUT OF SCOPE:
+- Building UI components
+- Implementing bidding logic
+- Database migrations
+- Stripe integration
+- Authentication
+- Deployment
 
 INPUTS / DEPENDENCIES:
+- Tasks 0.1-0.9 completed
+- Existing AGENTS.md with repository safety rules
+- Existing documentation structure
 
 IMPLEMENTATION REQUIREMENTS:
+- AGENTS.md must include: Project Overview, Architecture, Security Rules, Environment Variables, Development Workflow, Task Scope Rules, Quality Checks, Documentation Workflow, Git Workflow
+- Documentation workflow must cover: docs/<TASK_ID>.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
+- Git commit convention must be documented
 
 FILES EXPECTED TO CHANGE:
+- AGENTS.md (updated with complete agent instructions)
+- docs/0.10.txt (created with implementation details)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TEST PLAN:
+1. Run `npm run typecheck` - TypeScript compilation should pass
+2. Run `npm run lint` - ESLint should pass
+3. Run `npm run format:check` - Prettier should verify formatting
+4. Run `npm run build` - Production build should succeed
+5. Verify AGENTS.md exists at repository root
+6. Verify docs/0.10.txt exists
+7. Verify no secrets in repository
 
 DEFINITION OF DONE:
+- AGENTS.md updated with all required sections
+- Documentation workflow established
+- All validation checks pass
+- Task documentation complete
+- Git commit created
 
 IMPLEMENTATION NOTES:
+Updated AGENTS.md to include all required sections from the task specification while preserving existing repository safety rules. The file now contains:
+- Project Overview with core bidding flow and tech stack
+- Architecture description
+- Security Rules (non-negotiable principles)
+- Environment Variables (server-only vs client-safe)
+- Development Workflow (10-step process)
+- Task Scope Rules
+- Quality Checks (npm commands)
+- Documentation Workflow (3 files to update)
+- Git Workflow (commit convention, examples, branch strategy)
+- Critical Rules, Required Reading, Task Execution Workflow, Business Rules, Code Quality Standards, Environment Setup, Useful Commands
+
+Created docs/0.10.txt with full task documentation.
+Updated PROJECT_PROGRESS.md to mark Task 0.10 as completed.
+Updated PROJECT_RESULT.md with Task 0.10 completion record.
 
 RESULT:
+Task 0.10 completed successfully. Verified by:
+- AGENTS.md exists at repository root with all required sections
+- docs/0.10.txt created
+- PROJECT_PROGRESS.md updated
+- PROJECT_RESULT.md updated
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- No secrets committed
+- .env.local remains ignored
 
 FILES ACTUALLY CHANGED:
+- AGENTS.md (updated with complete agent instructions)
+- docs/0.10.txt (created)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Phase 0 complete. Next recommended: Phase 1 — UI / Design (Task 1.1: Global layout)

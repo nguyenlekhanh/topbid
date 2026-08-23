@@ -189,9 +189,168 @@ Confirm:
 
 Only then commit and push.
 
+---
+
 # AGENTS.md — Topbid.lol Agent Instructions
 
 This file provides instructions for AI agents working on the Topbid.lol project.
+
+## Project Overview
+
+**Topbid.lol** is a simple public bidding/leaderboard website where users bid on categories and compete for the top spot.
+
+**Core bidding flow:**
+
+1. Users choose a category
+2. Users click BID
+3. System checks current highest paid bid for that category
+4. If no bids exist, use category's starting bid; otherwise calculate minimum valid bid = highest_bid + increment
+5. User pays through Stripe Checkout
+6. Only after Stripe confirms payment via verified webhook does the bid become valid
+7. New bid becomes highest bid for that category
+8. Leaderboard updates in real-time
+9. Previous highest bidder may receive outbid notification
+
+**Technology Stack:**
+
+- **Framework**: Next.js 16+ (App Router)
+- **Language**: TypeScript (strict mode)
+- **Styling**: Tailwind CSS v4
+- **Database**: Supabase / PostgreSQL
+- **Payments**: Stripe (Checkout + Webhooks)
+- **Deployment**: Vercel
+
+## Architecture
+
+- **Next.js App Router** with React Server Components and Server Actions
+- **Supabase/PostgreSQL** for data persistence (categories, bids)
+- **Stripe Checkout** for payment processing; **Stripe Webhooks** for payment confirmation
+- **Vercel** for hosting and deployment
+- **Server/client responsibilities**:
+  - Server: Bid calculations, payment validation, database writes, webhook handling
+  - Client: UI rendering, Stripe Checkout redirect, real-time subscriptions
+
+## Security Rules
+
+**Non-negotiable security principles:**
+
+- **Never trust client-provided bid amounts** — All bid calculations must happen server-side
+- **Never expose secret environment variables to the client** — No NEXT_PUBLIC_ prefix for server-only secrets
+- **Stripe webhook signatures must be verified** on every request
+- **Stripe webhook handling must be idempotent** — Use event IDs to prevent duplicate processing
+- **Supabase service role key is server-only** — Never expose to client
+- **Never commit .env.local or secrets** — .env.local is in .gitignore
+- **Validate all API input** — Use Zod or similar for request validation
+- **Follow RLS policies** — Database access controlled by Row Level Security
+- **Do not bypass security controls for convenience**
+
+## Environment Variables
+
+### Server-only (never expose to client, no NEXT_PUBLIC_ prefix):
+
+- `STRIPE_SECRET_KEY` — Stripe secret key for server-side operations
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role for admin operations
+- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret
+
+### Client-safe (must use NEXT_PUBLIC_ prefix):
+
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anonymous key for client
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe publishable key
+- `NEXT_PUBLIC_APP_URL` — Application URL (e.g., https://topbid.lol)
+
+### Environment variable management:
+
+- `.env.local` is for local development only — **never committed**
+- Production environment variables belong in Vercel Project Settings
+- Stripe production/live secrets must not be used casually during development
+
+## Development Workflow
+
+When implementing any task:
+
+1. **Read PROJECT_PLAN.md** — Understand the overall roadmap
+2. **Identify the exact task being worked on** — Read the specific task file
+3. **Inspect existing implementation** — Understand current code before modifying
+4. **Make the smallest necessary changes** — Focus only on the assigned task
+5. **Run relevant tests/checks** — Verify your changes don't break existing functionality
+6. **Update task documentation** — Document what was actually implemented
+7. **Update PROJECT_PROGRESS.md** — Mark task as completed, note next recommended task
+8. **Update PROJECT_RESULT.md** — Add cumulative implementation record
+9. **Commit using required format** — `feat(<task_id>): <description>` or `fix(<task_id>): <description>`
+10. **Push to origin/main** when explicitly requested or appropriate
+
+## Task Scope Rules
+
+Agents must:
+
+- Work only on the assigned task
+- Not silently implement future tasks
+- Not mark unrelated tasks as completed
+- Not change PROJECT_PLAN.md task status unless explicitly requested
+- Preserve existing functionality
+- Avoid unnecessary dependencies
+- Avoid unnecessary architectural changes
+
+## Quality Checks
+
+Run these checks when applicable:
+
+```bash
+npm run typecheck    # TypeScript compiler check
+npm run lint         # ESLint with Prettier rules
+npm run format:check # Prettier format verification
+npm run build        # Production build verification
+npm run test         # Tests (when available)
+```
+
+Fix any issues caused by your changes before committing.
+
+## Documentation Workflow
+
+Every completed task must update these three files:
+
+- `docs/<TASK_ID>.txt` — Task-specific documentation with actual results
+- `docs/PROJECT_PROGRESS.md` — Current project state
+- `docs/PROJECT_RESULT.md` — Cumulative implementation record
+
+Each task document must clearly state:
+
+- Task ID and title
+- Objective
+- Implementation details
+- Files changed
+- Validation/tests run
+- Final status
+- Commit information when available
+
+## Git Workflow
+
+**Commit convention:**
+
+```
+<type>(<task-id>): <description>
+```
+
+**Examples:**
+
+- `feat(0.9): configure Vercel deployment`
+- `feat(0.10): create agent documentation workflow`
+- `fix(3.6): handle concurrent bids`
+
+**Do not create vague commits:**
+
+- `update`
+- `changes`
+- `fixes`
+- `work`
+- `stuff`
+
+**Branch strategy:**
+
+- Create feature branches for each task (optional for solo development)
+- Commit after each completed task
+- Push to remote when task is complete and verified
 
 ## Critical Rules
 
