@@ -66,9 +66,9 @@ you may modify ONLY:
 2. Files needed to integrate the implementation.
 3. The required documentation files:
 
-   * `docs/0.1.txt`
-   * `docs/PROJECT_PROGRESS.md`
-   * `docs/PROJECT_RESULT.md`
+   - `docs/0.1.txt`
+   - `docs/PROJECT_PROGRESS.md`
+   - `docs/PROJECT_RESULT.md`
 
 Do NOT modify future task files.
 
@@ -189,7 +189,6 @@ Confirm:
 
 Only then commit and push.
 
-
 # AGENTS.md — Topbid.lol Agent Instructions
 
 This file provides instructions for AI agents working on the Topbid.lol project.
@@ -220,7 +219,7 @@ When asked to implement a task (e.g., "Implement task 3.1"):
 3. Implement ONLY the specified task
 4. Run relevant tests
 5. Run TypeScript checks (`npm run typecheck` or equivalent)
-5. Run linting (`npm run lint` or equivalent)
+6. Run linting (`npm run lint` or equivalent)
 7. Fix any issues caused by your implementation
 8. Update task documentation:
    - `docs/<TASK_ID>.txt` (with actual results)

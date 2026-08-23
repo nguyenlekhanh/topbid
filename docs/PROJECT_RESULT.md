@@ -71,9 +71,28 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.4 - Configure ESLint + Prettier
 
 ### Task 0.4
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure ESLint + Prettier
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Installed Prettier and ESLint plugins, updated ESLint config with Prettier integration, created .prettierrc, added format scripts to package.json. Fixed existing code formatting.
+- **Files changed**:
+  - eslint.config.mjs (added Prettier integration)
+  - .prettierrc (created)
+  - package.json (added format scripts and devDependencies)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run lint:fix`: PASSED
+  - `npm run format`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**: 
+  - Prettier 3.9.6 with standard config (semi: true, singleQuote: true, tabWidth: 2)
+  - eslint-plugin-prettier for ESLint integration
+  - eslint-config-prettier to disable conflicting rules
+  - Format scripts: format, format:check, lint:fix
+- **Known limitations**: None
+- **Follow-up work**: Task 0.5 - Configure Supabase client
 
 ### Task 0.5
 - **Date**: Not started
