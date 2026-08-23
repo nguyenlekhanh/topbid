@@ -1,32 +1,72 @@
 ﻿TASK ID: 2.3
 PHASE: 2
 TITLE: Database indexes
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create additive Supabase/PostgreSQL migration for the four planned bids indexes exactly as specified in PROJECT_PLAN.md.
 
 SCOPE:
+- New migration supabase/migrations/20260823000003_add_bids_indexes.sql
+- idx_bids_category_status ON public.bids(category_id, status)
+- idx_bids_category_paid_amount ON public.bids(category_id, amount DESC) WHERE status = 'paid' (partial)
+- idx_bids_stripe_session ON public.bids(stripe_session_id) — documented as potentially redundant with UNIQUE constraint
+- idx_bids_payment_intent ON public.bids(stripe_payment_intent_id)
+- No RLS, no constraints, no seed, no queries, no UI
 
 OUT OF SCOPE:
+- Constraints/CHECK (2.4), RLS (2.5), seed (2.6), queries (2.7+), bid engine/Stripe/realtime/UI
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1 categories, 2.2 bids migrations
+- PROJECT_PLAN.md Indexes section
 
 IMPLEMENTATION REQUIREMENTS:
+- NEW migration file, do not modify 2.1/2.2
+- Preserve amount DESC ordering and partial condition status = 'paid' exactly
+- Use public.bids explicitly
+- Consider redundancy with UNIQUE constraints — document, do not silently drop index
+- No DROP INDEX, additive only
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000003_add_bids_indexes.sql (created)
+- docs/2.3.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Inspect all four index definitions
+2. Validate via Supabase CLI if available
+3. npm run typecheck
+4. npm run lint
+5. npm run format:check
+6. npm run build
 
 DEFINITION OF DONE:
+- Migration file exists with four indexes as planned, partial condition preserved, additive, version-controlled, all checks pass
 
 IMPLEMENTATION NOTES:
+Created additive file 20260823000003_add_bids_indexes.sql with four CREATE INDEX statements matching plan order and naming. Parsed public.bids. idx_bids_category_paid_amount uses amount desc + where status = 'paid' exactly. idx_bids_stripe_session documented as potentially redundant because unique constraint on stripe_session_id already creates btree index bids_stripe_session_id_key; retained per plan instruction to document not remove. No CONCURRENTLY (cannot run in transaction), no DROP, no unrelated indexes.
 
 RESULT:
+Inspected index definitions — category_status (category_id, status) correct, category_paid_amount with DESC + WHERE status = 'paid' correct, stripe_session and payment_intent single-column correct. Supabase CLI 2.115.0 via npx supabase available. Build unchanged.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000003_add_bids_indexes.sql (created - 12 lines)
+- docs/2.3.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Migration inspection: PASSED
+- Supabase CLI version check: 2.115.0 via npx supabase
 
 KNOWN ISSUES:
+- None (one redundancy documented)
 
 FOLLOW-UP:
+Proceed to Task 2.4 — Constraints

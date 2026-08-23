@@ -865,6 +865,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push after 2.1 to apply)
 - **Follow-up work**: Task 2.3 — Database indexes
 
+### Task 2.3
+
+- **Date**: 2026-08-23
+- **Objective**: Create database indexes exactly as planned
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000003_add_bids_indexes.sql with four planned indexes
+  - idx_bids_category_status on public.bids(category_id, status)
+  - idx_bids_category_paid_amount on public.bids(category_id, amount desc) where status = 'paid' (partial index preserved)
+  - idx_bids_stripe_session on public.bids(stripe_session_id) — documented as potentially redundant with unique constraint bids_stripe_session_id_key that already creates btree index; retained per plan instead of silently dropping
+  - idx_bids_payment_intent on public.bids(stripe_payment_intent_id)
+  - Additive after 20260823000002, no RLS/constraints/seed, no DROP, public.bids qualified
+- **Files changed**:
+  - supabase/migrations/20260823000003_add_bids_indexes.sql (created)
+  - docs/2.3.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (all four indexes verified, DESC and partial condition preserved)
+  - Supabase CLI version: 2.115.0 via npx supabase
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Created all four indexes as planned, not silently omitting redundant stripe_session one
+  - Preserved amount DESC ordering and status = 'paid' exactly
+  - Used public.bids explicitly, no CONCURRENTLY (txn-safe), no extra indexes
+- **Known limitations**: None (one redundancy documented as noted)
+- **Follow-up work**: Task 2.4 — Constraints
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

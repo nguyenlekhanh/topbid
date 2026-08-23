@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.2 completed** — Next recommended: 2.3
+**2.3 completed** — Next recommended: 2.4
 
 ## Completed Tasks
 
@@ -37,6 +37,7 @@
 - 1.15: UI polish (animations, transitions) ✓
 - 2.1: Categories schema + migration ✓
 - 2.2: Bids schema + migration ✓
+- 2.3: Database indexes ✓
 
 ## Tasks in Progress
 
@@ -85,6 +86,7 @@ _None_
 - UI polish applied (subtle animations: fadeInUp, slideDown, scaleIn, lift/shadow, underline, motion-safe)
 - Categories schema migration created (UUID PK, slug unique, integer cents, timestamps, pgcrypto guard)
 - Bids schema migration created (UUID PK, FK to categories ON DELETE CASCADE, integer cents, stripe_session_id UNIQUE + composite unique, status pending, is_highest, timestamps)
+- Database indexes migration created (4 bids indexes, partial status='paid' with DESC preserved, stripe_session redundancy documented)
 
 ## Current Environment/Setup Status
 
@@ -102,10 +104,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.3 — Database indexes**
+**2.4 — Constraints**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.2 completed successfully. Bids migration created at supabase/migrations/20260823000002_create_bids.sql matching PROJECT_PLAN.md exactly, FK to categories ON DELETE CASCADE, uniques verified, build passed.
+Task 2.3 completed successfully. Indexes migration created at supabase/migrations/20260823000003_add_bids_indexes.sql with four planned bids indexes (partial status='paid' preserved), build passed.
