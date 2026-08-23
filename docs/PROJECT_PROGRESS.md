@@ -1,15 +1,12 @@
 # PROJECT_PROGRESS.md — Current Project State
 
 ## Current Phase
-
-**Phase 0 — Project Setup**
+**Phase 1 — UI / Design**
 
 ## Current Task
-
-**0.10 completed** — Next recommended: 1.1
+**1.1 completed** — Next recommended: 1.2
 
 ## Completed Tasks
-
 - 0.1: Create Next.js project with TypeScript ✓
 - 0.2: Configure TypeScript (strict mode) ✓
 - 0.3: Configure Tailwind CSS ✓
@@ -20,25 +17,21 @@
 - 0.8: Configure Git + initial commit ✓
 - 0.9: Configure Vercel deployment ✓
 - 0.10: Create AGENTS.md and documentation workflow ✓
+- 1.1: Global layout (app shell) ✓
 
 ## Tasks in Progress
-
-_None_
+*None*
 
 ## Blocked Tasks
-
-_None_
+*None*
 
 ## Known Bugs
-
-_None_
+*None*
 
 ## Known Technical Debt
-
-_None_
+*None*
 
 ## Current Architecture Status
-
 - Repository initialized with .git
 - Documentation structure created
 - Next.js project created with TypeScript, App Router, src/ directory
@@ -51,9 +44,9 @@ _None_
 - Environment variables configured (.env.example, .gitignore)
 - Vercel deployment prepared (repository ready)
 - AGENTS.md and documentation workflow established
+- Global app shell implemented (header/main/footer, full-height layout)
 
 ## Current Environment/Setup Status
-
 - Node.js: v20.18.3 ✓
 - npm: 11.19.0 ✓
 - Next.js: 16.3.2 ✓
@@ -67,9 +60,7 @@ _None_
 - Environment variables: .env.example created ✓
 
 ## Next Recommended Task
-
-**1.1 — Global layout (app shell)**
+**1.2 — Typography and design system**
 
 ## Notes
-
-Task 0.10 completed successfully. AGENTS.md updated with comprehensive agent instructions. Documentation workflow established. Phase 0 (Project Setup) is now complete.
+Task 1.1 completed successfully. Global app shell implemented with semantic header/main/footer structure, full-height flex layout, responsive container, and minimal placeholder root page. Phase 1 (UI/Design) has begun.
