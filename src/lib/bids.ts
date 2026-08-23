@@ -331,6 +331,12 @@ const MAX_BIDDER_NAME_LENGTH = 100;
  * - Never trusts client data: category is resolved from the DB via validateCategory,
  *   the amount is checked against the authoritative minimum via validateBidAmount, and
  *   the stored category_id comes from the DB row (never a client-supplied object)
+ * - Concurrency (Task 3.6): the authoritative minimum re-check and the insert run inside
+ *   the create_pending_bid RPC, which takes SELECT ... FOR UPDATE on the category row.
+ *   Same-category bids serialize on that lock; different categories never block each
+ *   other. The RPC recomputes the minimum inside the lock (accounting for pending
+ *   reservations) so two simultaneous bids can never both reserve the same amount slot.
+ *   The pre-validation above remains as fast-fail UX; the RPC is the source of truth.
  * - The record is explicitly created as status: 'pending'; it is never marked paid or
  *   highest at creation (paid conversion happens via verified Stripe webhook in Phase 4)
  * - Contract for Task 4.1 (Stripe Checkout): expected failures return a typed union with
@@ -338,8 +344,6 @@ const MAX_BIDDER_NAME_LENGTH = 100;
  *   failures (DB errors, missing server env config) throw descriptive Errors. On success
  *   the full inserted Bid row (id, amount in integer cents, status='pending') is returned,
  *   sufficient to build the Checkout session and attach metadata later.
- * - Concurrency locking (3.6) and duplicate-transaction prevention (3.7) are NOT handled
- *   here; multiple pending rows per category are possible until those tasks land.
  */
 export async function createPendingBid(input: PendingBidInput): Promise<CreatePendingBidResult> {
   const email = normalizeBidderEmail(input.bidderEmail);
@@ -380,23 +384,49 @@ export async function createPendingBid(input: PendingBidInput): Promise<CreatePe
 
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
-    .from('bids')
-    .insert({
-      category_id: category.id,
-      amount,
-      bidder_email: email,
-      bidder_name: nameResult.name,
-      status: 'pending',
-    })
-    .select(BID_FIELDS)
-    .single();
+  // Atomic critical section (row lock on the category + minimum recheck + insert).
+  const { data, error } = await supabase.rpc('create_pending_bid', {
+    p_category_id: category.id,
+    p_amount: amount,
+    p_bidder_email: email,
+    p_bidder_name: nameResult.name,
+  });
 
   if (error) {
+    const mapped = mapPendingBidRpcError(error.message);
+
+    if (mapped) {
+      return mapped;
+    }
+
     throw new Error(`Failed to create pending bid: ${error.message}`);
   }
 
-  return { valid: true, bid: data as Bid };
+  return { valid: true, bid: data as unknown as Bid };
+}
+
+function mapPendingBidRpcError(message: string): CreatePendingBidResult | null {
+  if (!message.startsWith('bid_error:')) {
+    return null;
+  }
+
+  const [, reason, extra] = message.split(':');
+
+  if (reason === 'category_not_found') {
+    return { valid: false, reason: 'category_not_found', minimumBid: null };
+  }
+
+  if (reason === 'amount_below_minimum') {
+    const parsed = Number.parseInt(extra ?? '', 10);
+
+    return {
+      valid: false,
+      reason: 'amount_below_minimum',
+      minimumBid: Number.isNaN(parsed) ? null : parsed,
+    };
+  }
+
+  return null;
 }
 
 function normalizeBidderEmail(email: unknown): string | null {

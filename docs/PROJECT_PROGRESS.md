@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.5 completed** — Next recommended: 3.6
+**3.6 completed** — Next recommended: 3.7
 
 ## Completed Tasks
 
@@ -50,6 +50,7 @@
 - 3.3: Validate bid amount server-side ✓
 - 3.4: Validate category server-side ✓
 - 3.5: Create pending bid record ✓
+- 3.6: Handle concurrent bids (DB locking) ✓
 
 ## Tasks in Progress
 
@@ -111,6 +112,7 @@ _None_
 - Server-side bid amount validation created (getMinimumBidForCategory unified authoritative minimum resolver + validateBidAmount with untrusted-amount runtime guards, discriminated-union result, equality-to-minimum accepted)
 - Server-side category validation created (validateCategory in categories.ts: untrusted slug runtime guards, authoritative DB-sourced row via getCategoryBySlug, active-only enforced by app filter + RLS, predictable invalid_slug/category_not_found reasons)
 - Pending bid record creation created (createPendingBid in bids.ts: composes validateCategory + validateBidAmount, service-role write via new server-only supabase-service.ts, explicit status='pending', DB-sourced category_id, typed failure union with 4.1-ready contract)
+- Concurrent bid handling created (create_pending_bid PL/pgSQL RPC via migration 20260823000007: SELECT FOR UPDATE on the category row serializes same-category critical sections, pending-aware minimum floor recomputed inside the lock, EXECUTE restricted to service_role; createPendingBid switched to the RPC with unchanged external contract)
 
 ## Current Environment/Setup Status
 
@@ -128,7 +130,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.6 — Handle concurrent bids (DB locking)**
+**3.7 — Prevent duplicate transactions**
 
 ## Notes
 
@@ -150,3 +152,5 @@ Task 3.3 completed successfully. Server-side amount validation added to src/lib/
 Task 3.4 completed successfully. validateCategory added to src/lib/categories.ts: authoritative DB-sourced category validation with untrusted-slug runtime guards; active-only enforced by app-level filter + RLS; predictable invalid_slug/category_not_found failure reasons; no service-role usage.
 
 Task 3.5 completed successfully. createPendingBid added to src/lib/bids.ts: validates category + amount authoritatively, then inserts a bids row with explicit status='pending' via the new server-only service-role client (src/lib/supabase-service.ts); typed failure union documented as the Task 4.1 Stripe Checkout contract; concurrency/duplicate handling deferred to Tasks 3.6/3.7.
+
+Task 3.6 completed successfully. Concurrency-safe reservation added: migration 20260823000007 introduces create_pending_bid RPC (SELECT FOR UPDATE on the category row, pending-aware minimum recheck, insert) restricted to service_role; createPendingBid now calls the RPC so same-category critical sections serialize at the database level while different categories proceed concurrently. Live concurrency testing skipped (no local Docker), documented honestly.

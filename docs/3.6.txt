@@ -1,32 +1,83 @@
 ﻿TASK ID: 3.6
 PHASE: 3
 TITLE: Handle concurrent bids (DB locking)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prevent two concurrent bid attempts for the same category from both calculating the same minimum and creating conflicting pending bids, enforced at the database level - never via an in-process JavaScript mutex, and without pretending independent Supabase queries are atomic.
 
 SCOPE:
+- New migration supabase/migrations/20260823000007_create_pending_bid_function.sql - PL/pgSQL function create_pending_bid(uuid, integer, text, text) returns jsonb containing the entire critical section
+- src/lib/bids.ts - createPendingBid now invokes the RPC via the existing service-role client instead of a direct non-atomic insert; adds mapPendingBidRpcError translating bid_error:* messages into the EXISTING stable CreatePendingBidResult union (external contract unchanged)
 
 OUT OF SCOPE:
+- Duplicate transaction prevention (Task 3.7), test infrastructure (3.8), Stripe/payment flow, expiry/cleanup of abandoned pending reservations (Phase 4 payment-failure territory), API-route wiring, schema changes beyond the function itself
 
-INPUTS / DEPENDENCIES:
+STRATEGY CHOSEN (and why):
+- SELECT ... FOR UPDATE on the single categories row inside a database transaction
+- supabase-js cannot open transactions or take locks: every .from() call is an independent PostgREST request, so app-level sequencing of read-minimum + insert is NOT atomic. The critical section therefore lives in a PL/pgSQL function invoked via supabase.rpc() through the service client
+- Narrowest correct lock: one row per category -> same-category bids serialize; different categories lock different rows and proceed concurrently; lock held only for the transaction duration, released automatically
+- Rejected alternatives: advisory locks (discouraged casually; key-collision subtleties), SERIALIZABLE isolation (broader contention + retry machinery for no benefit here), unique partial index on pending bids (that is reservation policy closer to Task 3.7 and rejects rather than serializes)
 
-IMPLEMENTATION REQUIREMENTS:
+RESERVATION CORRECTNESS (the subtle part):
+A row lock alone does NOT suffice: transaction T2 unblocked after T1 commits would recompute the minimum from PAID bids only and still derive the same amount slot (T1's bid is pending, not paid). Inside the lock the authoritative floor therefore accounts for pending reservations too:
+  - no paid AND no pending bids -> minimum = categories.starting_bid
+  - otherwise                   -> minimum = greatest(paid_max, pending_max) + increment
+Consequence: simultaneous same-category bids receive strictly increasing reserved slots; abandoned pendings hold their slot until Phase 4 expiry/failure handling addresses them (documented interaction, not silently ignored).
+
+SECURITY MODEL PRESERVED:
+- Function is SECURITY DEFINER with pinned search_path=public (definer context bypasses RLS), so it re-checks is_active and recomputes the minimum authoritatively itself - caller input is never trusted even from our own server code path
+- Postgres grants EXECUTE to PUBLIC by default: revoked from public, anon, authenticated; granted ONLY to service_role. Public clients still never see the service-role key; anon can neither call the RPC nor write rows under RLS
+- Pre-validation (validateCategory + validateBidAmount from Tasks 3.4/3.3) kept as fast-fail UX; the in-lock recheck remains the source of truth
+
+ERROR CONTRACT (stable for Task 4.1):
+- Same CreatePendingBidResult union as Task 3.5; new internal mapping only:
+  'bid_error:category_not_found' -> reason category_not_found
+  'bid_error:amount_below_minimum:<min>' -> reason amount_below_minimum with parsed minimumBid echoed
+  anything else -> descriptive thrown Error (infrastructure failure)
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000007_create_pending_bid_function.sql (new)
+- src/lib/bids.ts
+- docs/3.6.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Static SQL inspection: lock placement, FOUND handling, floor arithmetic incl. increment=0 edge, definer/search_path hardening, revoke/grant signature match
+6. Concurrency testing: REQUIRES live PostgreSQL/Supabase - SKIPPED honestly (local Docker unavailable); intended procedure documented below
 
 DEFINITION OF DONE:
+- Database-enforced per-category serialization covers minimum calculation + pending-bid creation; different categories unaffected; security model intact; contract stable; all runnable checks pass
 
 IMPLEMENTATION NOTES:
+Migration follows repo numbering (20260823000007). Function body order: lock category row (active-only filter inside the FOR UPDATE query so inactive categories are indistinguishable from missing, consistent with Task 3.4) -> not found -> bid_error:category_not_found; compute paid_max/pending_max; derive floor; below-floor -> bid_error:amount_below_minimum:<min>; INSERT with explicit status='pending'; RETURNING * into %rowtype; to_jsonb scalar return maps cleanly through supabase-js (no .single() needed). increment=0 edge: second bidder's floor equals the occupied tier amount (documented as legitimate since Task 3.2). Multiple pending rows remain possible across DIFFERENT amounts; identical-slot conflicts are now impossible while reservations are counted.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED. Static inspection confirmed lock coverage of calculate+insert, pending-aware flooring, hardened execute permissions, and unchanged external union contract. Concurrency integration test NOT executed - local Supabase/Docker unavailable; nothing faked.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000007_create_pending_bid_function.sql (new)
+- src/lib/bids.ts (createPendingBid write path switched to RPC + private mapPendingBidRpcError; validators untouched)
+- docs/3.6.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Static SQL/code inspection: PASSED
+- DB integration/concurrency tests: SKIPPED - local Supabase Docker unavailable; could NOT be verified live. Intended procedure when available: apply migrations (supabase db push), seed one category, fire N parallel supabase.rpc('create_pending_bid') calls for the SAME category with the same starting amount and assert (a) exactly one succeeds at the starting bid, others fail with amount_below_minimum echoing strictly increasing floors, (b) parallel calls for DIFFERENT categories all succeed concurrently with wall-clock time showing no serialization.
 
 KNOWN ISSUES:
+- Abandoned pending reservations hold their amount slot until Phase 4 expiry/failure handling exists (by design of reservation flooring)
+- Live concurrency behavior unverified until a real database environment is available (honestly documented, not faked)
 
 FOLLOW-UP:
+Task 3.7 — Prevent duplicate transactions
