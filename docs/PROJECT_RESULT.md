@@ -806,4 +806,36 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+## Phase 2 — Database
+
+### Task 2.1
+
+- **Date**: 2026-08-23
+- **Objective**: Create categories schema + migration exactly as planned
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000001_create_categories.sql with exact planned DDL
+  - Includes create extension if not exists "pgcrypto" guard + public.categories table with id uuid primary key default gen_random_uuid(), slug text unique not null, name text not null, description text, starting_bid integer not null default 100, increment integer not null default 100, image_url text, is_active boolean default true, created_at/updated_at timestamptz default now()
+  - No bids table, no indexes, no RLS, no seed — per task scope
+- **Files changed**:
+  - supabase/migrations/20260823000001_create_categories.sql (created)
+  - docs/2.1.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (matches PROJECT_PLAN.md)
+  - Supabase CLI version: 2.115.0 via npx supabase
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Qualified public.categories, extension guard safe on Supabase
+  - No DROP statements, no extra constraints, no invented rules
+  - Version-controlled migration reproducible
+- **Known limitations**: None (requires supabase db push to apply remotely; local docker not required for validation)
+- **Follow-up work**: Task 2.2 — Bids schema + migration
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

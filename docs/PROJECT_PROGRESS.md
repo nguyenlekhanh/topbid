@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-**Phase 1 — UI / Design (complete)** → **Phase 2 — Database**
+**Phase 2 — Database**
 
 ## Current Task
 
-**1.15 completed** — Next recommended: 2.1
+**2.1 completed** — Next recommended: 2.2
 
 ## Completed Tasks
 
@@ -35,6 +35,7 @@
 - 1.13: Success state (post-bid) ✓
 - 1.14: Responsive mobile design ✓
 - 1.15: UI polish (animations, transitions) ✓
+- 2.1: Categories schema + migration ✓
 
 ## Tasks in Progress
 
@@ -81,6 +82,7 @@ _None_
 - Success state implemented (reusable SuccessState with amount/category/reference, mock demo disclaimer, View Leaderboard/Continue Browsing, motion-safe)
 - Responsive mobile design audited and refined (320/375/390/430 verified, overflow fixed, touch targets 44px, tables/cards/modals readable)
 - UI polish applied (subtle animations: fadeInUp, slideDown, scaleIn, lift/shadow, underline, motion-safe)
+- Categories schema migration created (UUID PK, slug unique, integer cents, timestamps, pgcrypto guard)
 
 ## Current Environment/Setup Status
 
@@ -98,10 +100,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.1 — Categories schema**
+**2.2 — Bids schema + migration**
 
 ## Notes
 
-Task 1.15 completed successfully. Subtle polish added: Navbar underline + slideDown, Hero fadeInUp staggered, CategoryCards lift, Leaderboard/RecentBids hover, BidButton shadow/lift, BidModal fade+scale, all motion-safe and verified 320px usable.
-
 Phase 1 (UI/Design) is now complete.
+
+Task 2.1 completed successfully. Categories migration created at supabase/migrations/20260823000001_create_categories.sql matching PROJECT_PLAN.md exactly, verified syntax and build.
