@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.3 completed** — Next recommended: 2.4
+**2.4 completed** — Next recommended: 2.5
 
 ## Completed Tasks
 
@@ -38,6 +38,7 @@
 - 2.1: Categories schema + migration ✓
 - 2.2: Bids schema + migration ✓
 - 2.3: Database indexes ✓
+- 2.4: Constraints ✓
 
 ## Tasks in Progress
 
@@ -87,6 +88,7 @@ _None_
 - Categories schema migration created (UUID PK, slug unique, integer cents, timestamps, pgcrypto guard)
 - Bids schema migration created (UUID PK, FK to categories ON DELETE CASCADE, integer cents, stripe_session_id UNIQUE + composite unique, status pending, is_highest, timestamps)
 - Database indexes migration created (4 bids indexes, partial status='paid' with DESC preserved, stripe_session redundancy documented)
+- Constraints migration created (4 CHECKs: starting_bid/increment/amount >=0, status IN, justified, allow 0)
 
 ## Current Environment/Setup Status
 
@@ -104,10 +106,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.4 — Constraints**
+**2.5 — RLS / security policies**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.3 completed successfully. Indexes migration created at supabase/migrations/20260823000003_add_bids_indexes.sql with four planned bids indexes (partial status='paid' preserved), build passed.
+Task 2.4 completed successfully. Constraints migration created at supabase/migrations/20260823000004_add_constraints.sql with four justified CHECKs (monetary >=0 allow 0, status IN), compatible and build passed.

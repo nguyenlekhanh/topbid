@@ -896,6 +896,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (one redundancy documented as noted)
 - **Follow-up work**: Task 2.4 — Constraints
 
+### Task 2.4
+
+- **Date**: 2026-08-23
+- **Objective**: Add database constraints for existing categories/bids without changing MVP behavior
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000004_add_constraints.sql with four justified CHECK constraints
+  - categories_starting_bid_non_negative check (starting_bid >= 0) — allows 0 per task, not requiring >0
+  - categories_increment_non_negative check (increment >= 0) — allows 0 per task, not requiring >0
+  - bids_amount_non_negative check (amount >= 0) — INTEGER cents non-negative
+  - bids_status_check check (status in ('pending','paid','failed','refunded')) — restricts to planned values
+  - Additive after 20260823000003, no RLS/seed/queries, no DROP, no extra UNIQUE/FK duplication, no email validation, no NULL behavior change
+- **Files changed**:
+  - supabase/migrations/20260823000004_add_constraints.sql (created)
+  - docs/2.4.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (four CHECKs verified against plan, compatible with schema, not duplicating PK/UNIQUE/FK)
+  - Supabase CLI version: 2.115.0 via npx supabase (db lint skipped: Docker unavailable, documented as limitation)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Only added constraints justified by PROJECT_PLAN.md invariants (monetary cents non-negative, status enum)
+  - Allowed 0 for starting_bid/increment/amount (not >0) per explicit task instruction
+  - No email-format CHECK (app-level later), no Stripe-state CHECK, preserved nullable columns
+  - Used public.categories/public.bids qualified, additive ALTER TABLE ADD CONSTRAINT
+- **Known limitations**: None (requires supabase db push to apply; local docker not available for full lint)
+- **Follow-up work**: Task 2.5 — RLS / security policies
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

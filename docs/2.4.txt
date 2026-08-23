@@ -1,32 +1,67 @@
 ﻿TASK ID: 2.4
 PHASE: 2
 TITLE: Constraints (unique, check)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add safe, justified CHECK constraints for existing public.categories and public.bids without changing MVP behavior or inventing business rules.
 
 SCOPE:
+- New additive migration supabase/migrations/20260823000004_add_constraints.sql
+- Categories: starting_bid >=0, increment >=0 (allow 0, do NOT require >0)
+- Bids: amount >=0, status IN ('pending','paid','failed','refunded')
+- No RLS, no seed, no queries, no new UNIQUE/FK (already exist), no email format, no Stripe-state checks
 
 OUT OF SCOPE:
+- RLS (2.5), seed (2.6), queries (2.7+), bid/Stripe/realtime/UI, additional UNIQUE/CHECK beyond listed, changing NULL behavior
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1, 2.2, 2.3 migrations
+- PROJECT_PLAN.md: Database Design, monetary INTEGER cents, status values
 
 IMPLEMENTATION REQUIREMENTS:
+- Additive file, do not modify 2.1-2.3, no DROP, approved constraints only, justified by plan, not duplicating PK/UNIQUE/FK, keep increment/starting_bid >=0 not >0
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000004_add_constraints.sql (created)
+- docs/2.4.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Inspect SQL vs plan
+2. Verify compatibility with current schema
+3. Supabase CLI validation if available (note Docker limitation)
+4. npm run typecheck
+5. npm run lint
+6. npm run format:check
+7. npm run build
 
 DEFINITION OF DONE:
+- Migration exists with four justified CHECKs, additive, compatible, version-controlled, all checks pass
 
 IMPLEMENTATION NOTES:
+Inspected PROJECT_PLAN.md: categories.starting_bid/increment and bids.amount are INTEGER cents — negative makes no sense. Added >=0 checks, explicitly allowing 0 per task instructions. Status is documented as pending/paid/failed/refunded — added IN check. Avoided requiring >0, avoided email regex (app-level later), avoided Stripe state, preserved NULL behavior (bidder_name, stripe cols stay nullable), did not duplicate PK/UNIQUE/FK. File additive after 2.3.
 
 RESULT:
+Migration SQL verified compatible — tables/columns exist, types match, values allow 0. Supabase CLI 2.115.0 via npx supabase available; local Docker not running so db lint not executed — documented as limitation but SQL/schema validation done carefully and typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000004_add_constraints.sql (created - 24 lines)
+- docs/2.4.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Migration inspection: PASSED
+- Supabase CLI version check: 2.115.0 via npx supabase (db lint skipped: Docker unavailable, documented)
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.5 — RLS / security policies
