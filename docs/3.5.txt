@@ -1,32 +1,72 @@
 ﻿TASK ID: 3.5
 PHASE: 3
 TITLE: Create pending bid record
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a new public.bids record with status = 'pending' after authoritative server-side category and amount validation, with a return/error contract ready for Task 4.1 Stripe Checkout.
 
 SCOPE:
+- New src/lib/supabase-service.ts - server-only service-role Supabase client (writes are required because RLS grants public SELECT only; migration 2.5 documents service_role as the intended write path)
+- Extend src/lib/bids.ts - createPendingBid(input) composing validateCategory (3.4) + validateBidAmount (3.3), basic bidder email/name input handling, explicit status:'pending' insert via the service client
+- Stored fields: category_id from the DB row (never client-supplied object), validated integer-cent amount, normalized bidder_email, optional trimmed bidder_name (null when absent/empty), status explicitly 'pending'; stripe_session_id/is_highest/paid_at left at defaults (NULL/false)
 
 OUT OF SCOPE:
+- Concurrency locking (Task 3.6), duplicate transaction prevention (3.7), test infrastructure (3.8), Stripe Checkout/session creation (4.1+), webhook/payment handling, marking paid/highest, rate limiting, API-route wiring, Zod layering (Phase 9), schema/migration/RLS changes
 
 INPUTS / DEPENDENCIES:
+- Tasks 3.3/3.4 validators (authoritative minimum + category resolution)
+- Task 2.2 bids schema (columns, UNIQUE(category_id, stripe_session_id) - multiple NULL session ids allowed)
+- Task 2.5 RLS (no public write policies; service_role bypass documented in migration note)
+- .env.example already defines SUPABASE_SERVICE_ROLE_KEY (server-only)
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side only; service-role key never exposed to client (no NEXT_PUBLIC_ prefix; module throws on missing env config at call time)
+- Never trusts client data: all four inputs typed unknown; runtime guards for email/name; amount re-checked locally only for TS narrowing, semantic validation stays in validateBidAmount
+- Cheap local shape validation runs BEFORE any DB queries (fail fast); then category validation, then amount-vs-minimum validation
+- Record created explicitly as status:'pending'; never marked paid/highest at creation
+- Contract: expected failures -> typed union { valid:false, reason } with stable reasons ('invalid_slug','category_not_found','invalid_amount','amount_below_minimum','invalid_bidder_email','invalid_bidder_name'), minimumBid echoed on amount failures; unexpected infrastructure failures (DB insert error, missing env) throw descriptive Errors; success returns full inserted Bid row (id, integer-cent amount, status='pending') sufficient for Task 4.1 to build a Checkout session and attach metadata
 
 FILES EXPECTED TO CHANGE:
+- src/lib/supabase-service.ts (new)
+- src/lib/bids.ts
+- docs/3.5.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Code inspection: validation order, explicit pending status, DB-sourced category_id, no paid/highest flags, server-only key handling, contract completeness
 
 DEFINITION OF DONE:
+- Reusable server-side createPendingBid exists per requirements with a documented 4.1-ready contract; all checks pass; Tasks 1.1-3.4 code untouched except additive imports/composition
 
 IMPLEMENTATION NOTES:
+validateCategory and validateBidAmount are called as-is (no refactor of completed tasks); this costs one extra category read per call - accepted for correctness and task isolation, consolidation possible later if needed. Email normalization: string -> trim -> non-empty, <=254 chars, basic /^[^\s@]+@[^\s@]+\.[^\s@]+$/ pattern (full validation/Zod deferred). Name normalization: undefined/null or empty-after-trim -> NULL; non-string or >100 chars -> 'invalid_bidder_name'. Insert omits stripe_session_id (NULL; PG unique treats NULLs as distinct so multiple pendings per category are possible until 3.7), is_highest defaults false, paid_at NULL. One Prettier line-break fix applied via lint:fix during validation.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED (after one import addition caught by typecheck and one Prettier auto-fix). Inspection confirmed: validation-before-write ordering, explicit pending status, authoritative category_id/amount, defaults untouched for is_highest/paid_at/stripe_session_id, service key confined to server module.
 
 FILES ACTUALLY CHANGED:
+- src/lib/supabase-service.ts (new - server-only service-role client)
+- src/lib/bids.ts (extended - PendingBidInput/CreatePendingBid types + createPendingBid + private normalizers; Tasks 1.1-3.4 logic untouched)
+- docs/3.5.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED (one Prettier auto-fix)
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Code inspection: PASSED
+- DB integration checks: SKIPPED - local Supabase Docker unavailable, consistent with tasks 2.7-3.4; NOT claimed as passing; no fake database results
 
 KNOWN ISSUES:
+- None (multiple concurrent/duplicate pending rows remain possible by design until Tasks 3.6/3.7)
 
 FOLLOW-UP:
+Task 3.6 — Handle concurrent bids (DB locking)

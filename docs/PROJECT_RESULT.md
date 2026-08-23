@@ -1229,6 +1229,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.5 — Create pending bid record
 
+### Task 3.5
+
+- **Date**: 2026-08-23
+- **Objective**: Create a public.bids record with status = 'pending' after authoritative server-side category and amount validation, with a Task 4.1-ready contract
+- **Status**: Completed
+- **What was implemented**:
+  - New src/lib/supabase-service.ts — server-only service-role Supabase client (persistSession/autoRefreshToken disabled; throws on missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY); required because RLS grants public SELECT only and migration 2.5 documents service_role as the intended write path
+  - createPendingBid(input) added to src/lib/bids.ts composing validateCategory (3.4) + validateBidAmount (3.3) with all four inputs typed unknown (untrusted)
+  - Validation order: cheap local shape checks first (email/name/amount integer), then DB-backed category validation, then amount-vs-authoritative-minimum
+  - Insert: category_id from the DB row, validated integer-cent amount, normalized bidder_email, optional trimmed bidder_name (NULL when absent/empty), explicit status:'pending'; stripe_session_id NULL, is_highest defaults false, paid_at NULL — never marked paid/highest at creation
+  - Contract for Task 4.1: expected failures -> typed union { valid:false, reason } over stable reasons ('invalid_slug','category_not_found','invalid_amount','amount_below_minimum','invalid_bidder_email','invalid_bidder_name') with minimumBid echoed on amount failures; unexpected infrastructure failures throw descriptive Errors; success returns the full inserted Bid row (id, amount in integer cents, status='pending')
+- **Files changed**:
+  - src/lib/supabase-service.ts (new)
+  - src/lib/bids.ts (extended — types + createPendingBid + private email/name normalizers; Tasks 1.1-3.4 logic untouched)
+  - docs/3.5.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED (caught a missing validateCategory import during development, fixed)
+  - `npm run lint`: PASSED (one Prettier line-break auto-fix via lint:fix)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (validation-before-write ordering, explicit pending status, authoritative category_id/amount, untouched is_highest/paid_at/stripe_session_id, service key confined to the server module)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, consistent with tasks 2.7-3.4; NOT claimed as passing; no fake database results
+- **Important technical decisions**:
+  - Writes use the service-role client per AGENTS.md ("Service role for writes") since RLS intentionally has no public INSERT policy; the key stays server-only (no NEXT_PUBLIC_ prefix)
+  - Validators from Tasks 3.3/3.4 reused as-is rather than refactored (one redundant category read accepted for task isolation); consolidation deferred
+  - Multiple pending rows per category remain possible (stripe_session_id NULLs are distinct under PG unique) until Tasks 3.6 locking / 3.7 duplicate prevention land — documented, not silently ignored
+  - Basic email pattern + length caps chosen over heavy validation; Zod layering arrives in Phase 9
+- **Known limitations**: None beyond documented concurrency/duplicate deferral to Tasks 3.6/3.7 (live verification requires supabase db push + Docker)
+- **Follow-up work**: Task 3.6 — Handle concurrent bids (DB locking)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

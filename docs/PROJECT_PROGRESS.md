@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.4 completed** — Next recommended: 3.5
+**3.5 completed** — Next recommended: 3.6
 
 ## Completed Tasks
 
@@ -49,6 +49,7 @@
 - 3.2: Calculate minimum bid (existing bids) ✓
 - 3.3: Validate bid amount server-side ✓
 - 3.4: Validate category server-side ✓
+- 3.5: Create pending bid record ✓
 
 ## Tasks in Progress
 
@@ -109,6 +110,7 @@ _None_
 - Existing-bid minimum calculation created (getIncrementedMinimumBid: minimum = highest paid bid amount + category increment, composes getCategoryBySlug + getHighestBidForCategory, null for missing/inactive/no-paid-bid cases)
 - Server-side bid amount validation created (getMinimumBidForCategory unified authoritative minimum resolver + validateBidAmount with untrusted-amount runtime guards, discriminated-union result, equality-to-minimum accepted)
 - Server-side category validation created (validateCategory in categories.ts: untrusted slug runtime guards, authoritative DB-sourced row via getCategoryBySlug, active-only enforced by app filter + RLS, predictable invalid_slug/category_not_found reasons)
+- Pending bid record creation created (createPendingBid in bids.ts: composes validateCategory + validateBidAmount, service-role write via new server-only supabase-service.ts, explicit status='pending', DB-sourced category_id, typed failure union with 4.1-ready contract)
 
 ## Current Environment/Setup Status
 
@@ -126,7 +128,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.5 — Create pending bid record**
+**3.6 — Handle concurrent bids (DB locking)**
 
 ## Notes
 
@@ -146,3 +148,5 @@ Task 3.2 completed successfully. getIncrementedMinimumBid added to src/lib/bids.
 Task 3.3 completed successfully. Server-side amount validation added to src/lib/bids.ts: getMinimumBidForCategory resolves the authoritative minimum (starting_bid or highest+increment) in one query pass and validateBidAmount validates untrusted client amounts against it (runtime shape guards, below-minimum rejection, equality accepted).
 
 Task 3.4 completed successfully. validateCategory added to src/lib/categories.ts: authoritative DB-sourced category validation with untrusted-slug runtime guards; active-only enforced by app-level filter + RLS; predictable invalid_slug/category_not_found failure reasons; no service-role usage.
+
+Task 3.5 completed successfully. createPendingBid added to src/lib/bids.ts: validates category + amount authoritatively, then inserts a bids row with explicit status='pending' via the new server-only service-role client (src/lib/supabase-service.ts); typed failure union documented as the Task 4.1 Stripe Checkout contract; concurrency/duplicate handling deferred to Tasks 3.6/3.7.

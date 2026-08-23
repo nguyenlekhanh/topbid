@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server';
-import { getCategoryBySlug } from '@/lib/categories';
+import { createServiceClient } from '@/lib/supabase-service';
+import { getCategoryBySlug, validateCategory } from '@/lib/categories';
 
 export type Bid = {
   id: string;
@@ -298,4 +299,140 @@ export async function validateBidAmount(
   }
 
   return { valid: true, minimumBid: minimum.minimumBid, basis: minimum.basis };
+}
+
+export type PendingBidInput = {
+  categorySlug: unknown;
+  amount: unknown;
+  bidderEmail: unknown;
+  bidderName?: unknown;
+};
+
+export type CreatePendingBidFailureReason =
+  | 'invalid_slug'
+  | 'category_not_found'
+  | 'invalid_amount'
+  | 'amount_below_minimum'
+  | 'invalid_bidder_email'
+  | 'invalid_bidder_name';
+
+export type CreatePendingBidResult =
+  | { valid: true; bid: Bid }
+  | { valid: false; reason: CreatePendingBidFailureReason; minimumBid: number | null };
+
+const BIDDER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_BIDDER_EMAIL_LENGTH = 254;
+const MAX_BIDDER_NAME_LENGTH = 100;
+
+/**
+ * Create a new bids row with status = 'pending' after authoritative validation.
+ * - Server-side only; writes go through the service-role client because RLS grants
+ *   public SELECT only (no public write policies exist by design)
+ * - Never trusts client data: category is resolved from the DB via validateCategory,
+ *   the amount is checked against the authoritative minimum via validateBidAmount, and
+ *   the stored category_id comes from the DB row (never a client-supplied object)
+ * - The record is explicitly created as status: 'pending'; it is never marked paid or
+ *   highest at creation (paid conversion happens via verified Stripe webhook in Phase 4)
+ * - Contract for Task 4.1 (Stripe Checkout): expected failures return a typed union with
+ *   stable reasons (minimumBid echoed on amount failures); unexpected infrastructure
+ *   failures (DB errors, missing server env config) throw descriptive Errors. On success
+ *   the full inserted Bid row (id, amount in integer cents, status='pending') is returned,
+ *   sufficient to build the Checkout session and attach metadata later.
+ * - Concurrency locking (3.6) and duplicate-transaction prevention (3.7) are NOT handled
+ *   here; multiple pending rows per category are possible until those tasks land.
+ */
+export async function createPendingBid(input: PendingBidInput): Promise<CreatePendingBidResult> {
+  const email = normalizeBidderEmail(input.bidderEmail);
+
+  if (!email) {
+    return { valid: false, reason: 'invalid_bidder_email', minimumBid: null };
+  }
+
+  const nameResult = normalizeBidderName(input.bidderName);
+
+  if (!nameResult.valid) {
+    return { valid: false, reason: 'invalid_bidder_name', minimumBid: null };
+  }
+
+  if (typeof input.amount !== 'number' || !Number.isInteger(input.amount)) {
+    return { valid: false, reason: 'invalid_amount', minimumBid: null };
+  }
+
+  const amount = input.amount;
+
+  const categoryValidation = await validateCategory(input.categorySlug);
+
+  if (!categoryValidation.valid) {
+    return { valid: false, reason: categoryValidation.reason, minimumBid: null };
+  }
+
+  const category = categoryValidation.category;
+
+  const amountValidation = await validateBidAmount(category.slug, amount);
+
+  if (!amountValidation.valid) {
+    return {
+      valid: false,
+      reason: amountValidation.reason,
+      minimumBid: amountValidation.minimumBid,
+    };
+  }
+
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase
+    .from('bids')
+    .insert({
+      category_id: category.id,
+      amount,
+      bidder_email: email,
+      bidder_name: nameResult.name,
+      status: 'pending',
+    })
+    .select(BID_FIELDS)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create pending bid: ${error.message}`);
+  }
+
+  return { valid: true, bid: data as Bid };
+}
+
+function normalizeBidderEmail(email: unknown): string | null {
+  if (typeof email !== 'string') {
+    return null;
+  }
+
+  const trimmed = email.trim();
+
+  if (!trimmed || trimmed.length > MAX_BIDDER_EMAIL_LENGTH || !BIDDER_EMAIL_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function normalizeBidderName(
+  name: unknown
+): { valid: true; name: string | null } | { valid: false } {
+  if (name === undefined || name === null) {
+    return { valid: true, name: null };
+  }
+
+  if (typeof name !== 'string') {
+    return { valid: false };
+  }
+
+  const trimmed = name.trim();
+
+  if (!trimmed) {
+    return { valid: true, name: null };
+  }
+
+  if (trimmed.length > MAX_BIDDER_NAME_LENGTH) {
+    return { valid: false };
+  }
+
+  return { valid: true, name: trimmed };
 }
