@@ -1022,6 +1022,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (DB integration requires supabase db push + Docker; Phase 1 UI still uses mockCategories until real data wiring later)
 - **Follow-up work**: Task 2.8 — Highest bid query
 
+### Task 2.8
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable server-side query for highest paid bid per category
+- **Status**: Completed
+- **What was implemented**:
+  - New file src/lib/bids.ts with Bid type matching public.bids schema and BID_FIELDS allowlist
+  - getHighestBidForCategory(categoryId): server client (supabase-server anon, no service_role), selects BID_FIELDS where category_id = normalized and status = 'paid', ordered amount desc, limit 1, maybeSingle
+  - Returns null when no paid bid exists or categoryId empty/invalid; throws predictably with message on Supabase errors
+  - Respects RLS bids_public_select_paid (status='paid') and leverages idx_bids_category_paid_amount partial index
+  - Mirrors categories.ts conventions (async createClient, field allowlist, not-found via maybeSingle)
+- **Files changed**:
+  - src/lib/bids.ts (created)
+  - docs/2.8.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Code inspection: PASSED (server/client usage, RLS paid-only, order/limit, null handling, no service_role import)
+  - DB integration checks: SKIPPED — local Supabase Docker unavailable, clearly documented, no fake results
+- **Important technical decisions**:
+  - Used supabase-server createClient (anon key) — service-role never imported into this module
+  - .eq('status','paid') app-level filter in addition to RLS (defense in depth), matches planned index/partial condition
+  - limit(1) + maybeSingle for clean null instead of array; explicit Bid type rather than inferred row type for stable public API
+  - Kept query isolated in lib, no UI changes
+- **Known limitations**: None (live DB verification requires supabase db push + Docker; Phase 1 UI still mock-driven until wiring tasks later)
+- **Follow-up work**: Task 2.9 — Leaderboard query
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

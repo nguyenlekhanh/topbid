@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.7 completed** — Next recommended: 2.8
+**2.8 completed** — Next recommended: 2.9
 
 ## Completed Tasks
 
@@ -42,6 +42,7 @@
 - 2.5: RLS / security policies ✓
 - 2.6: Seed categories ✓
 - 2.7: Category queries (list, get) ✓
+- 2.8: Highest bid query ✓
 
 ## Tasks in Progress
 
