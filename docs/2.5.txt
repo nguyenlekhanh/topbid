@@ -1,32 +1,71 @@
 ﻿TASK ID: 2.5
 PHASE: 2
 TITLE: RLS / security policies
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Configure Row Level Security for MVP per PROJECT_PLAN.md: public reads active categories and paid bids only, no public writes, service_role bypass.
 
 SCOPE:
+- Enable RLS on public.categories and public.bids
+- Categories: public SELECT USING (is_active = true) only
+- Bids: public SELECT USING (status = 'paid') only
+- No public INSERT/UPDATE/DELETE policies
+- No service_role policies (bypass by design)
+- Additive migration supabase/migrations/20260823000005_enable_rls.sql
 
 OUT OF SCOPE:
+- Seed (2.6), queries (2.7+), bid/Stripe/realtime/UI, additional policies, modifying 2.1-2.4
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1-2.4 migrations
+- PROJECT_PLAN.md RLS section: public read active categories, public read paid bids, service role writes
 
 IMPLEMENTATION REQUIREMENTS:
+- NEW additive file, do not modify 2.1-2.4, no DROP
+- Enable RLS on both tables
+- Explicit policy names, qualified public. tables, no USING(true), no WITH CHECK(true), no auth requirement
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000005_enable_rls.sql (created)
+- docs/2.5.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Inspect migration SQL and policies
+2. Verify anon SELECT limited, no public writes, service_role bypass
+3. Supabase CLI local validation if possible (note Docker limitation)
+4. npm run typecheck
+5. npm run lint
+6. npm run format:check
+7. npm run build
 
 DEFINITION OF DONE:
+- Migration exists with RLS enabled and two precise SELECT policies, no public write path, additive, auditable, all checks pass
 
 IMPLEMENTATION NOTES:
+Created file 20260823000005_enable_rls.sql with ALTER TABLE ... ENABLE ROW LEVEL SECURITY for both tables, then CREATE POLICY categories_public_select_active ON public.categories FOR SELECT USING (is_active = true) and CREATE POLICY bids_public_select_paid ON public.bids FOR SELECT USING (status = 'paid'). No TO clause → applies to PUBLIC (includes anon), covers unauthenticated browser. No INSERT/UPDATE/DELETE policies created, so those are denied. Comment documents service_role bypass and lack of WITH CHECK(true).
 
 RESULT:
+Inspected migration — RLS enabled on both tables, categories policy checks is_active=true, bids policy checks status='paid', no USING(true), no write policies, no auth. Supabase CLI 2.115.0 via npx supabase available; local Docker not running so db lint not executed — documented as limitation but static policy validation done. All npm checks PASSED.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000005_enable_rls.sql (created - 24 lines)
+- docs/2.5.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Migration inspection: PASSED
+- Supabase CLI version check: 2.115.0 via npx supabase (db lint skipped: Docker unavailable, documented)
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.6 — Seed categories

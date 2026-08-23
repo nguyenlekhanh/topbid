@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.4 completed** — Next recommended: 2.5
+**2.5 completed** — Next recommended: 2.6
 
 ## Completed Tasks
 
@@ -39,6 +39,7 @@
 - 2.2: Bids schema + migration ✓
 - 2.3: Database indexes ✓
 - 2.4: Constraints ✓
+- 2.5: RLS / security policies ✓
 
 ## Tasks in Progress
 
@@ -89,6 +90,7 @@ _None_
 - Bids schema migration created (UUID PK, FK to categories ON DELETE CASCADE, integer cents, stripe_session_id UNIQUE + composite unique, status pending, is_highest, timestamps)
 - Database indexes migration created (4 bids indexes, partial status='paid' with DESC preserved, stripe_session redundancy documented)
 - Constraints migration created (4 CHECKs: starting_bid/increment/amount >=0, status IN, justified, allow 0)
+- RLS migration created (RLS enabled on categories/bids, public SELECT active categories and paid bids only, no public writes, service_role bypass)
 
 ## Current Environment/Setup Status
 
@@ -106,10 +108,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.5 — RLS / security policies**
+**2.6 — Seed categories**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.4 completed successfully. Constraints migration created at supabase/migrations/20260823000004_add_constraints.sql with four justified CHECKs (monetary >=0 allow 0, status IN), compatible and build passed.
+Task 2.5 completed successfully. RLS migration created at supabase/migrations/20260823000005_enable_rls.sql enabling RLS on categories/bids with public SELECT for active/paid only, no public writes, service_role bypass documented.

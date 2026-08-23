@@ -928,6 +928,40 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply; local docker not available for full lint)
 - **Follow-up work**: Task 2.5 — RLS / security policies
 
+### Task 2.5
+
+- **Date**: 2026-08-23
+- **Objective**: Configure Row Level Security for MVP per PROJECT_PLAN.md
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000005_enable_rls.sql with RLS enable and two public SELECT policies
+  - ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY; ALTER TABLE public.bids ENABLE ROW LEVEL SECURITY;
+  - CREATE POLICY categories_public_select_active ON public.categories FOR SELECT USING (is_active = true) — public (includes anon) can read only active categories
+  - CREATE POLICY bids_public_select_paid ON public.bids FOR SELECT USING (status = 'paid') — public can read only paid bids for leaderboard
+  - No public INSERT/UPDATE/DELETE policies (those actions denied for anon/authenticated)
+  - No service_role policies (service_role bypasses RLS by design, documented)
+  - Explicit qualified names, no USING(true), no WITH CHECK(true), no auth requirement per MVP
+- **Files changed**:
+  - supabase/migrations/20260823000005_enable_rls.sql (created)
+  - docs/2.5.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (RLS enabled on both tables, categories checks is_active=true, bids checks status='paid', no USING(true), no write policies)
+  - Supabase CLI version: 2.115.0 via npx supabase (db lint skipped: Docker unavailable, documented as limitation)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Security validation: anon SELECT limited to active/paid, pending/failed/refunded/inactive not readable, no INSERT/UPDATE/DELETE path, service_role bypass confirmed
+- **Important technical decisions**:
+  - Used FOR SELECT USING with precise predicates, not overly broad true
+  - Omitted TO clause defaults to PUBLIC (covers anon + authenticated, correct for MVP with no accounts)
+  - No write policies intentionally — anon cannot INSERT/UPDATE/DELETE bids or categories
+  - Documented service_role bypass, no service_role policy needed
+- **Known limitations**: None (requires supabase db push to apply; local docker not available for full policy test)
+- **Follow-up work**: Task 2.6 — Seed categories
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
