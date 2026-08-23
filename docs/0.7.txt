@@ -1,32 +1,85 @@
 ﻿TASK ID: 0.7
 PHASE: 0
 TITLE: Configure environment variables
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Verify and ensure environment variables are properly configured for the project.
 
 SCOPE:
+- Verify .env.example contains all required environment variables
+- Verify .gitignore excludes all .env files (including .env.local)
+- Verify no real secrets are committed
+- Verify server-only secrets don't use NEXT_PUBLIC_* prefix
+- Verify client-safe variables use NEXT_PUBLIC_* prefix
 
 OUT OF SCOPE:
+- Creating actual .env.local with real values (done by developer during setup)
+- Setting up Vercel environment variables (task 0.9)
+- Setting up Supabase/Stripe dashboard environment variables
 
 INPUTS / DEPENDENCIES:
+- Task 0.1-0.6 completed
+- .env.example already created in task 0.5
+- .gitignore already configured
 
 IMPLEMENTATION REQUIREMENTS:
+- .env.example must document all required variables
+- .gitignore must ignore .env* files
+- No real API keys in repository
+- Server-only secrets: STRIPE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET
+- Client-safe variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, NEXT_PUBLIC_APP_URL
 
 FILES EXPECTED TO CHANGE:
+- None (already correctly configured)
 
 TEST PLAN:
+1. Run `npm run typecheck` - TypeScript compilation should pass
+2. Run `npm run lint` - ESLint should pass
+3. Run `npm run format:check` - Prettier should verify formatting
+4. Run `npm run build` - Production build should succeed
+5. Verify .env.example contains all required variables
+6. Verify .gitignore ignores .env files
+7. Verify no .env.local exists in repository
 
 DEFINITION OF DONE:
+- Environment variables properly documented in .env.example
+- .gitignore correctly excludes .env files
+- No secrets in repository
+- All checks pass
 
 IMPLEMENTATION NOTES:
+The environment variable configuration was already correctly set up in task 0.5 when .env.example was created and .gitignore was verified. This task verifies the existing configuration meets all requirements.
+
+Verification results:
+- .env.example contains all required variables for Supabase, Stripe, and App
+- .gitignore has `.env*` pattern to ignore all environment files
+- No .env.local or other .env files exist in repository
+- Server-only secrets don't use NEXT_PUBLIC_* prefix
+- Client-safe variables use NEXT_PUBLIC_* prefix
+- All checks pass
 
 RESULT:
+Environment variable configuration verified as correct. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- .env.example contains all required variables
+- .gitignore correctly ignores .env* files
+- No secret files in repository
 
 FILES ACTUALLY CHANGED:
+- None (configuration already correct)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to task 0.8: Configure Git + initial commit

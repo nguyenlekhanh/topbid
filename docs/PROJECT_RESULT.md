@@ -144,9 +144,26 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.7 - Configure environment variables
 
 ### Task 0.7
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure environment variables
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Verified environment variable configuration is correctly set up. .env.example documents all required variables for Supabase, Stripe, and App. .gitignore correctly excludes all .env files. No secrets in repository.
+- **Files changed**: None (configuration already correct from task 0.5)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Verified .env.example contains all required variables
+  - Verified .gitignore ignores .env* files
+  - Verified no .env.local or secret files in repository
+- **Important technical decisions**: 
+  - Server-only secrets: STRIPE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET (no NEXT_PUBLIC_ prefix)
+  - Client-safe variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, NEXT_PUBLIC_APP_URL
+  - .env.example committed as template (no real values)
+  - .gitignore has `.env*` pattern to ignore all environment files
+- **Known limitations**: None
+- **Follow-up work**: Task 0.8 - Configure Git + initial commit
 
 ### Task 0.8
 - **Date**: Not started
