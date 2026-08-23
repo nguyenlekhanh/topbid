@@ -1,32 +1,66 @@
 ﻿TASK ID: 2.6
 PHASE: 2
 TITLE: Seed categories
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Seed public.categories with six stable MVP categories matching Phase 1 UI, idempotent and deterministic.
 
 SCOPE:
+- New additive migration supabase/migrations/20260823000006_seed_categories.sql
+- Six categories: Art & Collectibles (art), Tech & Gadgets (tech), Fashion & Accessories (fashion), Sports Memorabilia (sports), Automotive (automotive), Digital Assets (crypto)
+- Human-readable slugs, useful descriptions (from UI mock), integer cents starting_bid/increment, is_active true, image_url NULL (no stable URL)
+- Idempotent INSERT ... ON CONFLICT (slug) DO NOTHING
 
 OUT OF SCOPE:
+- Duplicate categories on reapply, new tables, indexes, RLS, queries, bid engine/Stripe/realtime/auth, dependencies, UI changes
 
 INPUTS / DEPENDENCIES:
+- Tasks 2.1-2.5 migrations and constraints/RLS
+- Phase 1 mockCategories in src/components/CategoryCards.tsx
 
 IMPLEMENTATION REQUIREMENTS:
+- Use slug unique for idempotency, deterministic values, no random, no DELETE/TRUNCATE, no secrets
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000006_seed_categories.sql (created)
+- docs/2.6.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Inspect migration, verify six unique slugs, integer cents, constraints, RLS compatibility
+2. Supabase CLI validation if available
+3. npm run typecheck
+4. npm run lint
+5. npm run format:check
+6. npm run build
 
 DEFINITION OF DONE:
+- Migration exists with six active categories, unique slugs, correct cents, idempotent, version-controlled, all checks pass
 
 IMPLEMENTATION NOTES:
+Inspected Phase 1 mockCategories and preserved names/slugs/descriptions exactly. Did NOT copy fake bidder/bid amounts — only categories. Used ON CONFLICT (slug) DO NOTHING for idempotency. Values: art 50000/5000, tech 20000/2000, fashion 30000/3000, sports 15000/1500, automotive 100000/10000, crypto 10000/1000 — all >=0 per 2.4 CHECKs, determinisitic. is_active true ensures visible via RLS is_active=true policy. image_url NULL as no stable URL.
 
 RESULT:
+Inspected — six unique slugs verified, integer cents verified, >=0 constraints satisfied, RLS compatible (active true). Supabase CLI 2.115.0 via npx supabase available; local Docker not running so db apply skipped — documented as limitation but static SQL validated. All npm checks PASSED.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000006_seed_categories.sql (created - 13 lines)
+- docs/2.6.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Migration inspection: PASSED
+- Supabase CLI version check: 2.115.0 via npx supabase (db apply skipped: Docker unavailable, documented)
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.7 — Category queries (list, get)

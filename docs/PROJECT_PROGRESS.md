@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**2.5 completed** — Next recommended: 2.6
+**2.6 completed** — Next recommended: 2.7
 
 ## Completed Tasks
 
@@ -40,6 +40,7 @@
 - 2.3: Database indexes ✓
 - 2.4: Constraints ✓
 - 2.5: RLS / security policies ✓
+- 2.6: Seed categories ✓
 
 ## Tasks in Progress
 
@@ -91,6 +92,7 @@ _None_
 - Database indexes migration created (4 bids indexes, partial status='paid' with DESC preserved, stripe_session redundancy documented)
 - Constraints migration created (4 CHECKs: starting_bid/increment/amount >=0, status IN, justified, allow 0)
 - RLS migration created (RLS enabled on categories/bids, public SELECT active categories and paid bids only, no public writes, service_role bypass)
+- Seed categories migration created (6 active MVP categories, idempotent ON CONFLICT DO NOTHING, integer cents, preserved UI slugs)
 
 ## Current Environment/Setup Status
 
@@ -108,10 +110,10 @@ _None_
 
 ## Next Recommended Task
 
-**2.6 — Seed categories**
+**2.7 — Category queries (list, get)**
 
 ## Notes
 
 Phase 1 (UI/Design) is now complete.
 
-Task 2.5 completed successfully. RLS migration created at supabase/migrations/20260823000005_enable_rls.sql enabling RLS on categories/bids with public SELECT for active/paid only, no public writes, service_role bypass documented.
+Task 2.6 completed successfully. Seed migration created at supabase/migrations/20260823000006_seed_categories.sql with six deterministic MVP categories, idempotent via slug, compatible with constraints and RLS.

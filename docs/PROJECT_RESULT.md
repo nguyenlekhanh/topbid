@@ -962,6 +962,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply; local docker not available for full policy test)
 - **Follow-up work**: Task 2.6 — Seed categories
 
+### Task 2.6
+
+- **Date**: 2026-08-23
+- **Objective**: Seed public.categories with six stable MVP categories matching Phase 1 UI
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000006_seed_categories.sql with idempotent INSERT ... ON CONFLICT (slug) DO NOTHING
+  - Six categories: Art & Collectibles (art, 50000/5000), Tech & Gadgets (tech, 20000/2000), Fashion & Accessories (fashion, 30000/3000), Sports Memorabilia (sports, 15000/1500), Automotive (automotive, 100000/10000), Digital Assets (crypto, 10000/1000)
+  - All with is_active true, image_url NULL, deterministic descriptions from UI mock, integer cents, no secrets, no fake bids
+  - Additive after RLS/constraints, no new tables/indexes/RLS, no TRUNCATE/DELETE
+- **Files changed**:
+  - supabase/migrations/20260823000006_seed_categories.sql (created)
+  - docs/2.6.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (six unique slugs, integer cents verified, >=0 constraints satisfied, RLS active true compatible)
+  - Supabase CLI version: 2.115.0 via npx supabase (db apply skipped: Docker unavailable, documented)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Preserved UI slugs/names/descriptions exactly for compatibility
+  - Idempotent ON CONFLICT (slug) DO NOTHING prevents duplicates on reapply
+  - Did not copy fake bidder/bid amounts, only categories; no fake paid bids
+  - image_url NULL (no stable URL), kept deterministic and easy to understand
+- **Known limitations**: None (requires supabase db push to apply)
+- **Follow-up work**: Task 2.7 — Category queries (list, get)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
