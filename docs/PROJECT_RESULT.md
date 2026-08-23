@@ -1292,6 +1292,39 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Live concurrency behavior unverified until a real database environment is available (honestly documented); abandoned-reservation slot holding until Phase 4
 - **Follow-up work**: Task 3.7 — Prevent duplicate transactions
 
+### Task 3.7
+
+- **Date**: 2026-08-23
+- **Objective**: Prevent the same bid/payment transaction from being created more than once, race-safe, at the database boundary — using only duplicate semantics evidenced by the schema/plan
+- **Status**: Completed
+- **Duplicate definition derived from evidence**:
+  - stripe_session_id TEXT UNIQUE + UNIQUE(category_id, stripe_session_id) (migration 2.2), idx_bids_stripe_session (2.3), plan comment and Phase 4.9 idempotent webhook handling all key on the Stripe session identity
+  - Therefore: duplicate = second bids row with an already-used stripe_session_id; the single-column UNIQUE is the arbiter (strictly stronger than the composite for non-null ids) — integrated, not duplicated; no new constraints/indexes
+  - Prior behavior stored NULL session ids on every pending bid; NULLs are distinct under UNIQUE, so identifier-less creation is unaffected
+- **What was implemented**:
+  - Migration 20260823000008_create_pending_bid_stripe_session.sql: RPC gains nullable p_stripe_session_id; INSERT wrapped in an exception handler translating unique_violation into 'bid_error:duplicate_transaction'; old 4-parameter signature explicitly dropped (CREATE OR REPLACE would have silently created an overload); revokes/grants re-applied for the new signature (service_role only)
+  - src/lib/bids.ts: PendingBidInput.stripeSessionId?: unknown; normalizeStripeSessionId (undefined/null/empty -> NULL; non-string or >255 chars -> 'invalid_stripe_session_id'); RPC call passes p_stripe_session_id; mapper adds 'duplicate_transaction' union member
+- **Race-safety argument**: PostgreSQL enforces UNIQUE(stripe_session_id) atomically at write time — simultaneous attempts with the same identifier cannot both commit regardless of lock ordering; the loser's insert raises inside the RPC and maps to the typed reason. No application check-and-set anywhere, so no TOCTOU window. Task 3.6 category-row locking and pending-aware flooring fully preserved (insert still inside the locked section)
+- **Files changed**:
+  - supabase/migrations/20260823000008_create_pending_bid_stripe_session.sql (new)
+  - src/lib/bids.ts (optional input + normalizer + two union members + mapper case)
+  - docs/3.7.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL/code inspection: PASSED (exception scoped to INSERT only, NULL-id passthrough, drop/create overload mechanics, grant signature match, union exhaustiveness)
+  - DB integration/concurrency regression: SKIPPED — local Supabase Docker unavailable; could NOT be verified live; nothing faked. Intended check: two parallel RPC calls with identical p_stripe_session_id assert exactly one success + one duplicate_transaction failure; NULL-id path unchanged
+- **Important technical decisions**:
+  - Dedup keyed on the schema's own identity (stripe_session_id) rather than inventing an idempotency-key rule with no schema/plan basis
+  - Empty-after-trim treated as "no identifier" (NULL) rather than invalid, preserving 3.5 semantics exactly
+  - Phase 4 guidance recorded: Task 4.1 supplies/attaches the checkout session id; Task 4.9 webhook idempotency relies on this same constraint
+- **Known limitations**: Live duplicate/conflict verification pending a real database environment (honestly documented)
+- **Follow-up work**: Task 3.8 — Bid engine unit tests
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

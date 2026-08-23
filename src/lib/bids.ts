@@ -306,6 +306,7 @@ export type PendingBidInput = {
   amount: unknown;
   bidderEmail: unknown;
   bidderName?: unknown;
+  stripeSessionId?: unknown;
 };
 
 export type CreatePendingBidFailureReason =
@@ -314,7 +315,9 @@ export type CreatePendingBidFailureReason =
   | 'invalid_amount'
   | 'amount_below_minimum'
   | 'invalid_bidder_email'
-  | 'invalid_bidder_name';
+  | 'invalid_bidder_name'
+  | 'invalid_stripe_session_id'
+  | 'duplicate_transaction';
 
 export type CreatePendingBidResult =
   | { valid: true; bid: Bid }
@@ -323,6 +326,7 @@ export type CreatePendingBidResult =
 const BIDDER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_BIDDER_EMAIL_LENGTH = 254;
 const MAX_BIDDER_NAME_LENGTH = 100;
+const MAX_STRIPE_SESSION_ID_LENGTH = 255;
 
 /**
  * Create a new bids row with status = 'pending' after authoritative validation.
@@ -337,6 +341,11 @@ const MAX_BIDDER_NAME_LENGTH = 100;
  *   other. The RPC recomputes the minimum inside the lock (accounting for pending
  *   reservations) so two simultaneous bids can never both reserve the same amount slot.
  *   The pre-validation above remains as fast-fail UX; the RPC is the source of truth.
+ * - Duplicate prevention (Task 3.7): an optional stripeSessionId is stored when provided
+ *   and arbitrated by the existing UNIQUE(stripe_session_id) constraint - race-safe even
+ *   for simultaneous attempts, since PostgreSQL guarantees exactly one winner. A conflict
+ *   surfaces as reason 'duplicate_transaction'. Absent/empty ids store NULL (multiple
+ *   NULLs are distinct), keeping Task 3.5 successful behavior unchanged.
  * - The record is explicitly created as status: 'pending'; it is never marked paid or
  *   highest at creation (paid conversion happens via verified Stripe webhook in Phase 4)
  * - Contract for Task 4.1 (Stripe Checkout): expected failures return a typed union with
@@ -356,6 +365,12 @@ export async function createPendingBid(input: PendingBidInput): Promise<CreatePe
 
   if (!nameResult.valid) {
     return { valid: false, reason: 'invalid_bidder_name', minimumBid: null };
+  }
+
+  const sessionIdResult = normalizeStripeSessionId(input.stripeSessionId);
+
+  if (!sessionIdResult.valid) {
+    return { valid: false, reason: 'invalid_stripe_session_id', minimumBid: null };
   }
 
   if (typeof input.amount !== 'number' || !Number.isInteger(input.amount)) {
@@ -390,6 +405,7 @@ export async function createPendingBid(input: PendingBidInput): Promise<CreatePe
     p_amount: amount,
     p_bidder_email: email,
     p_bidder_name: nameResult.name,
+    p_stripe_session_id: sessionIdResult.stripeSessionId,
   });
 
   if (error) {
@@ -424,6 +440,10 @@ function mapPendingBidRpcError(message: string): CreatePendingBidResult | null {
       reason: 'amount_below_minimum',
       minimumBid: Number.isNaN(parsed) ? null : parsed,
     };
+  }
+
+  if (reason === 'duplicate_transaction') {
+    return { valid: false, reason: 'duplicate_transaction', minimumBid: null };
   }
 
   return null;
@@ -465,4 +485,28 @@ function normalizeBidderName(
   }
 
   return { valid: true, name: trimmed };
+}
+
+function normalizeStripeSessionId(
+  stripeSessionId: unknown
+): { valid: true; stripeSessionId: string | null } | { valid: false } {
+  if (stripeSessionId === undefined || stripeSessionId === null) {
+    return { valid: true, stripeSessionId: null };
+  }
+
+  if (typeof stripeSessionId !== 'string') {
+    return { valid: false };
+  }
+
+  const trimmed = stripeSessionId.trim();
+
+  if (!trimmed) {
+    return { valid: true, stripeSessionId: null };
+  }
+
+  if (trimmed.length > MAX_STRIPE_SESSION_ID_LENGTH) {
+    return { valid: false };
+  }
+
+  return { valid: true, stripeSessionId: trimmed };
 }

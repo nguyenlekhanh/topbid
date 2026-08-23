@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.6 completed** — Next recommended: 3.7
+**3.7 completed** — Next recommended: 3.8
 
 ## Completed Tasks
 
@@ -51,6 +51,7 @@
 - 3.4: Validate category server-side ✓
 - 3.5: Create pending bid record ✓
 - 3.6: Handle concurrent bids (DB locking) ✓
+- 3.7: Prevent duplicate transactions ✓
 
 ## Tasks in Progress
 
@@ -113,6 +114,7 @@ _None_
 - Server-side category validation created (validateCategory in categories.ts: untrusted slug runtime guards, authoritative DB-sourced row via getCategoryBySlug, active-only enforced by app filter + RLS, predictable invalid_slug/category_not_found reasons)
 - Pending bid record creation created (createPendingBid in bids.ts: composes validateCategory + validateBidAmount, service-role write via new server-only supabase-service.ts, explicit status='pending', DB-sourced category_id, typed failure union with 4.1-ready contract)
 - Concurrent bid handling created (create_pending_bid PL/pgSQL RPC via migration 20260823000007: SELECT FOR UPDATE on the category row serializes same-category critical sections, pending-aware minimum floor recomputed inside the lock, EXECUTE restricted to service_role; createPendingBid switched to the RPC with unchanged external contract)
+- Duplicate transaction prevention created (migration 20260823000008 adds nullable p_stripe_session_id to the RPC with unique_violation -> bid_error:duplicate_transaction handling, arbitrated race-safe by the existing UNIQUE(stripe_session_id); optional stripeSessionId input on createPendingBid with invalid_stripe_session_id/duplicate_transaction union members)
 
 ## Current Environment/Setup Status
 
@@ -130,7 +132,7 @@ _None_
 
 ## Next Recommended Task
 
-**3.7 — Prevent duplicate transactions**
+**3.8 — Bid engine unit tests**
 
 ## Notes
 
@@ -154,3 +156,5 @@ Task 3.4 completed successfully. validateCategory added to src/lib/categories.ts
 Task 3.5 completed successfully. createPendingBid added to src/lib/bids.ts: validates category + amount authoritatively, then inserts a bids row with explicit status='pending' via the new server-only service-role client (src/lib/supabase-service.ts); typed failure union documented as the Task 4.1 Stripe Checkout contract; concurrency/duplicate handling deferred to Tasks 3.6/3.7.
 
 Task 3.6 completed successfully. Concurrency-safe reservation added: migration 20260823000007 introduces create_pending_bid RPC (SELECT FOR UPDATE on the category row, pending-aware minimum recheck, insert) restricted to service_role; createPendingBid now calls the RPC so same-category critical sections serialize at the database level while different categories proceed concurrently. Live concurrency testing skipped (no local Docker), documented honestly.
+
+Task 3.7 completed successfully. Duplicate transaction prevention added: migration 20260823000008 extends the RPC with a nullable stripe session identifier arbitrated race-safe by the existing UNIQUE(stripe_session_id) constraint (unique_violation -> typed duplicate_transaction failure); createPendingBid accepts an optional stripeSessionId with shape guards; success behavior for bids without identifiers unchanged. Live DB verification skipped honestly.

@@ -1,32 +1,74 @@
 ﻿TASK ID: 3.7
 PHASE: 3
 TITLE: Prevent duplicate transactions
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prevent the same bid/payment transaction from being created more than once, race-safe and enforced at the database boundary - using ONLY the duplicate semantics already present in the schema and plan.
+
+DUPLICATE DEFINITION DERIVED FROM EVIDENCE (nothing invented):
+- Migration 20260823000002_create_bids.sql declares stripe_session_id TEXT UNIQUE plus UNIQUE(category_id, stripe_session_id)
+- Migration 20260823000003 adds idx_bids_stripe_session ON bids(stripe_session_id)
+- PROJECT_PLAN.md bids table comment repeats stripe_session_id TEXT UNIQUE; Phase 4.9 (Idempotent webhook handling) builds on that same identity
+=> A duplicate transaction is a second bids row carrying an already-used stripe_session_id. The single-column UNIQUE constraint is strictly stronger than the composite for non-null ids, so it is THE arbiter; the composite stays untouched for plan fidelity and NO redundant constraints/indexes were added.
+- Current 3.5/3.6 behavior stores stripe_session_id as NULL on every pending bid; PostgreSQL UNIQUE treats NULLs as distinct, so bids created without a session identifier are unaffected.
 
 SCOPE:
+- New migration supabase/migrations/20260823000008_create_pending_bid_stripe_session.sql - RPC signature gains nullable p_stripe_session_id; INSERT wrapped in a unique_violation handler raising 'bid_error:duplicate_transaction'; old 4-param signature dropped explicitly (CREATE OR REPLACE would have created an overload); revokes/grants re-applied for the new signature
+- src/lib/bids.ts - PendingBidInput gains optional stripeSessionId?: unknown; local shape guard (non-string or >255 chars after trim -> 'invalid_stripe_session_id'; absent/null/empty -> NULL, stored as before); RPC call passes p_stripe_session_id; mapPendingBidRpcError translates bid_error:duplicate_transaction into new union member 'duplicate_transaction'
 
 OUT OF SCOPE:
+- Stripe Checkout/session creation, webhooks, payment processing (Phase 4), who supplies the identifier and when it gets attached (Task 4.1+), webhook-level idempotency (Task 4.9 builds on this same constraint), test infrastructure (3.8), schema changes beyond the function replacement
 
-INPUTS / DEPENDENCIES:
+RACE-SAFETY ARGUMENT:
+PostgreSQL enforces UNIQUE(stripe_session_id) atomically at write time. Two simultaneous attempts with the same identifier - even racing through different category locks - cannot both commit; exactly one INSERT wins and the loser's insert raises unique_violation inside the RPC, which is translated to the typed failure reason. No application-level check-and-set exists anywhere in the path, so no TOCTOU window is introduced. The Task 3.6 category-row lock and pending-aware minimum floor are fully preserved (insert remains inside the locked critical section).
 
-IMPLEMENTATION REQUIREMENTS:
+ERROR CONTRACT (extended but backwards compatible):
+- Existing reasons and success shape unchanged (Task 3.5/4.1 callers keep working)
+- New reasons: 'invalid_stripe_session_id' (malformed input), 'duplicate_transaction' (session id already used; minimumBid null)
+- Infrastructure failures still throw descriptive Errors
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000008_create_pending_bid_stripe_session.sql (new)
+- src/lib/bids.ts
+- docs/3.7.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck
+2. npm run lint
+3. npm run format:check
+4. npm run build
+5. Static SQL/code inspection: exception scope, NULL-id passthrough, drop/create overload mechanics, grant signature match, union exhaustiveness
+6. DB/concurrency regression check: REQUIRES live PostgreSQL/Supabase - SKIPPED honestly (local Docker unavailable)
 
 DEFINITION OF DONE:
+- Same-session duplicates impossible at the database boundary under concurrency; successful no-session bid behavior byte-for-byte unchanged; security model intact; runnable checks pass
 
 IMPLEMENTATION NOTES:
+normalizeStripeSessionId mirrors normalizeBidderName semantics: undefined/null -> NULL; empty-after-trim -> NULL (treated as "no identifier", matching current behavior rather than inventing strictness); non-string or length > 255 -> invalid reason. Guard order places all cheap local checks before any DB round-trips. The RPC's exception block wraps ONLY the INSERT statement - minimum/category raises are unaffected. Phase 4 note recorded for successors: Task 4.1 should pass its created checkout session id here (or attach it post-creation), and Task 4.9 webhook idempotency should rely on the same UNIQUE(stripe_session_id) guarantee.
 
 RESULT:
+Implementation complete; typecheck/lint/format:check/build all PASSED on first run. Static inspection confirmed evidence-based dedup scope, race-safe arbitration by the existing constraint, preserved 3.6 locking, unchanged success behavior for NULL ids, and hardened function privileges.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000008_create_pending_bid_stripe_session.sql (new)
+- src/lib/bids.ts (optional stripeSessionId input + normalizer + two union members + mapper case)
+- docs/3.7.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Static SQL/code inspection: PASSED
+- DB integration/concurrency regression: SKIPPED - local Supabase Docker unavailable; could NOT be verified live; nothing faked. Intended procedure documented in docs/3.7.txt follow-up notes.
 
 KNOWN ISSUES:
+- None (live duplicate/conflict verification pending a real database environment, honestly documented)
 
 FOLLOW-UP:
+Task 3.8 — Bid engine unit tests
