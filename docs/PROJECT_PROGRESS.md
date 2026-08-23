@@ -4,7 +4,7 @@
 **Phase 0 — Project Setup**
 
 ## Current Task
-**0.5 completed** — Next recommended: 0.6
+**0.6 completed** — Next recommended: 0.7
 
 ## Completed Tasks
 - 0.1: Create Next.js project with TypeScript ✓
@@ -12,6 +12,7 @@
 - 0.3: Configure Tailwind CSS ✓
 - 0.4: Configure ESLint + Prettier ✓
 - 0.5: Configure Supabase client ✓
+- 0.6: Configure Stripe SDK ✓
 
 ## Tasks in Progress
 *None*
@@ -34,6 +35,7 @@
 - Path aliases (@/*) configured
 - Tailwind CSS v4 configured with @import syntax
 - Supabase client configured (client & server)
+- Stripe SDK configured (client & server)
 
 ## Current Environment/Setup Status
 - Node.js: v20.18.3 ✓
@@ -44,12 +46,12 @@
 - Tailwind CSS: v4 ✓
 - Prettier: 3.9.6 ✓
 - Supabase: Configured ✓
-- Stripe: Not configured
+- Stripe: Configured ✓
 - Vercel: Not configured
 - Environment variables: .env.example created
 
 ## Next Recommended Task
-**0.6 — Configure Stripe SDK**
+**0.7 — Configure environment variables**
 
 ## Notes
-Task 0.5 completed successfully. Supabase client configured with @supabase/ssr for both client-side and server-side usage. Environment variables documented in .env.example.
+Task 0.6 completed successfully. Stripe SDK configured with server-side (secret key) and client-side (publishable key) clients. Secret key never exposed to client-side code.

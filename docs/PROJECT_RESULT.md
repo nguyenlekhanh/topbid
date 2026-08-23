@@ -120,9 +120,28 @@ This file records what has actually been built, not what was planned.
 - **Follow-up work**: Task 0.6 - Configure Stripe SDK
 
 ### Task 0.6
-- **Date**: Not started
+- **Date**: 2026-08-23
 - **Objective**: Configure Stripe SDK
-- **Status**: Pending
+- **Status**: Completed
+- **What was implemented**: Installed stripe (server-side) and @stripe/stripe-js (client-side) packages. Created server-side Stripe client (src/lib/stripe.ts) using secret key and client-side Stripe client (src/lib/stripe-client.ts) using publishable key. Secret key is NEVER exposed to client-side code.
+- **Files changed**:
+  - package.json (added stripe, @stripe/stripe-js)
+  - package-lock.json
+  - src/lib/stripe.ts (created - server-side client with secret key)
+  - src/lib/stripe-client.ts (created - client-side client with publishable key)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**: 
+  - Server-side: Stripe secret key (STRIPE_SECRET_KEY) used only in server-side code
+  - Client-side: Stripe publishable key (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) used in browser
+  - Current Stripe API version: 2026-07-29.dahlia
+  - Client uses loadStripe for lazy loading
+  - Critical: Secret key never exposed to client bundle
+- **Known limitations**: None
+- **Follow-up work**: Task 0.7 - Configure environment variables
 
 ### Task 0.7
 - **Date**: Not started

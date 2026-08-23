@@ -1,32 +1,84 @@
 ﻿TASK ID: 0.6
 PHASE: 0
 TITLE: Configure Stripe SDK
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Configure Stripe SDK for both client-side and server-side usage in the Next.js application.
 
 SCOPE:
+- Install stripe (server-side) and @stripe/stripe-js (client-side) packages
+- Create server-side Stripe client (src/lib/stripe.ts) using secret key
+- Create client-side Stripe client (src/lib/stripe-client.ts) using publishable key
+- Verify TypeScript compilation, linting, formatting, and build pass
+- Ensure secret key is never exposed to client-side code
 
 OUT OF SCOPE:
+- Creating Stripe Checkout sessions (Phase 4)
+- Setting up Stripe webhooks (Phase 4)
+- Creating payment flows (Phase 4)
+- Setting up Stripe account (done externally)
 
 INPUTS / DEPENDENCIES:
+- Task 0.1-0.5 completed
+- Next.js 16.3.2 with App Router
+- Environment variables will be provided via .env.local at runtime
+- .env.example already contains STRIPE_SECRET_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET
 
 IMPLEMENTATION REQUIREMENTS:
+- Server-side client uses Stripe secret key (STRIPE_SECRET_KEY)
+- Client-side client uses Stripe publishable key (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+- Server client uses current Stripe API version
+- Client client uses loadStripe for lazy loading
+- No hardcoded secrets - all via environment variables
+- Secret key never exposed to client-side code
 
 FILES EXPECTED TO CHANGE:
+- src/lib/stripe.ts (new - server-side)
+- src/lib/stripe-client.ts (new - client-side)
+- package.json (dependencies added)
 
 TEST PLAN:
+1. Run `npm run typecheck` - TypeScript compilation should pass
+2. Run `npm run lint` - ESLint should pass
+3. Run `npm run format:check` - Prettier should verify formatting
+4. Run `npm run build` - Production build should succeed
 
 DEFINITION OF DONE:
+- Stripe packages installed
+- Server and client clients created and typed
+- All checks pass
+- Secret key only used server-side
 
 IMPLEMENTATION NOTES:
+Installed stripe (server-side) and @stripe/stripe-js (client-side) packages.
+Created two client utilities:
+- src/lib/stripe.ts: Server-side Stripe client using secret key, configured with current API version (2026-07-29.dahlia)
+- src/lib/stripe-client.ts: Client-side Stripe client using publishable key with lazy loading via loadStripe
+The .env.example file already contains the required environment variables.
+Critical: Server-side secret key is NEVER exposed to client-side code.
 
 RESULT:
+Stripe SDK successfully configured. Verified by:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 FILES ACTUALLY CHANGED:
+- package.json (added stripe, @stripe/stripe-js)
+- package-lock.json
+- src/lib/stripe.ts (created - server-side client)
+- src/lib/stripe-client.ts (created - client-side client)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to task 0.7: Configure environment variables
