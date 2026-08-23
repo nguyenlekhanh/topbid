@@ -1,32 +1,70 @@
 ﻿TASK ID: 1.12
 PHASE: 1
 TITLE: Error states
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create reusable UI-only error states for Topbid.lol (categories, leaderboard, bids, network, inline) — mock/static, user-friendly, accessible.
 
 SCOPE:
+- Reusable ErrorState component (src/components/ErrorState.tsx) with card + inline variants
+- Generic props: title, description, actionLabel/actionHref/onRetry, variant
+- Variants: CategoriesError, LeaderboardError, RecentBidsError, BidError, NetworkError, InlineFormError
+- Card: centered dashed-like but destructive/20 bg-destructive/5, icon circle destructive/10, title/description, Retry (primary) + Go home (outline)
+- Inline: flex row border-destructive/20 bg-destructive/5 with icon + text + Retry
+- No real error recovery, mock retry only
+- Uses design tokens, no new styling system, no DB/realtime/auth/Stripe
+- Preserves Phase 1 work
 
 OUT OF SCOPE:
+- Success states (1.13), loading (1.11 done), empty (1.10 done)
+- Supabase / DB / realtime / real backend error handling
+- Exposing secrets/stack traces
 
 INPUTS / DEPENDENCIES:
+- Task 1.10 EmptyState pattern
+- Task 1.2 design system
 
 IMPLEMENTATION REQUIREMENTS:
+- User-friendly messages, no secrets, no stack traces
+- Clear Retry action
+- Accessible: role alert aria-live assertive, focus-visible on actions
+- Responsive, no overflow, reuses EmptyState/Skeleton patterns
 
 FILES EXPECTED TO CHANGE:
+- src/components/ErrorState.tsx (created)
+- docs/1.12.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run typecheck - pass
+2. npm run lint - pass
+3. npm run format:check - pass
+4. npm run build - pass
+5. Visual mobile/desktop, retry focus, no overflow, alert live
 
 DEFINITION OF DONE:
+- ErrorState(s) exist, user-friendly, retry, responsive, accessible, all checks pass, docs updated, committed, pushed
 
 IMPLEMENTATION NOTES:
+Created ErrorState.tsx with ErrorIcon/InlineErrorIcon. Default card: role alert aria-live assertive, rounded-xl border-destructive/20 bg-destructive/5 px-6 py-12, icon 12x12 destructive/10, h3 title, p description muted-foreground, actions flex wrap: primary Retry with refresh icon + Go home outline. Inline variant: flex gap-3 border bg-destructive/5 px-4 py-3 with icon/text/Retry. Exported variants each with friendly title/description (no internal details) and Retry onRetry prop. InlineFormError for form-level errors. No secrets, mock only.
 
 RESULT:
+Verified via typecheck/lint/format:check/build all PASSED. Visual: card centered, destructive subtle, icon visible, retry focus ring, responsive, no overflow, alert announced.
 
 FILES ACTUALLY CHANGED:
+- src/components/ErrorState.tsx (created - ~140 lines)
+- docs/1.12.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 1.13 - Success state (post-bid)

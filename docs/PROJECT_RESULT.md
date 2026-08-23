@@ -654,6 +654,40 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.12 - Error states
 
+### Task 1.12
+
+- **Date**: 2026-08-23
+- **Objective**: Create reusable error-state presentation for Topbid.lol
+- **Status**: Completed
+- **What was implemented**:
+  - Reusable ErrorState component (src/components/ErrorState.tsx) with card/inline variants, user-friendly, no secrets
+  - Props: title, description, actionLabel/actionHref/onRetry, variant card/inline
+  - Card: centered rounded-xl border-destructive/20 bg-destructive/5 px-6 py-12, icon 12x12 destructive/10, title/description, Retry primary with refresh icon + Go home outline, role alert aria-live assertive
+  - Inline: flex gap-3 border-destructive/20 bg-destructive/5 px-4 py-3, icon + text + Retry border button
+  - Variants: CategoriesError, LeaderboardError, RecentBidsError, BidError, NetworkError, InlineFormError — each with friendly message, no stack trace, clear Retry
+  - Uses design tokens: destructive, foreground, muted-foreground, border, ring, background, primary, muted, transitions
+  - Responsive: px-6 py-12 sm:px-8 sm:py-16, max-w-md, no overflow, focus-visible on actions, reuses EmptyState/Skeleton pattern
+  - Preserved Phase 1 work, no DB/Stripe/auth/realtime, mock/static only
+- **Files changed**:
+  - src/components/ErrorState.tsx (created)
+  - docs/1.12.txt (created/updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Manual verification: error card shows user-friendly title, no secrets, Retry visible with focus ring, inline variant row layout, responsive centered, no overflow, alert live
+- **Important technical decisions**:
+  - Generic ErrorState with actionHref vs onRetry branch (Link vs button), inline vs card layout
+  - Dedicated friendly messages per context, never expose internal details
+  - Retry as primary action, Go home as secondary, both focus-visible
+  - Role alert for screen readers, reusable across categories/leaderboard/bids/network
+  - No new dependencies, UI-only mock
+- **Known limitations**: None
+- **Follow-up work**: Task 1.13 - Success state (post-bid)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
