@@ -836,6 +836,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply remotely; local docker not required for validation)
 - **Follow-up work**: Task 2.2 — Bids schema + migration
 
+### Task 2.2
+
+- **Date**: 2026-08-23
+- **Objective**: Create bids schema + migration exactly as planned
+- **Status**: Completed
+- **What was implemented**:
+  - Migration file supabase/migrations/20260823000002_create_bids.sql with exact planned DDL
+  - Creates public.bids with id uuid primary key default gen_random_uuid(), category_id uuid references public.categories(id) on delete cascade, amount integer not null, bidder_email text not null, bidder_name text, stripe_session_id text unique, stripe_payment_intent_id text, status text not null default 'pending', is_highest boolean default false, created_at timestamptz default now(), paid_at timestamptz, unique (category_id, stripe_session_id)
+  - Preserves status values pending/paid/failed/refunded via default (no CHECK yet per 2.4), amount as integer cents
+  - Additive after 20260823000001, no indexes/RLS/seed per scope
+- **Files changed**:
+  - supabase/migrations/20260823000002_create_bids.sql (created)
+  - docs/2.2.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - Migration inspection: PASSED (FK references public.categories, uniques verified, matches PROJECT_PLAN.md)
+  - Supabase CLI version: 2.115.0 via npx supabase
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Qualified public.bids and FK to public.categories for explicit schema
+  - No DROP, no extra constraints, no invented rules, reproducible ordering via timestamp
+  - Kept status as plain TEXT DEFAULT 'pending' (CHECK added in 2.4)
+- **Known limitations**: None (requires supabase db push after 2.1 to apply)
+- **Follow-up work**: Task 2.3 — Database indexes
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

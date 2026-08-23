@@ -1,32 +1,67 @@
 ﻿TASK ID: 2.2
 PHASE: 2
 TITLE: Bids schema + migration
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create the Supabase/PostgreSQL migration for the bids table exactly as defined in PROJECT_PLAN.md, additive after categories.
 
 SCOPE:
+- New migration supabase/migrations/20260823000002_create_bids.sql with public.bids table
+- UUID PK gen_random_uuid(), category_id FK to public.categories(id) ON DELETE CASCADE, amount INTEGER cents, bidder_email TEXT NOT NULL, bidder_name TEXT, stripe_session_id TEXT UNIQUE, stripe_payment_intent_id TEXT, status TEXT NOT NULL DEFAULT 'pending', is_highest BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW(), paid_at TIMESTAMPTZ, UNIQUE(category_id, stripe_session_id)
+- No indexes, no CHECK constraints, no RLS, no seed, no queries — per 2.3-2.6 later
 
 OUT OF SCOPE:
+- Indexes (2.3), CHECK constraints (2.4), RLS (2.5), seed (2.6), queries (2.7+), bid engine, Stripe/realtime/UI
 
 INPUTS / DEPENDENCIES:
+- Task 2.1 categories migration
+- PROJECT_PLAN.md Database Design — bids table
 
 IMPLEMENTATION REQUIREMENTS:
+- additive, reproducible, no DROP, no modification of 2.1 migration, runs after categories
+- public.bids qualified, correct types/defaults, foreign key and uniques exactly as planned
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000002_create_bids.sql (created)
+- docs/2.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. Inspect SQL against PROJECT_PLAN.md
+2. Verify FK and UNIQUE constraints
+3. Supabase CLI version check / local validation if available
+4. npm run typecheck
+5. npm run lint
+6. npm run format:check
+7. npm run build
 
 DEFINITION OF DONE:
+- Migration file exists with exact planned schema, additive, version-controlled, FK/uniques correct, no extra business rules, all checks pass
 
 IMPLEMENTATION NOTES:
+Created additive file 20260823000002_create_bids.sql with public.bids DDL matching plan byte-for-byte, references public.categories(id) on delete cascade, stripe_session_id TEXT UNIQUE inline plus composite unique(category_id, stripe_session_id). Status defaults pending (no CHECK yet per 2.4). No indexes/RLS/seed. Verified not modifying 20260823000001. Timestamp ordering ensures categories runs first.
 
 RESULT:
+Inspected SQL — FK to public.categories(id) ON DELETE CASCADE correct, stripe_session_id UNIQUE + composite UNIQUE correct, types/defaults match. Supabase CLI 2.115.0 via npx supabase available. Build unchanged, no UI impact.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000002_create_bids.sql (created - 16 lines)
+- docs/2.2.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Migration inspection: PASSED
+- Supabase CLI version check: 2.115.0 via npx supabase
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Proceed to Task 2.3 — Database indexes
