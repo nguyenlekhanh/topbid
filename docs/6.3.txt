@@ -1,32 +1,73 @@
 ﻿TASK ID: 6.3
 PHASE: 6
 TITLE: Outbid email template
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Provide a pure, side-effect-free outbid notification email composer producing subject/HTML/text from authoritative input - consumed by Task 6.4's send flow through the Task 6.2 sendEmail boundary.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "6.3 | Outbid email template | 6.2". Per the phase decomposition, the bid-again link belongs to Task 6.5 (dep 6.4) - so this template deliberately contains NO CTA link, with a regression test guarding that boundary until 6.5 lands.
 
 SCOPE:
+- New src/lib/outbid-email-template.ts (pure module; zero provider/network imports):
+  * buildOutbidEmail(input): OutbidEmailContent {to, subject, html, text} shaped exactly for the Task 6.2 sendEmail contract (type-verified)
+  * Private escapeHtml helper covering & < > " ' entities for all dynamic HTML interpolations
+  * formatCurrency matching project convention (en-US USD, cents->dollars)
+- Input: to (previous champion address), bidderName|null (greeting fallback 'there'), categoryName, previousAmount/newAmount (integer cents), newBidderName|null (fallback 'Another bidder')
+- Subject: "You've been outbid on {categoryName}!" (plain text context)
+- Text body mirrors HTML content without any tags
+
+PRESERVED / BOUNDARIES:
+- Deterministic and pure: identical input -> identical output; no Date.now, no network, no Resend import
+- XSS-safe: all dynamic values escaped in HTML; malicious-input test proves <script>/<img> payloads render inert
+- No CTA link included (Task 6.5 owns it) - regression test asserts absence of href/http
+- Tasks 1.1-6.2 untouched; no new dependencies
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Bid-again link (Task 6.5), notification triggering/sending (Task 6.4), unsubscribe footer (6.6), retry/failure flows (6.7)
 
 FILES EXPECTED TO CHANGE:
+- src/lib/outbid-email-template.ts (new)
+- src/lib/outbid-email-template.test.ts (new)
+- docs/6.3.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (12 new template tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: purity (no provider imports), escaping coverage, deterministic output
 
 DEFINITION OF DONE:
+- Pure typed template composer exists with HTML/text bodies, full escaping, deterministic output, and a scope-guard test excluding premature CTA/link work; all repo checks green
 
 IMPLEMENTATION NOTES:
+Output shape is compile-time verified against SendEmailParams via a type-level assignment in tests, guaranteeing drop-in compatibility with sendEmail in Task 6.4. Subjects intentionally keep raw dynamic values (email subjects are plain-text context). Blank newBidderName trims to 'Another bidder' fallback; blank bidderName greets 'there'. Static inspection confirmed zero provider imports in the template module and full escaping coverage.
 
 RESULT:
+Implementation complete. Suite: 172/172 PASSED across 11 files (+12 template tests). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- src/lib/outbid-email-template.ts (new)
+- src/lib/outbid-email-template.test.ts (new)
+- docs/6.3.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 172/172 PASSED across 11 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Real email rendering/delivery: N/A for this task (pure composition); live delivery remains Task 4.12/6.x integration territory
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 6.4 - Send outbid notification

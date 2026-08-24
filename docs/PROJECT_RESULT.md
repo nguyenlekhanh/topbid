@@ -2024,6 +2024,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery deferred pending real API key/domain)
 - **Follow-up work**: Task 6.3 — Outbid email template
 
+### Task 6.3
+
+- **Date**: 2026-08-23
+- **Objective**: Pure outbid-notification email composer producing deterministic subject/HTML/text from authoritative input, shaped for the Task 6.2 sendEmail contract
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/outbid-email-template.ts (pure module, zero provider/network imports): buildOutbidEmail(input) -> OutbidEmailContent {to, subject, html, text}
+  - Subject: "You've been outbid on {categoryName}!"; HTML and text bodies mirror the same content (greeting with bidder-name fallback 'there', category, previous/new amounts formatted as USD currency, new-bidder label fallback 'Another bidder')
+  - Full HTML escaping of every dynamic interpolation via a private escapeHtml helper (& < > " '); malicious-input test proves script/img payloads render inert
+  - Output shape compile-time verified against SendEmailParams; deterministic output asserted by deep-equality test
+  - Scope guard: regression test asserts NO href/http/link in output since the bid-again link belongs to Task 6.5
+- **Files changed**:
+  - src/lib/outbid-email-template.ts (new)
+  - src/lib/outbid-email-template.test.ts (new — 12 tests)
+  - docs/6.3.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 172/172 PASSED across 11 files (+12 template tests)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: purity (zero provider imports), escaping coverage, determinism
+  - Real email rendering/delivery: N/A for this pure-composition task; live delivery remains Task 4.12/6.x integration territory
+- **Important technical decisions**:
+  - Pure standalone module: template composition fully separated from provider sending (6.2) and notification triggering (6.4), per the phase decomposition
+  - Subjects intentionally keep raw dynamic values (plain-text context); only HTML bodies escape
+  - Bid-again CTA deliberately absent with a scope-guard test — Task 6.5 owns it
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 6.4 — Send outbid notification
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
