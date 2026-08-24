@@ -1,32 +1,67 @@
 ﻿TASK ID: 3.8
 PHASE: 3
 TITLE: Bid engine unit tests
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add a unit test suite covering the Phase 3 bid engine (minimum-bid rules, amount validation, pending-bid creation, duplicate/concurrency error mapping) so regressions surface without a live database.
 
-SCOPE:
+TEST SETUP ESTABLISHED (none existed previously - verified before starting):
+- New dev dependency: vitest ^4.1.11 (single, justified addition; AGENTS.md quality gates already reference npm run test)
+- vitest.config.mts (.mts required: vitest 4 treats .ts configs as CJS in non-type-module repos and fails on its ESM-only std-env dependency) with node environment, src/**/*.test.ts include pattern, and @ -> ./src alias mirroring tsconfig paths
+- package.json script: test = vitest run
+- Test file colocated by convention: src/lib/bids.test.ts (covered by existing typecheck/lint/prettier gates via tsconfig include **/*.ts)
+
+APPROACH:
+Mock ONLY the Supabase client boundary (@/lib/supabase-server, @/lib/supabase-service) using vi.hoisted state and two hand-rolled proxies mimicking real shapes: the CLIENT is not thenable (awaiting createClient() yields it), each query BUILDER is thenable and consumes the next queued {data,error} result deterministically; method calls are recorded for RPC assertions. All business logic runs for real: validators, minimum resolvers, normalizers, and RPC error mapping are exercised end-to-end without any database, network, or service-role key. No production source files were modified.
+
+COVERAGE (38 tests, all passing):
+- getHighestBidForCategory: row mapping; blank-slug guard returns null without DB access
+- getMinimumBidForCategory: starting_bid basis when no paid bids; highest+increment basis; null on missing category
+- getInitialMinimumBid / getIncrementedMinimumBid: complementary null contracts (Tasks 3.1/3.2)
+- validateBidAmount (Task 3.3): malformed amounts rejected pre-DB (non-number, float, NaN, Infinity, 0, negative, null, object); equality-to-minimum accepted; below-minimum echoes authoritative minimum; category_not_found
+- createPendingBid local handling (Task 3.5): malformed emails/names/session ids/non-integer amounts rejected before any query; success path asserts the exact create_pending_bid RPC invocation (authoritative category_id, integer-cent amount, trimmed email/name/session id); Task 3.7 duplicate_transaction mapping; RPC below-minimum echo mapping; category_not_found mapping; unmapped errors throw descriptively
+- Tasks 3.4/3.6 logic is exercised transitively (validateCategory against the fake; RPC contract assertions)
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Phase 4+ functionality, integration/E2E tests requiring live Supabase, leaderboard/recent-bids query suites (Phase 2 data-access, not bid engine), webhook idempotency tests (Task 4.9 territory), refactoring completed task code to expose internals
 
 FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
+- package.json (+vitest, +test script)
+- vitest.config.mts (new)
+- src/lib/bids.test.ts (new)
+- docs/3.8.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 DEFINITION OF DONE:
+- Reusable test command exists and passes; engine rules from Tasks 3.1-3.7 are regression-guarded; all repo checks pass; no production behavior changed
 
 IMPLEMENTATION NOTES:
+The first run exposed a thenable-proxy pitfall: a universal chain proxy makes the CLIENT itself thenable, so await createClient() unwrapped it into a queue result (supabase.from is not a function). Fixed with the client/builder proxy split described above. One unused module-level type removed after lint flagged it; one Prettier line-break auto-fixed via lint:fix. Queue semantics are strict FIFO: tests enqueue exactly the responses a flow consumes, so unexpected extra queries fail loudly (empty queue resolves null data rather than silently passing - acceptable trade-off documented here).
 
 RESULT:
+Implementation complete. npm run test: 38/38 PASSED. Full gate suite green afterwards: typecheck, lint, format:check, build all PASSED. No production source modified; Tasks 1.1-3.7 preserved.
 
 FILES ACTUALLY CHANGED:
+- package.json (devDependency vitest + test script)
+- package-lock.json (dependency install artifact)
+- vitest.config.mts (new)
+- src/lib/bids.test.ts (new)
+- docs/3.8.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test (vitest run): 38/38 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED (one prettier auto-fix + one unused type removal during development)
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live DB/integration verification: SKIPPED - local Supabase Docker unavailable (consistent with Tasks 2.7-3.7); unit suite deliberately isolates the DB boundary instead of faking live results
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Phase 3 complete. Proceed to Task 4.1 - Create Stripe Checkout session (deps 3.5, 0.6 both satisfied)

@@ -1325,6 +1325,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Live duplicate/conflict verification pending a real database environment (honestly documented)
 - **Follow-up work**: Task 3.8 — Bid engine unit tests
 
+### Task 3.8
+
+- **Date**: 2026-08-23
+- **Objective**: Unit-test the Phase 3 bid engine (minimum-bid rules, amount validation, pending-bid creation, duplicate/concurrency error mapping) without requiring a live database
+- **Status**: Completed
+- **What was implemented**:
+  - Test infrastructure (none existed previously): dev dependency vitest ^4.1.11, `npm run test` script (vitest run), vitest.config.mts (.mts required — vitest 4 treats .ts configs as CJS in non-type-module repos and fails on its ESM-only std-env dep) with node environment and @->./src alias mirroring tsconfig paths
+  - src/lib/bids.test.ts: 38 tests. Boundary-only mocking via vi.hoisted + two proxies mimicking real shapes (non-thenable CLIENT; thenable query BUILDER consuming a strict FIFO result queue; call log for RPC assertions). All src/lib business logic runs for real — no DB, network, or service-role key
+  - Coverage: getHighestBidForCategory mapping + blank-slug guard; getMinimumBidForCategory starting/increment/missing branches; complementary getInitialMinimumBid/getIncrementedMinimumBid contracts; validateBidAmount full matrix incl. pre-DB rejection of malformed amounts and equality acceptance; createPendingBid local guards (email/name/session-id/amount), exact create_pending_bid RPC invocation assertions with authoritative values, duplicate_transaction / below-minimum echo / category_not_found mappings, unmapped-error throwing
+- **Files changed**:
+  - package.json (+vitest, +test script) and package-lock.json (install artifact)
+  - vitest.config.mts (new)
+  - src/lib/bids.test.ts (new)
+  - docs/3.8.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 38/38 PASSED
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (one unused module-level type removed; one Prettier auto-fix during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live DB/integration verification: SKIPPED — local Supabase Docker unavailable (consistent with Tasks 2.7-3.7); the unit suite deliberately isolates the DB boundary instead of faking live results
+- **Important technical decisions**:
+  - Vitest chosen as the single justified dependency for this plan-mandated task (AGENTS.md quality gates already reference npm run test); colocated *.test.ts convention keeps existing typecheck/lint/prettier gates applicable
+  - Client/builder proxy split fixed a subtle first-run failure where the client itself was thenable and await createClient() unwrapped it into a queue result
+  - Strict FIFO queues make unexpected extra queries fail loudly rather than silently pass; scope limited to the bid engine (leaderboard/recent-bids suites remain out of scope)
+- **Known limitations**: None (live integration coverage remains deferred to a real database environment)
+- **Follow-up work**: Phase 3 complete — Task 4.1 — Create Stripe Checkout session
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
