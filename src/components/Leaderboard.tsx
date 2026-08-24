@@ -1,62 +1,12 @@
-interface LeaderboardEntry {
-  rank: number;
-  bidderName: string;
-  bidderEmail: string;
-  category: string;
-  amount: number;
-  timeAgo: string;
-}
+'use client';
 
-const mockLeaderboard: LeaderboardEntry[] = [
-  {
-    rank: 1,
-    bidderName: 'Alex Chen',
-    bidderEmail: 'alex.c@example.com',
-    category: 'Automotive',
-    amount: 250000,
-    timeAgo: '2 min ago',
-  },
-  {
-    rank: 2,
-    bidderName: 'Sarah M.',
-    bidderEmail: 'sarah.m@example.com',
-    category: 'Art & Collectibles',
-    amount: 125000,
-    timeAgo: '15 min ago',
-  },
-  {
-    rank: 3,
-    bidderName: 'James K.',
-    bidderEmail: 'james.k@example.com',
-    category: 'Fashion & Accessories',
-    amount: 78000,
-    timeAgo: '1 hour ago',
-  },
-  {
-    rank: 4,
-    bidderName: 'Priya R.',
-    bidderEmail: 'priya.r@example.com',
-    category: 'Sports Memorabilia',
-    amount: 52000,
-    timeAgo: '3 hours ago',
-  },
-  {
-    rank: 5,
-    bidderName: 'Marcus T.',
-    bidderEmail: 'marcus.t@example.com',
-    category: 'Tech & Gadgets',
-    amount: 45000,
-    timeAgo: '5 hours ago',
-  },
-  {
-    rank: 6,
-    bidderName: 'Elena V.',
-    bidderEmail: 'elena.v@example.com',
-    category: 'Digital Assets',
-    amount: 35000,
-    timeAgo: '8 hours ago',
-  },
-];
+import { useCallback, useEffect, useState } from 'react';
+
+import { EmptyLeaderboard } from '@/components/EmptyState';
+import { LeaderboardError } from '@/components/ErrorState';
+import { getLeaderboardEntries, type LeaderboardEntryData } from '@/lib/bids-client';
+import { createLeaderboardTracker } from '@/lib/leaderboard-tracker';
+import { subscribeToBidChanges } from '@/lib/realtime';
 
 function formatCurrency(cents: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -67,6 +17,16 @@ function formatCurrency(cents: number): string {
   }).format(cents / 100);
 }
 
+function getTimeAgo(createdAt: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000));
+
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+
+  return `${Math.floor(seconds / 86400)} days ago`;
+}
+
 function getRankBadge(rank: number) {
   if (rank === 1) return 'bg-warning text-warning-foreground';
   if (rank === 2)
@@ -75,10 +35,54 @@ function getRankBadge(rank: number) {
   return 'bg-muted text-muted-foreground';
 }
 
-import { EmptyLeaderboard } from '@/components/EmptyState';
-
 export default function Leaderboard() {
-  if (mockLeaderboard.length === 0) {
+  const [entries, setEntries] = useState<LeaderboardEntryData[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const fetched = await getLeaderboardEntries();
+
+      setEntries(fetched);
+      setLoadFailed(false);
+    } catch (error) {
+      console.error('[leaderboard] failed to load leaderboard', error);
+      setLoadFailed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Task 5.3: realtime events are signals only - the tracker performs the initial
+    // authoritative load and re-fetches on every change (RLS paid-only via anon client),
+    // notifying this component through its callback.
+    return createLeaderboardTracker({
+      subscribe: subscribeToBidChanges,
+      fetchLeaderboard: getLeaderboardEntries,
+      onLeaderboardChange: (updated) => {
+        setEntries(updated);
+        setLoadFailed(false);
+      },
+      onError: () => setLoadFailed(true),
+    });
+  }, []);
+
+  const ranked =
+    entries?.map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+    })) ?? [];
+
+  if (loadFailed && entries === null) {
+    return (
+      <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <LeaderboardError onRetry={() => void refresh()} />
+        </div>
+      </section>
+    );
+  }
+
+  if (entries !== null && entries.length === 0) {
     return (
       <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -140,9 +144,9 @@ export default function Leaderboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {mockLeaderboard.map((entry) => (
+              {ranked.map((entry) => (
                 <tr
-                  key={entry.rank}
+                  key={entry.id}
                   className={`transition-colors duration-150 ease-out hover:bg-muted/50 motion-reduce:transition-none ${
                     entry.rank === 1 ? 'bg-primary/5 border-l-4 border-warning' : ''
                   }`}
@@ -164,18 +168,20 @@ export default function Leaderboard() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-medium text-primary">
-                          {entry.bidderName.charAt(0)}
+                          {(entry.bidderName ?? entry.bidderEmail).charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <div className="font-medium text-foreground">{entry.bidderName}</div>
+                        <div className="font-medium text-foreground">
+                          {entry.bidderName ?? 'Anonymous bidder'}
+                        </div>
                         <div className="text-xs text-muted-foreground">{entry.bidderEmail}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                      {entry.category}
+                      {entry.category?.name ?? 'Unknown category'}
                     </span>
                   </td>
                   <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
@@ -191,12 +197,18 @@ export default function Leaderboard() {
                     )}
                   </td>
                   <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-muted-foreground">
-                    {entry.timeAgo}
+                    {getTimeAgo(entry.createdAt)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {entries === null && (
+            <p className="px-4 sm:px-6 py-4 text-sm text-muted-foreground" role="status">
+              Loading leaderboard…
+            </p>
+          )}
         </div>
 
         <div className="mt-8 text-center">

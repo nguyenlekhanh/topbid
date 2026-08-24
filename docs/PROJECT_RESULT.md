@@ -1803,6 +1803,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Mock categories use non-UUID ids ('1'..'6'), so the tracker receives no matching events in the current mock-driven UI; it activates fully once real category ids flow through — consistent with the documented Phase 1 mock state
 - **Follow-up work**: Task 5.3 — Update leaderboard rankings
 
+### Task 5.3
+
+- **Date**: 2026-08-23
+- **Objective**: Make leaderboard rankings update live from authoritative database state, signal-driven by realtime events — payload values never drive the UI
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/bids-client.ts: getLeaderboardEntries(limit=10) + LeaderboardEntryData — browser anon query mirroring the server-side getLeaderboard (paid bids, amount DESC + created_at DESC, category embed), null-safe typed mapping
+  - src/lib/leaderboard-tracker.ts: createLeaderboardTracker<T> — performs the INITIAL authoritative fetch on creation, coalesces event bursts into at most one trailing refetch, notifies only when a JSON snapshot of fetched entries differs, optional onError callback for load failures
+  - src/components/Leaderboard.tsx converted to a live 'use client' consumer: loading state while first fetch is in flight, EmptyLeaderboard on authoritative empty result, LeaderboardError with working Retry on load failure; rows ranked from fetched order with #1 emphasis/rank badges preserved; timeAgo computed from createdAt; bidder name falls back to 'Anonymous bidder'
+  - Home page composition unchanged (<Leaderboard />); markup/accessibility of the table kept identical
+- **Files changed**:
+  - src/lib/bids-client.ts (browser leaderboard query + type)
+  - src/lib/leaderboard-tracker.ts (new)
+  - src/components/Leaderboard.tsx (live data conversion)
+  - src/lib/leaderboard-tracker.test.ts (new — 7 tests)
+  - docs/5.3.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 122/122 PASSED across 7 files (43 bids + 8 checkout + 44 webhook + 8 real-crypto signature + 5 realtime + 7 highest-bid tracker + 7 leaderboard tracker)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Supabase Realtime delivery: SKIPPED — environment limitation carried from Task 5.1; NOT faked
+- **Important technical decisions**:
+  - Tracker owns the initial authoritative load so component effects contain only subscription wiring (also satisfies the react-hooks/set-state-in-effect lint rule)
+  - Snapshot equality via JSON.stringify keeps change detection dependency-free
+  - Any bid change triggers a global ranking refetch (rankings are global); per-category filtering remains specific to the Task 5.2 tracker
+- **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
+- **Follow-up work**: Task 5.4 — Recent bid updates
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

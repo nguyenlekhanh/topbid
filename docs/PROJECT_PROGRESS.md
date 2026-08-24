@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**5.2 completed** — Next recommended: 5.3
+**5.3 completed** — Next recommended: 5.4
 
 ## Completed Tasks
 
@@ -67,6 +67,7 @@
 - 4.12: Stripe integration tests ✓
 - 5.1: Supabase realtime subscription ✓
 - 5.2: Update highest bid display ✓
+- 5.3: Update leaderboard rankings ✓
 
 ## Tasks in Progress
 
@@ -145,6 +146,7 @@ _None_
 - Stripe integration test infrastructure created (npm run test:integration via vitest.integration.config.mts; src/integration/stripe.integration.test.ts provides opt-in guarded suites for real test-mode Checkout API, signature round-trip, and the full paid/duplicate/refund lifecycle against real Supabase - skipped honestly when credentials/opt-in are absent)
 - Supabase realtime subscription created (migration 20260823000014 adds public.bids to the supabase_realtime publication; src/lib/realtime.ts exposes subscribeToBidChanges over the browser anon client with RLS-filtered paid-bid deliveries and typed payloads; structural row type avoids server modules in the client bundle)
 - Highest-bid display updated live (src/lib/bids-client.ts browser anon queries, src/lib/highest-bid-tracker.ts signal-driven authoritative refetch with burst coalescing and change-only notifications, src/components/HighestBidDisplay.tsx wired into CategoryCards cards replacing static Current Bid values)
+- Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
 ## Current Environment/Setup Status
 
@@ -162,7 +164,7 @@ _None_
 
 ## Next Recommended Task
 
-**5.3 — Update leaderboard rankings**
+**5.4 — Recent bid updates**
 
 ## Notes
 
@@ -219,5 +221,7 @@ Task 4.12 completed successfully. Stripe integration test infrastructure added: 
 Task 5.1 completed successfully. Supabase realtime subscription added: migration 20260823000014 enables realtime for public.bids via the supabase_realtime publication, and src/lib/realtime.ts exposes subscribeToBidChanges over the browser anon client - deliveries RLS-filtered to paid bids only; 108/108 tests passing.
 
 Task 5.2 completed successfully. Highest-bid display made live: bids-client.ts provides RLS-respecting browser queries, highest-bid-tracker.ts turns realtime signals into authoritative refetches (burst coalescing, change-only notifications), and HighestBidDisplay is wired into CategoryCards cards; payload values never trusted for display; 115/115 tests passing.
+
+Task 5.3 completed successfully. Leaderboard rankings made live: getLeaderboardEntries browser query added to bids-client.ts, leaderboard-tracker.ts performs the initial authoritative load plus coalesced signal-driven refetches, and Leaderboard.tsx now renders live rankings (loading/empty/error states, rank badges preserved); 122/122 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

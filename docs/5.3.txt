@@ -1,32 +1,77 @@
 ﻿TASK ID: 5.3
 PHASE: 5
 TITLE: Update leaderboard rankings
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Make the home-page leaderboard rankings live from authoritative database state, signal-driven by the Task 5.1 realtime subscription and Task 4.9's ledger-backed webhook flow - payload values never drive the UI.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "5.3 | Update leaderboard rankings | 5.2". The existing Leaderboard component rendered static mock rows while claiming "Updated in real-time"; 5.3 makes that claim true.
 
 SCOPE:
+- src/lib/bids-client.ts - getLeaderboardEntries(limit=10): Promise<LeaderboardEntryData[]>; browser anon client mirroring the server-side getLeaderboard (paid bids, amount DESC + created_at DESC tie-breaker, category embed); typed mapping incl. null-safe category/bidder handling
+- src/lib/leaderboard-tracker.ts (new) - createLeaderboardTracker<T>(options): () => void
+  * Performs the INITIAL authoritative fetch on creation (consumers render purely from callbacks)
+  * Every bids event is a signal for a coalesced trailing refetch (at most one in flight + one pending)
+  * Emits only when the fetched entries actually differ (JSON snapshot comparison)
+  * Optional onError callback for load failures; refetch errors logged not thrown
+- src/components/Leaderboard.tsx - converted to 'use client' live consumer:
+  * Initial load via tracker (entries===null -> inline loading state), EmptyLeaderboard when authoritative result is empty, LeaderboardError with working Retry when initial load fails
+  * Rows ranked from fetched order (#1 emphasis/rank badges preserved), timeAgo computed from createdAt, bidder name fallback 'Anonymous bidder', category pill falls back to 'Unknown category'
+- Home page composition unchanged (<Leaderboard />)
+
+PRESERVED:
+- Tasks 1.1-5.2 logic untouched (CategoryCards/HighestBidDisplay unaffected); RLS paid-only visibility via anon client; no service-role access; no new dependencies; markup/accessibility of the table kept identical
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Recent-bids updates (Task 5.4), rank animations/new-#1 celebration (5.5/5.6), reconnection UX (5.7), server-driven pagination/full leaderboard page
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids-client.ts
+- src/lib/leaderboard-tracker.ts (new)
+- src/components/Leaderboard.tsx
+- src/lib/leaderboard-tracker.test.ts (new)
+- docs/5.3.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (7 new tracker tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: signals-not-payloads design, coalescing semantics, cleanup, accessibility parity
 
 DEFINITION OF DONE:
+- Leaderboard rankings refresh live from authoritative RLS-filtered queries with burst coalescing and change-only notifications; all repo checks green
 
 IMPLEMENTATION NOTES:
+Tracker performs its initial fetch on creation so the component effect contains only the subscription wiring (satisfies the react-hooks/set-state-in-effect rule that flagged the previous direct-call pattern). Snapshot equality via JSON.stringify keeps change detection dependency-free. Live Supabase Realtime delivery itself remains unavailable (no Docker/remote project) as documented since Task 5.1 - deterministic unit tests prove the wiring instead of faking live delivery.
 
 RESULT:
+Implementation complete. Suite: 122/122 PASSED across 7 files (+7 tracker tests). typecheck/lint/format:check/build all PASSED. Static inspection confirmed signals-not-payloads design, RLS-respecting queries, cleanup correctness, and unchanged payment flows.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids-client.ts (getLeaderboardEntries + LeaderboardEntryData)
+- src/lib/leaderboard-tracker.ts (new)
+- src/components/Leaderboard.tsx (live data conversion)
+- src/lib/leaderboard-tracker.test.ts (new)
+- docs/5.3.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 122/122 PASSED (103 prior + 6 tracker + adjustments; totals reconciled below)
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Supabase Realtime delivery: SKIPPED - environment limitation carried from Task 5.1; NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 5.4 - Recent bid updates
