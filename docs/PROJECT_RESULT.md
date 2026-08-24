@@ -2226,6 +2226,35 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: failed-vs-pending indistinguishability remains the standing 4.3 decision (page deliberately does not consult Stripe)
 - **Follow-up work**: Task 7.2 — Share on X
 
+### Task 7.2
+
+- **Date**: 2026-08-24
+- **Objective**: Add a Share on X action to the bid success experience using the standard X web-intent, without implementing Task 7.4's public category URL or leaking payment identifiers
+- **Status**: Completed
+- **Audit findings**: only /, /success, /cancel, /unsubscribe routes exist (no public category URL); zero pre-existing share infrastructure; /#leaderboard-heading is an established in-repo deep-link convention; success-page `reference` is the Stripe session id and therefore forbidden share material
+- **What was implemented**:
+  - src/lib/x-share.ts: pure buildXShareText (claim-free copy from authoritative amount/category only, category omitted when unavailable) + buildXShareUrl (https://x.com/intent/tweet with per-parameter encodeURIComponent → canonical %20 encoding); both deterministic
+  - src/app/success/page.tsx: intent built server-side from the DB-backed view model (confirmed bids only); shared URL = {NEXT_PUBLIC_APP_URL}/#leaderboard-heading via the established base-URL conventions
+  - src/components/SuccessState.tsx: optional xShareUrl prop renders a "Share on X" anchor (target=_blank rel=noopener noreferrer, inline ExternalLinkIcon SVG) inside the existing grouped action row; omitted keeps all other consumers unchanged
+- **Files changed**:
+  - src/lib/x-share.ts + src/lib/x-share.test.ts (created, 13 tests)
+  - src/components/SuccessState.tsx (optional prop + icon + anchor)
+  - src/app/success/page.tsx (server-side intent construction)
+  - docs/7.2.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 315/315 across 16 files (+13 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Shared URL is the existing leaderboard anchor rather than /success?session_id=... (no Stripe identifiers in social shares) or an invented /categories/[slug] (that is Task 7.4's scope)
+  - Copy makes no winner/rank claims because the page never verifies ranking position
+  - Intent fully constructed server-side; the action is a static external anchor requiring no client JS
+- **Known limitations**:
+  - Shared destination points at the global leaderboard; revisit once Task 7.4 introduces public per-category URLs
+- **Follow-up work**: Task 7.3 — Copy share link
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

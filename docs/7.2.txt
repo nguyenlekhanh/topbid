@@ -1,32 +1,43 @@
 ﻿TASK ID: 7.2
 PHASE: 7
 TITLE: Share on X (Twitter)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add a user-facing "Share on X" action to the bid success experience that opens the standard X web-intent with claim-free copy and a safe public URL - without implementing Task 7.4's public category URL or leaking any payment identifiers.
 
-SCOPE:
+AUDIT FINDINGS (read-only):
+- Public routes under current architecture: /, /success, /cancel, /unsubscribe only. NO public category route exists (Hero/CategoryCards '/categories' hrefs are unimplemented Phase-1 placeholders)
+- Zero existing share infrastructure (no twitter/x.com/intent matches anywhere)
+- NEXT_PUBLIC_APP_URL + trailing-slash normalization + descriptive missing-env throw = established URL convention; /#leaderboard-heading is an in-repo deep-link convention (SuccessState's own CTA targets it)
+- Success page data: amountCents, categoryName (nullable), reference (= Stripe session id - FORBIDDEN as share material)
 
-OUT OF SCOPE:
+SHARE URL STRATEGY:
+{NEXT_PUBLIC_APP_URL}/#leaderboard-heading
+Why valid: the homepage leaderboard section is a real existing destination that already receives deep links from SuccessState; recipients land on the public leaderboard where the paid bid is visible. Why safe: contains no session/payment/email data, unlike /success?session_id=... which was explicitly rejected as a share target.
 
-INPUTS / DEPENDENCIES:
+SHARE TEXT STRATEGY:
+Claim-free copy built ONLY from authoritative DB values: "I just bid $1,250 on {Category} on Topbid.lol!" (category segment omitted entirely when unavailable). No #1/winner/rank claims - the success page never verifies ranking position. Amount formatted with the repo-wide whole-dollar en-US USD convention.
 
-IMPLEMENTATION REQUIREMENTS:
+IMPLEMENTATION:
+- src/lib/x-share.ts: pure deterministic buildXShareText({amountCents, categoryName}) + buildXShareUrl({text, url}) using encodeURIComponent per parameter (canonical %20 encoding); X_INTENT_BASE = https://x.com/intent/tweet
+- src/components/SuccessState.tsx: optional xShareUrl prop renders a "Share on X" anchor (target=_blank rel=noopener noreferrer, inline ExternalLinkIcon SVG) inside the EXISTING grouped actions row between View Leaderboard and Continue Browsing; prop omitted keeps every other consumer unchanged (BidModal demo usage untouched)
+- src/app/success/page.tsx: builds text+intent server-side from the authoritative view model only for confirmed bids; getAppBaseUrl mirrors checkout/outbid-notification/unsubscribe base-URL conventions
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+SECURITY / PRIVACY:
+- Never included in share URLs/texts: bidder email, Stripe session id, payment intent id, internal bid/database ids, unsubscribe tokens, any client-controlled values
+- Category name and amount come exclusively from the DB-backed view model
+- No secrets enter the browser bundle: intent URL is fully constructed server-side and passed as a plain string prop; the action is a static anchor requiring no client JS or network call to render
 
 TESTS ACTUALLY RUN:
+- npm run test: 315/315 PASSED across 16 files (+13 new x-share tests: exact intent construction, %20/%26/%23 encoding, category spaces/special chars round-trip through URL parsing, sensitive-identifier absence pins, no-winner-claim copy guard, determinism)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NOT implemented: 7.3 copy-share link, 7.4 public category URL (no route invented - shared URL is the existing homepage leaderboard anchor), 7.5 Open Graph metadata, 7.6 dynamic OG image, 7.7 share tracking (no analytics/tracking params). No new dependencies, SDKs, API routes, migrations, or backend changes.
 
 KNOWN ISSUES:
+- When a future 7.4 public category URL lands, the shared URL can be revisited to point at the specific category; today's leaderboard-anchor destination is the correct existing-convention choice.
 
 FOLLOW-UP:
+Task 7.3 - Copy share link

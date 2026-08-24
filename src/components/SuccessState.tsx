@@ -9,6 +9,8 @@ interface SuccessStateProps {
   note?: string;
   onClose?: () => void;
   onViewLeaderboard?: () => void;
+  /** Absolute X web-intent URL; when present a "Share on X" action renders. */
+  xShareUrl?: string;
 }
 
 function SuccessIcon() {
@@ -25,6 +27,25 @@ function SuccessIcon() {
   );
 }
 
+function ExternalLinkIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+      />
+    </svg>
+  );
+}
+
 export default function SuccessState({
   title = 'Bid placed! (demo)',
   description = 'Your mock bid was recorded locally. No payment was processed — this is a UI preview for the bidding flow.',
@@ -34,6 +55,7 @@ export default function SuccessState({
   note = 'Demo reference — not a real payment confirmation.',
   onClose,
   onViewLeaderboard,
+  xShareUrl,
 }: SuccessStateProps) {
   return (
     <div
@@ -92,6 +114,17 @@ export default function SuccessState({
           >
             View Leaderboard
           </Link>
+        )}
+        {xShareUrl && (
+          <a
+            href={xShareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-medium text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-11"
+          >
+            <ExternalLinkIcon />
+            Share on X
+          </a>
         )}
         {onClose ? (
           <button

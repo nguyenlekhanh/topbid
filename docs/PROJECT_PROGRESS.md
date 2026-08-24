@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 7 in progress — 7.1 completed** — Next recommended: 7.2
+**Phase 7 in progress — 7.2 completed** — Next recommended: 7.3
 
 ## Completed Tasks
 
@@ -80,6 +80,7 @@
 - 6.6: Unsubscribe handling ✓
 - 6.7: Email failure handling ✓
 - 7.1: Bid success page ✓
+- 7.2: Share on X (Twitter) ✓
 
 ## Tasks in Progress
 
@@ -170,6 +171,7 @@ _None_
 - Unsubscribe handling added (application-managed suppression: HMAC-SHA256(UNSUBSCRIBE_SECRET, email) capability tokens double as notification_unsubscribes PK - raw emails never stored or URL-exposed; RLS table with zero policies, service-role only; sendOutbidNotification checks isUnsubscribed before composition with 'recipient_unsubscribed' skip; template gains optional attribute-escaped footer link; List-Unsubscribe/List-Unsubscribe-Post headers attached at the transport boundary via additive optional headers passthrough on sendEmail; POST-only /api/unsubscribe (query token for RFC 8058 one-click, form fallback) + dynamic /unsubscribe confirmation page rendering authoritative state; idempotent ON CONFLICT upserts)
 - Email failure handling added (migration 20260823000016 outbid_notification_deliveries keyed by bid_id PK/FK = one logical notification per bid; SendEmailError classifies provider_rejected terminal vs send_unconfirmed retryable at the Resend boundary; attempt gate in sendOutbidNotification short-circuits sent/permanent rows ('already_sent'/'already_handled') and persists every send outcome; webhook dispatch widened to already_paid/duplicate redeliveries so Stripe's own retry schedule drives eventual delivery - transport-unconfirmed failures answer 500 while the ledger keeps conversion exactly-once; payment idempotency and notification-attempt idempotency remain independent domains; unsubscribe/self-outbid guards re-run on every attempt; no queues/cron/polling introduced)
 - Bid success page formalized for Phase 7 (audit confirmed Task 4.3 already delivered the baseline: authoritative DB-only lookup under RLS, confirmed/awaiting states, no Stripe queries from the page, never mutates payment state); delta = pure bid-success.ts resolver (extractSessionId accepts only single string values - repeated query keys previously crashed .trim() on an array with a 500 - plus resolveBidSuccessView mapping to confirmed/awaiting view models), page consumes it with identical rendered output, and the previously missing deterministic suite (21 cases) now covers every success/pending/unknown/malformed path
+- Share on X added (pure x-share.ts: buildXShareText composes claim-free copy from authoritative amount/category only - no winner claims; buildXShareUrl emits canonical percent-encoded https://x.com/intent/tweet intent; shared URL = {NEXT_PUBLIC_APP_URL}/#leaderboard-heading, an existing valid public destination that leaks no session/payment identifiers; optional xShareUrl prop renders a Share-on-X anchor inside SuccessState's existing action group with inline SVG icon; built server-side so no secrets enter the client bundle; no route invented for 7.4, no copy-link/tracking for 7.3/7.7)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -190,7 +192,7 @@ _None_
 
 ## Next Recommended Task
 
-**7.2 — Share on X (Twitter)**
+**7.3 — Copy share link**
 
 ## Notes
 
@@ -273,5 +275,7 @@ Task 6.6 completed successfully. Unsubscribe handling added as application-manag
 Task 6.7 completed successfully. Email failure handling added without new infrastructure: migration 20260823000016 creates outbid_notification_deliveries (bid_id PK/FK cascade, status pending/sent/failed_retryable/failed_permanent, attempts, provider_message_id, last_error; RLS zero policies); resend.ts classifies SendEmailError provider_rejected vs send_unconfirmed; notification-deliveries.ts gates and records each attempt (sent rows never resend; unconfirmed failures retry); stripe-webhook.ts dispatches on converted/already_paid/duplicate so Stripe redelivery becomes the retry scheduler - retryable failures answer 500 after payment has safely committed while the ledger keeps conversion exactly-once; terminal rejections and unexpected errors stay 200 with loud logs; suppression guards precede every attempt; two superseded never-dispatch-on-duplicates tests updated to the new contract; Phase 6 complete at 281/281 tests.
 
 Task 7.1 completed successfully. Bid success page formalized: read-only audit confirmed Task 4.3 already delivered the full baseline (dynamic server-rendered /success, untrusted session_id, authoritative getBidByStripeSessionId lookup under RLS paid-only visibility, confirmed vs awaiting states, never queries Stripe or mutates payment state); implemented delta = src/lib/bid-success.ts pure resolver fixing a real query-param bug (repeated ?session_id keys arrive as arrays from Next.js and previously crashed .trim() with a 500 - now shape-validated single-string only), page consumes resolveBidSuccessView/extractSessionId with identical rendered output, plus the previously absent deterministic suite covering confirmed/pending/unknown/missing/malformed/oversized paths; 302/302 tests passing. No 7.2+ sharing functionality.
+
+Task 7.2 completed successfully. Share on X added without touching Task 7.4's scope: src/lib/x-share.ts provides pure buildXShareText (claim-free copy from authoritative amount/category only) and buildXShareUrl (canonical percent-encoded x.com/intent/tweet intent); the success page builds the intent server-side from DB-backed view data with shared URL {NEXT_PUBLIC_APP_URL}/#leaderboard-heading - an existing valid public destination that avoids leaking Stripe session identifiers; SuccessState renders an optional Share-on-X anchor in its existing action group; no public category route invented, no copy-link/tracking/OG work; 315/315 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
