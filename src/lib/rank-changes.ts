@@ -41,3 +41,22 @@ export function detectRankChanges(
 
   return changes;
 }
+
+/**
+ * Task 5.6: true only when a DIFFERENT bid has taken the #1 position compared to the
+ * previously committed ranking - the trigger for the new-#1 celebration.
+ *
+ * Conservative by design:
+ * - No previous ranking (first load) -> false: nothing changed, nothing to celebrate
+ * - Current board empty -> false
+ * - Both must contain an actual rank-1 row for a meaningful comparison
+ */
+export function hasNewTopBid(
+  previous: RankedRow[] | null | undefined,
+  current: RankedRow[]
+): boolean {
+  const previousTop = (previous ?? []).find((row) => row.rank === 1)?.id;
+  const currentTop = current.find((row) => row.rank === 1)?.id;
+
+  return previousTop !== undefined && currentTop !== undefined && previousTop !== currentTop;
+}

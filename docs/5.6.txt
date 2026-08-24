@@ -1,32 +1,73 @@
 ﻿TASK ID: 5.6
 PHASE: 5
 TITLE: New #1 state celebration
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Celebrate visually when a DIFFERENT bid takes the #1 position on the live leaderboard - triggered only by actual authoritative ranking changes (never raw payloads or initial loads), purely visual, self-clearing, and respectful of reduced-motion preferences.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "5.6 | New #1 state celebration | 5.5". Combined with the existing architecture: the celebration triggers when hasNewTopBid detects that the current authoritative ranking's rank-1 bid id differs from the previously committed ranking's #1 - i.e., a genuine champion change, not merely any reshuffle or first load.
 
 SCOPE:
+- src/lib/rank-changes.ts - new pure hasNewTopBid(previous, current): boolean; true only when both rankings contain an actual rank-1 row and the ids differ; false for first loads (no previous), empty current boards, or malformed rankings lacking a rank-1 row
+- src/components/Leaderboard.tsx - celebration state wired into applyRows (the single point where authoritative entries land):
+  * setCelebrateNewTop(true) on genuine champion change; auto-clears after a fixed window (2600ms) via a cleanup-safe timeout ref cleared on unmount
+  * #1 row gains motion-safe scaleIn animation plus success ring styling while celebrating; "New #1!" pill appears beside Highest Bid
+  * Ordinary renders and unchanged snapshots never trigger it (detection compares ids across committed rankings)
+
+PRESERVED / BOUNDARIES:
+- Task 5.3 data flow unchanged: realtime signals -> tracker -> getLeaderboardEntries authority
+- Task 5.5 rank-change animation classes still applied independently per direction
+- Tasks 4.x payment/webhook behavior untouched; no DB/RPC/schema/RLS changes; no new dependencies
+- motion-safe prefixes + global prefers-reduced-motion override keep celebration off for reduced-motion users
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Reconnection UX (Task 5.7), recent-bids animations, server-side push changes, React testing infrastructure
 
 FILES EXPECTED TO CHANGE:
+- src/lib/rank-changes.ts (hasNewTopBid addition)
+- src/lib/rank-changes.test.ts (+5 tests)
+- src/components/Leaderboard.tsx (celebration state/render)
+- docs/5.6.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (5 new detection tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: trigger conditions, timer cleanup on unmount, reduced-motion coverage
 
 DEFINITION OF DONE:
+- Genuine champion changes produce a visual-only celebration that auto-clears; identical snapshots and first loads never celebrate; all repo checks green
 
 IMPLEMENTATION NOTES:
+hasNewTopBid is deliberately conservative: both rankings must carry an actual rank===1 row (defensive against malformed input), and absence of a previous champion yields false so initial loads never celebrate. Component wiring stores the clear-timer in a ref and clears it on unmount. Static inspection confirmed trigger correctness, reduced-motion coverage, and unchanged ranking/payment logic.
 
 RESULT:
+Implementation complete. Suite: 140/140 PASSED across 9 files (+5 hasNewTopBid detection tests). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- src/lib/rank-changes.ts (hasNewTopBid addition)
+- src/lib/rank-changes.test.ts (+5 tests)
+- src/components/Leaderboard.tsx (celebration state/timer/render)
+- docs/5.6.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 140/140 PASSED across 9 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Supabase Realtime delivery: SKIPPED - environment limitation carried from Task 5.1; NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 5.7 - Connection/reconnection handling

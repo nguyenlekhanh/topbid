@@ -6,7 +6,7 @@ import { EmptyLeaderboard } from '@/components/EmptyState';
 import { LeaderboardError } from '@/components/ErrorState';
 import { getLeaderboardEntries, type LeaderboardEntryData } from '@/lib/bids-client';
 import { createLeaderboardTracker } from '@/lib/leaderboard-tracker';
-import { detectRankChanges, type RankDirection } from '@/lib/rank-changes';
+import { detectRankChanges, hasNewTopBid, type RankDirection } from '@/lib/rank-changes';
 import { subscribeToBidChanges } from '@/lib/realtime';
 
 type LeaderboardRow = LeaderboardEntryData & { rank: number };
@@ -51,15 +51,30 @@ export default function Leaderboard() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [rankChanges, setRankChanges] = useState<Map<string, RankDirection>>(new Map());
+  const [celebrateNewTop, setCelebrateNewTop] = useState(false);
+  const celebrateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Previous committed ranking, used solely inside callbacks/effects (never during render)
-  // to compute Task 5.5 movement directions.
+  // to compute Task 5.5 movement directions and the Task 5.6 new-#1 trigger.
   const previousRowsRef = useRef<LeaderboardRow[] | null>(null);
 
   const applyRows = useCallback((updated: LeaderboardEntryData[]) => {
     const next = updated.map((entry, index) => ({ ...entry, rank: index + 1 }));
 
     setRankChanges(detectRankChanges(previousRowsRef.current, next));
+
+    // Task 5.6: celebrate only when a DIFFERENT bid takes #1 (authoritative ranking
+    // change). Identical snapshots and first loads never trigger it.
+    if (hasNewTopBid(previousRowsRef.current, next)) {
+      setCelebrateNewTop(true);
+
+      if (celebrateTimerRef.current !== null) {
+        clearTimeout(celebrateTimerRef.current);
+      }
+
+      celebrateTimerRef.current = setTimeout(() => setCelebrateNewTop(false), 2600);
+    }
+
     previousRowsRef.current = next;
     setRows(next);
     setLoadFailed(false);
@@ -88,6 +103,15 @@ export default function Leaderboard() {
       onError: () => setLoadFailed(true),
     });
   }, [applyRows]);
+
+  // Task 5.6: celebration timer cleanup on unmount.
+  useEffect(() => {
+    return () => {
+      if (celebrateTimerRef.current !== null) {
+        clearTimeout(celebrateTimerRef.current);
+      }
+    };
+  }, []);
 
   if (loadFailed && rows === null) {
     return (
@@ -161,63 +185,79 @@ export default function Leaderboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(rows ?? []).map((entry) => (
-                <tr
-                  key={entry.id}
-                  className={`transition-colors duration-150 ease-out hover:bg-muted/50 motion-reduce:transition-none ${
-                    entry.rank === 1 ? 'bg-primary/5 border-l-4 border-warning' : ''
-                  } ${getRankChangeClass(rankChanges.get(entry.id))}`}
-                >
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${getRankBadge(entry.rank)}`}
-                    >
-                      {entry.rank === 1 ? (
-                        <>
-                          <span className="sr-only">First place </span>#1
-                        </>
-                      ) : (
-                        entry.rank
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary">
-                          {(entry.bidderName ?? entry.bidderEmail).charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-foreground">
-                          {entry.bidderName ?? 'Anonymous bidder'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{entry.bidderEmail}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                      {entry.category?.name ?? 'Unknown category'}
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                    <span
-                      className={`font-bold text-lg ${entry.rank === 1 ? 'text-warning' : 'text-foreground'}`}
-                    >
-                      {formatCurrency(entry.amount)}
-                    </span>
-                    {entry.rank === 1 && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
-                        Highest Bid
+              {(rows ?? []).map((entry) => {
+                const isNewTop = entry.rank === 1 && celebrateNewTop;
+
+                return (
+                  <tr
+                    key={entry.id}
+                    className={`transition-colors duration-150 ease-out hover:bg-muted/50 motion-reduce:transition-none ${
+                      entry.rank === 1 ? 'bg-primary/5 border-l-4 border-warning' : ''
+                    } ${getRankChangeClass(rankChanges.get(entry.id))} ${
+                      isNewTop
+                        ? 'motion-safe:animate-[scaleIn_500ms_ease-out] ring-2 ring-success/60 rounded-lg'
+                        : ''
+                    }`}
+                  >
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${getRankBadge(entry.rank)}`}
+                      >
+                        {entry.rank === 1 ? (
+                          <>
+                            <span className="sr-only">First place </span>#1
+                          </>
+                        ) : (
+                          entry.rank
+                        )}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-muted-foreground">
-                    {getTimeAgo(entry.createdAt)}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-medium text-primary">
+                            {(entry.bidderName ?? entry.bidderEmail).charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-foreground">
+                            {entry.bidderName ?? 'Anonymous bidder'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{entry.bidderEmail}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                        {entry.category?.name ?? 'Unknown category'}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                      <span
+                        className={`font-bold text-lg ${entry.rank === 1 ? 'text-warning' : 'text-foreground'}`}
+                      >
+                        {formatCurrency(entry.amount)}
+                      </span>
+                      {entry.rank === 1 && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
+                          Highest Bid
+                        </span>
+                      )}
+                      {celebrateNewTop && entry.rank === 1 && (
+                        <span
+                          className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-success/10 text-success motion-safe:animate-[scaleIn_400ms_ease-out]"
+                          role="status"
+                        >
+                          New #1!
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-muted-foreground">
+                      {getTimeAgo(entry.createdAt)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

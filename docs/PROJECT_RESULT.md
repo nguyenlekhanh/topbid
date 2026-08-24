@@ -1897,6 +1897,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 5.6 — New #1 state celebration
 
+### Task 5.6
+
+- **Date**: 2026-08-23
+- **Objective**: Visual celebration when a DIFFERENT bid takes the #1 position, triggered only by actual authoritative ranking changes — never raw payloads, first loads, or unchanged snapshots
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/rank-changes.ts: hasNewTopBid(previous, current) — true only when both rankings contain an actual rank===1 row with different ids; false for first loads (no previous), empty boards, or malformed rankings (conservative by design)
+  - src/components/Leaderboard.tsx: celebration state wired into applyRows — setCelebrateNewTop(true) on genuine champion change; motion-safe scaleIn ring + "New #1!" pill rendered on the #1 row while active; auto-clears after 2600ms via a cleanup-safe timer ref cleared on unmount
+  - Reduced-motion respected: motion-safe prefixes plus the global prefers-reduced-motion override keep the animation off for those users
+- **Files changed**:
+  - src/lib/rank-changes.ts (hasNewTopBid addition)
+  - src/lib/rank-changes.test.ts (+5 tests)
+  - src/components/Leaderboard.tsx (celebration state/timer/render; Tasks 1.1–5.5 data flow unchanged)
+  - docs/5.6.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 140/140 PASSED across 9 files (+5 hasNewTopBid detection tests: champion change true; same champion false even if rest reshuffles; first delivery false; empty current false; missing rank-1 rows false)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: trigger conditions, timer cleanup on unmount, reduced-motion coverage
+  - Live Supabase Realtime delivery: SKIPPED — environment limitation carried from Task 5.1; NOT faked
+- **Important technical decisions**:
+  - Detection compares committed-ranking #1 ids rather than reacting to arbitrary payloads — identical snapshots and first loads can never celebrate
+  - Timer stored in a ref with unmount cleanup prevents leaks and stale clears across rapid champion changes
+  - Celebration is additive styling on the existing #1 row; no bid/ranking state is mutated and no payment logic touched
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 5.7 — Connection/reconnection handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

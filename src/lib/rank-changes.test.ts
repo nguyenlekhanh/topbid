@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectRankChanges } from './rank-changes';
+import { detectRankChanges, hasNewTopBid } from './rank-changes';
 
 function ranked(id: string, rank: number) {
   return { id, rank };
@@ -72,5 +72,35 @@ describe('detectRankChanges', () => {
 
     expect(changes.get('b')).toBe('same');
     expect(changes.get('a')).toBe('same');
+  });
+});
+
+describe('hasNewTopBid', () => {
+  it('returns true when a different bid takes the #1 position', () => {
+    const previous = [ranked('old-champ', 1), ranked('challenger', 2)];
+    const current = [ranked('challenger', 1), ranked('old-champ', 2)];
+
+    expect(hasNewTopBid(previous, current)).toBe(true);
+  });
+
+  it('returns false when the same bid keeps the #1 position', () => {
+    const previous = [ranked('champ', 1), ranked('a', 2), ranked('b', 3)];
+    const current = [ranked('champ', 1), ranked('b', 2), ranked('a', 3)];
+
+    expect(hasNewTopBid(previous, current)).toBe(false);
+  });
+
+  it('returns false on the first delivery (no previous ranking)', () => {
+    expect(hasNewTopBid(null, [ranked('champ', 1)])).toBe(false);
+    expect(hasNewTopBid([], [ranked('champ', 1)])).toBe(false);
+  });
+
+  it('returns false when the current board is empty', () => {
+    expect(hasNewTopBid([ranked('champ', 1)], [])).toBe(false);
+  });
+
+  it('returns false when either ranking lacks an actual rank-1 row', () => {
+    // Malformed/defensive: no row carries rank exactly 1.
+    expect(hasNewTopBid([ranked('x', 2)], [ranked('y', 1)])).toBe(false);
   });
 });
