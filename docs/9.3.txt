@@ -1,32 +1,43 @@
 ﻿TASK ID: 9.3
 PHASE: 9
 TITLE: CAPTCHA if needed
-STATUS: pending
+STATUS: completed - intentionally satisfied without CAPTCHA
 
 OBJECTIVE:
+Determine whether any externally reachable mutation endpoint requires CAPTCHA protection beyond the rate limiting already in place from Task 9.2. If not needed, document why rather than adding unnecessary infrastructure.
 
-SCOPE:
+AUDIT CONCLUSION:
+CAPTCHA is NOT needed. Reasons:
+1. No bid creation endpoint is publicly exposed yet (the highest-value spam/bot target does not exist as an HTTP surface)
+2. All mutation endpoints are already rate-limited server-side per IP or per admin identity
+3. Admin login has Supabase Auth + 10/10min/IP rate limiting + generic error responses preventing enumeration
+4. Share events are non-authoritative telemetry with no economic impact; flooding causes noise only
+5. Unsubscribe is capability-token gated (HMAC) + idempotent + rate-limited
+6. Refund is admin-authenticated + per-admin limiter + Stripe-side idempotency key
+7. Adding reCAPTCHA/Turnstile/hCaptcha would introduce a third-party availability dependency, client-side script inclusion, privacy surface expansion, and verification complexity - all disproportionate to the current threat model
 
-OUT OF SCOPE:
+THREAT MODEL ASSESSMENT PER ENDPOINT:
+- Admin login brute-force: mitigated by rate limiting + auth + generic errors. Distributed attacks possible but admin accounts are few and manually provisioned
+- Share-event flooding: rate limited; rows are non-authoritative telemetry; no economic impact
+- Unsubscribe abuse: capability-token gated + idempotent + rate limited; nuisance only
+- Bid spam: NOT POSSIBLE YET (no public bid creation endpoint); when exposed in a future task, CAPTCHA should be evaluated at that time
 
-INPUTS / DEPENDENCIES:
+WHEN CAPTCHA WOULD BECOME NECESSARY:
+- When a public bid creation / checkout endpoint is exposed without authentication
+- When automated spam on share-events or unsubscribe causes operational impact that rate limiting cannot address
+- At that point, prefer Cloudflare Turnstile or hCaptcha (privacy-friendly, no Google dependency)
 
-IMPLEMENTATION REQUIREMENTS:
+DECISION: Task 9.3 is intentionally satisfied WITHOUT implementing CAPTCHA. Rate limiting from Task 9.2 plus existing authorization boundaries are adequate for all currently reachable endpoints. This decision should be revisited when bid creation becomes publicly accessible.
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- docs/9.3.txt (created - this documentation)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
+NO source code, test, schema, or dependency changes were made.
 
 TESTS ACTUALLY RUN:
+- npm run test: 569/569 PASSED (unchanged - confirms no regression)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
-
-FOLLOW-UP:
+SCOPE BOUNDARY:
+NO CAPTCHA widget/provider/verification added. NO 9.4+ work. NO changes to payment/webhook/email/share/auth behavior.
