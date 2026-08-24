@@ -1355,6 +1355,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live integration coverage remains deferred to a real database environment)
 - **Follow-up work**: Phase 3 complete — Task 4.1 — Create Stripe Checkout session
 
+### Task 4.1
+
+- **Date**: 2026-08-23
+- **Objective**: Create a Stripe Checkout session for a newly validated pending bid, composing the Task 3.5 contract with the Task 0.6 Stripe client (server-side only)
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/checkout.ts: createCheckoutSession(input: PendingBidInput) -> CheckoutSessionResult; creates the pending bid first via createPendingBid (authoritative validation, status='pending', stripe_session_id NULL per Task 3.7 NULL-distinct semantics), then opens the session
+  - Session: mode='payment'; one line item at quantity 1 with price_data.unit_amount = validated bid.amount (integer cents), currency CHECKOUT_CURRENCY ('usd' app-level MVP constant — schema has no per-category currency), product_data.name from the authoritative DB category row
+  - success_url/cancel_url derived from trusted NEXT_PUBLIC_APP_URL env with placeholder paths (/success, /cancel) until Tasks 4.3/4.4; caller-supplied URLs rejected by design to avoid open-redirect surface
+  - Contract mirrors Task 3.5 union exactly for expected failures; infrastructure failures (Stripe API errors, missing env, missing session id/url) throw descriptively
+- **Task-boundary discipline**: metadata/client_reference_id and storing the session id on the bid row are deliberately NOT implemented here — that is Task 4.2; documented sequencing note recorded in docs/4.1.txt
+- **Files changed**:
+  - src/lib/checkout.ts (new)
+  - src/lib/checkout.test.ts (new — 6 tests; Supabase fake duplicated deliberately to keep the green Task 3.8 suite untouched)
+  - docs/4.1.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 44/44 PASSED (38 prior + 6 new)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (one Prettier auto-fix during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Stripe integration: SKIPPED — no Stripe test keys/environment available; NOT faked; first live verification belongs to Task 4.12 once webhooks exist end-to-end
+- **Important technical decisions**:
+  - Pricing provenance: unit_amount exclusively from the DB-validated bid row; client input never reaches pricing
+  - Display-name lookup re-runs validateCategory after bid creation (invariant-guarded throw if it ever fails) rather than modifying completed 3.x code
+  - Test-side lesson captured: createPendingBid consumes a category lookup before validateBidAmount, so failure flows need three queued results (fixed in test only; production logic unchanged)
+- **Known limitations**: None within scope (live Stripe verification deferred as documented)
+- **Follow-up work**: Task 4.2 — Attach category/bid metadata
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**3.8 completed** — Next recommended: 4.1
+**4.1 completed** — Next recommended: 4.2
 
 ## Completed Tasks
 
@@ -53,6 +53,7 @@
 - 3.6: Handle concurrent bids (DB locking) ✓
 - 3.7: Prevent duplicate transactions ✓
 - 3.8: Bid engine unit tests ✓
+- 4.1: Create Stripe Checkout session ✓
 
 ## Tasks in Progress
 
@@ -117,6 +118,7 @@ _None_
 - Concurrent bid handling created (create_pending_bid PL/pgSQL RPC via migration 20260823000007: SELECT FOR UPDATE on the category row serializes same-category critical sections, pending-aware minimum floor recomputed inside the lock, EXECUTE restricted to service_role; createPendingBid switched to the RPC with unchanged external contract)
 - Duplicate transaction prevention created (migration 20260823000008 adds nullable p_stripe_session_id to the RPC with unique_violation -> bid_error:duplicate_transaction handling, arbitrated race-safe by the existing UNIQUE(stripe_session_id); optional stripeSessionId input on createPendingBid with invalid_stripe_session_id/duplicate_transaction union members)
 - Bid engine unit tests created (vitest + npm run test; src/lib/bids.test.ts: 38 tests covering minimum-bid rules, validateBidAmount matrix, createPendingBid input handling, exact RPC invocation, and duplicate/below-minimum/category error mapping via a queue-based Supabase client-boundary fake)
+- Stripe Checkout session creation created (src/lib/checkout.ts: composes createPendingBid + Task 0.6 stripe client, payment-mode session priced at the validated integer-cent amount with DB-sourced product name, env-derived placeholder success/cancel URLs, union contract mirroring 3.5; metadata/session-id linkage deferred to 4.2)
 
 ## Current Environment/Setup Status
 
@@ -134,7 +136,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.1 — Create Stripe Checkout session**
+**4.2 — Attach category/bid metadata**
 
 ## Notes
 
@@ -163,3 +165,5 @@ Task 3.6 completed successfully. Concurrency-safe reservation added: migration 2
 Task 3.7 completed successfully. Duplicate transaction prevention added: migration 20260823000008 extends the RPC with a nullable stripe session identifier arbitrated race-safe by the existing UNIQUE(stripe_session_id) constraint (unique_violation -> typed duplicate_transaction failure); createPendingBid accepts an optional stripeSessionId with shape guards; success behavior for bids without identifiers unchanged. Live DB verification skipped honestly.
 
 Task 3.8 completed successfully. Vitest added with npm run test script; src/lib/bids.test.ts provides 38 passing unit tests over the bid engine via a queue-based Supabase client-boundary fake: minimum-bid rules, validateBidAmount matrix, createPendingBid input handling and exact RPC invocation, and duplicate/below-minimum/category error mapping.
+
+Task 4.1 completed successfully. createCheckoutSession added in src/lib/checkout.ts: creates the pending bid via the Task 3.5 contract, then opens a payment-mode Stripe Checkout session priced at the validated integer-cent amount with DB-sourced product name and env-derived placeholder success/cancel URLs; metadata/session-id linkage deliberately deferred to Task 4.2; 44/44 tests passing.

@@ -1,32 +1,81 @@
 ﻿TASK ID: 4.1
 PHASE: 4
 TITLE: Create Stripe Checkout session
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Create a Stripe Checkout session for a newly validated pending bid, composing the Task 3.5 createPendingBid contract with the Task 0.6 Stripe client, server-side only.
 
 SCOPE:
+- New src/lib/checkout.ts - createCheckoutSession(input: PendingBidInput): Promise<CheckoutSessionResult>
+- Flow: createPendingBid (authoritative validation, explicit status='pending', NULL stripe_session_id per Task 3.7 NULL-distinct semantics) -> authoritative category display-name lookup -> stripe.checkout.sessions.create
+- Session parameters: mode='payment'; single line item, quantity 1, price_data.unit_amount = validated bid.amount (integer cents), currency from new exported CHECKOUT_CURRENCY constant ('usd'), product_data.name from the DB-sourced category row; success_url/cancel_url derived from trusted NEXT_PUBLIC_APP_URL env with placeholder paths /success and /cancel until Tasks 4.3/4.4 define the real pages
 
-OUT OF SCOPE:
+OUT OF SCOPE (deliberate task boundaries):
+- Attaching metadata/client_reference_id or storing the session id on the bid row (Task 4.2 - Attach category/bid metadata); webhook endpoint/signature verification (4.5/4.6); pending->paid conversion (4.8); success/cancel pages (4.3/4.4); rate limiting/refunds/live Stripe calls
+- No production files modified other than adding this module; Tasks 1.1-3.8 untouched
 
 INPUTS / DEPENDENCIES:
+- Task 0.6 stripe client (src/lib/stripe.ts, STRIPE_SECRET_KEY server-only, pinned apiVersion)
+- Task 3.5 createPendingBid contract (typed union + Bid row)
+- Tasks 3.4 validateCategory (authoritative display name) and 2.7 getCategoryBySlug underneath
+- .env.example NEXT_PUBLIC_APP_URL (client-safe) for URL derivation
 
-IMPLEMENTATION REQUIREMENTS:
+IMPLEMENTATION REQUIREMENTS MET:
+- Secret key stays server-only (stripe.ts imported only by this server module; no NEXT_PUBLIC_ secrets introduced)
+- Client data never trusted for pricing: unit_amount comes exclusively from the DB-validated bid row
+- Expected failures mirror the Task 3.5 union exactly ({ valid:false, reason, minimumBid }); infrastructure failures (Stripe API errors, missing NEXT_PUBLIC_APP_URL, missing session id/url in response) throw descriptive Errors - consistent with codebase precedent
+- Caller-supplied success/cancel URLs rejected by design (open-redirect surface); URLs derive from trusted env config
 
 FILES EXPECTED TO CHANGE:
+- src/lib/checkout.ts (new)
+- src/lib/checkout.test.ts (new)
+- docs/4.1.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new suite + existing regression suites)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: secret handling, pricing provenance, task-boundary separation (no metadata), URL derivation
 
 DEFINITION OF DONE:
+- Reusable server-side checkout creation exists per plan scope, fully unit-tested including failure paths, all repo checks green, no changes to completed tasks
+
+TEST COVERAGE (6 new tests; suite totals 44 passing):
+- Payment-mode session created with exact expected parameters (unit_amount=validated amount, currency usd, quantity 1, DB-sourced product name, derived URLs); result returns bid + session id + hosted url
+- Input-validation failure short-circuits before any Stripe call
+- Below-minimum failure propagates the Task 3.3/3.5 union without contacting Stripe
+- Stripe API failures wrapped in descriptive errors
+- Missing session id/url in Stripe response throws defensively
+- Missing NEXT_PUBLIC_APP_URL throws before contacting Stripe
 
 IMPLEMENTATION NOTES:
+Mocking approach mirrors bids.test.ts: queue-based Supabase boundary fake duplicated deliberately (documented decision to avoid touching the green Task 3.8 suite) plus vi.hoisted stripe client mock and vi.stubEnv for URL configuration. One test-side bug caught during development: forgot that createPendingBid consumes a category lookup BEFORE validateBidAmount, so below-minimum flows need three queued results - fixed in the test, production logic unchanged. One Prettier line-break auto-fixed via lint:fix. Live Stripe calls NOT performed (no test keys configured); behavior verified against the typed SDK contract at the mocked boundary only - documented honestly.
 
 RESULT:
+Implementation complete. Suite: 44/44 PASSED (38 prior + 6 new). typecheck/lint/format:check/build all PASSED. Static inspection confirmed: secret confinement, authoritative pricing, no metadata linkage (clean 4.2 handoff), placeholder URL strategy documented.
 
 FILES ACTUALLY CHANGED:
+- src/lib/checkout.ts (new)
+- src/lib/checkout.test.ts (new)
+- docs/4.1.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 44/44 PASSED (2 files)
+- npm run typecheck: PASSED
+- npm run lint: PASSED (one Prettier auto-fix during development)
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Stripe integration: SKIPPED - no Stripe test keys/environment available; NOT faked. First live verification belongs to Phase 4 integration testing (Task 4.12) once webhooks exist end-to-end.
 
 KNOWN ISSUES:
+- None within scope. Documented sequencing note for Task 4.2: session id/metadata must be attached to the bid row next; until then bids keep stripe_session_id NULL by design.
 
 FOLLOW-UP:
+Task 4.2 - Attach category/bid metadata
