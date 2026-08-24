@@ -103,7 +103,9 @@ export async function createCheckoutSession(
           },
         },
       ],
-      success_url: buildAppUrl('/success'),
+      // Task 4.3: Stripe replaces {CHECKOUT_SESSION_ID} on redirect so the success
+      // page can look up the bid authoritatively by session identifier.
+      success_url: `${buildAppUrl('/success')}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: buildAppUrl('/cancel'),
     });
   } catch (error) {

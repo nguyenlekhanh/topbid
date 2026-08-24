@@ -165,6 +165,56 @@ export async function getRecentBids(options: { limit?: number } = {}): Promise<R
   );
 }
 
+export type BidWithCategory = {
+  bid: Bid;
+  category: LeaderboardCategory | null;
+};
+
+/**
+ * Look up a bid by its Stripe Checkout session identifier.
+ * - Used by the success page (Task 4.3) to display authoritative bid/category data
+ * - Respects RLS: only PAID bids are publicly readable, so a pending bid returns null
+ *   until webhook confirmation converts it (callers must render a neutral state then,
+ *   never a fake confirmation)
+ * - The identifier originates from the URL and is treated as untrusted input
+ * - Server-side only (uses supabase-server anon client; respects RLS)
+ */
+export async function getBidByStripeSessionId(
+  stripeSessionId: string
+): Promise<BidWithCategory | null> {
+  if (!stripeSessionId || typeof stripeSessionId !== 'string') {
+    return null;
+  }
+
+  const normalized = stripeSessionId.trim();
+
+  if (!normalized || normalized.length > MAX_STRIPE_SESSION_ID_LENGTH) {
+    return null;
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('bids')
+    .select(`${BID_FIELDS}, categories (${LEADERBOARD_CATEGORY_FIELDS})`)
+    .eq('stripe_session_id', normalized)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch bid by session id: ${error.message}`);
+  }
+
+  const row = data as unknown as (Bid & { categories: LeaderboardCategory | null }) | null;
+
+  if (!row) {
+    return null;
+  }
+
+  const { categories, ...bid } = row;
+
+  return { bid, category: categories };
+}
+
 /**
  * Calculate the minimum valid bid for a category with no existing paid bids.
  * Business rule: no valid bids -> minimum = category.starting_bid (server-side only).

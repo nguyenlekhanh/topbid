@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createPendingBid,
+  getBidByStripeSessionId,
   getHighestBidForCategory,
   getIncrementedMinimumBid,
   getInitialMinimumBid,
@@ -253,6 +254,35 @@ describe('validateBidAmount', () => {
       minimumBid: null,
     });
   });
+});
+
+describe('getBidByStripeSessionId', () => {
+  it('returns the bid with its embedded category when found', async () => {
+    const row = {
+      ...paidBid(1500),
+      categories: { id: CATEGORY.id, slug: 'gaming', name: 'Gaming' },
+    };
+    enqueueServer({ data: row, error: null });
+
+    await expect(getBidByStripeSessionId('cs_test_123')).resolves.toEqual({
+      bid: paidBid(1500),
+      category: { id: CATEGORY.id, slug: 'gaming', name: 'Gaming' },
+    });
+  });
+
+  it('returns null when no bid matches (e.g. still pending under RLS)', async () => {
+    enqueueServer({ data: null, error: null });
+
+    await expect(getBidByStripeSessionId('cs_unknown')).resolves.toBeNull();
+  });
+
+  it.each(['', '   ', 'x'.repeat(256)])(
+    'returns null for invalid session identifiers %p without querying',
+    async (sessionId) => {
+      await expect(getBidByStripeSessionId(sessionId)).resolves.toBeNull();
+      expect(mocks.serverState.calls).toHaveLength(0);
+    }
+  );
 });
 
 describe('createPendingBid local input handling', () => {

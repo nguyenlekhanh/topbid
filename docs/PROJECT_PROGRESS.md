@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.2 completed** — Next recommended: 4.3
+**4.3 completed** — Next recommended: 4.4
 
 ## Completed Tasks
 
@@ -55,6 +55,7 @@
 - 3.8: Bid engine unit tests ✓
 - 4.1: Create Stripe Checkout session ✓
 - 4.2: Attach category/bid metadata ✓
+- 4.3: Success page ✓
 
 ## Tasks in Progress
 
@@ -121,6 +122,7 @@ _None_
 - Bid engine unit tests created (vitest + npm run test; src/lib/bids.test.ts: 38 tests covering minimum-bid rules, validateBidAmount matrix, createPendingBid input handling, exact RPC invocation, and duplicate/below-minimum/category error mapping via a queue-based Supabase client-boundary fake)
 - Stripe Checkout session creation created (src/lib/checkout.ts: composes createPendingBid + Task 0.6 stripe client, payment-mode session priced at the validated integer-cent amount with DB-sourced product name, env-derived placeholder success/cancel URLs, union contract mirroring 3.5; metadata/session-id linkage deferred to 4.2)
 - Category/bid metadata linkage created (checkout sessions carry client_reference_id = bid id + metadata {bid_id, category_id}; migration 20260823000009 adds attach_stripe_session RPC persisting stripe_session_id onto pending bids with attach-once guard and race-safe duplicate surfacing; EXECUTE restricted to service_role)
+- Success page created (src/app/success/page.tsx: dynamic server-rendered /success route, authoritative getBidByStripeSessionId lookup via anon client under RLS, confirmed vs awaiting-confirmation states, no Stripe API calls, never marks bids paid; checkout success_url now carries the CHECKOUT_SESSION_ID template)
 
 ## Current Environment/Setup Status
 
@@ -138,7 +140,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.3 — Success page**
+**4.4 — Cancel page**
 
 ## Notes
 
@@ -171,3 +173,5 @@ Task 3.8 completed successfully. Vitest added with npm run test script; src/lib/
 Task 4.1 completed successfully. createCheckoutSession added in src/lib/checkout.ts: creates the pending bid via the Task 3.5 contract, then opens a payment-mode Stripe Checkout session priced at the validated integer-cent amount with DB-sourced product name and env-derived placeholder success/cancel URLs; metadata/session-id linkage deliberately deferred to Task 4.2; 44/44 tests passing.
 
 Task 4.2 completed successfully. Checkout sessions now carry client_reference_id = bid id plus metadata {bid_id, category_id}, and migration 20260823000009 adds attach_stripe_session (attach-once, race-safe, service_role-only) persisting stripe_session_id onto the bid row; 46/46 tests passing.
+
+Task 4.3 completed successfully. /success page added as a dynamic server-rendered route: authoritative lookup by session id through the anon client under RLS; renders confirmed bid details when visible or an honest awaiting-confirmation state otherwise; never verifies payments or marks bids paid; checkout success_url now includes the CHECKOUT_SESSION_ID template; 51/51 tests passing.

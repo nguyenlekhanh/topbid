@@ -1,32 +1,77 @@
 ﻿TASK ID: 4.3
 PHASE: 4
 TITLE: Success page
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add the /success route as the post-checkout result page. It is a UI/result page only: it never verifies payment, never calls the Stripe API, and never marks a bid paid - confirmation remains exclusively webhook territory (Tasks 4.5+).
 
 SCOPE:
+- New src/app/success/page.tsx - async server component reading searchParams (Next.js App Router conventions)
+- src/lib/bids.ts - additive getBidByStripeSessionId(stripeSessionId): Promise<BidWithCategory | null> plus BidWithCategory type; anon-client lookup by stripe_session_id embedding category (id, slug, name); untrusted-input guards (blank/oversized -> null)
+- src/components/SuccessState.tsx - minimal compatibility extension: new optional note prop (defaults to the original demo footnote) so real pages can show honest copy without altering Phase 1 behavior
+- src/lib/checkout.ts - success_url now appends ?session_id={CHECKOUT_SESSION_ID} so Stripe injects the session identifier on redirect (compatibility fix required for 4.1's placeholder URL to function with this page); cancel_url unchanged
+
+BEHAVIOR (authoritative data only):
+- Confirmed case: bid found via session id means it is already 'paid' and publicly readable under RLS - renders amount (formatted integer-cents USD), category name, reference; copy states payment verified
+- Awaiting case: unknown/unreadable/invalid session id (typical while webhook has not yet converted pending->paid) renders a neutral "Payment received / confirming" state with NO amount or category - visiting the page cannot fake or accelerate confirmation
+- Untrusted URL parameter is sanitized before echo (trimmed, max 64 chars) and used only as reference text
 
 OUT OF SCOPE:
+- Webhook endpoint/signature verification/payment-status checks (4.5-4.9), marking bids paid/highest, cancel page (4.4), refunds/rate limiting, client-side data fetching libraries
 
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+PRESERVED:
+- Tasks 1.1-4.2 logic untouched except the documented SuccessState note prop default and checkout success_url template (both required for this task); RLS model intact; no secret/service-role exposure (page reads via anon client)
 
 FILES EXPECTED TO CHANGE:
+- src/app/success/page.tsx (new)
+- src/lib/bids.ts (additive query + type)
+- src/components/SuccessState.tsx (additive note prop)
+- src/lib/checkout.ts (success_url template)
+- src/lib/checkout.test.ts (expected URL updated)
+- src/lib/bids.test.ts (new describe block: 5 tests)
+- docs/4.3.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new lookup tests + full regression incl. updated checkout URL expectation)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build (verifies /success registers as dynamic server-rendered route)
+6. Static inspection: no Stripe API usage on page, RLS-respecting read path, untrusted input handling
 
 DEFINITION OF DONE:
+- /success renders authoritative confirmed details when available and an honest awaiting state otherwise; no payment verification or status mutation anywhere in the path; all repo checks green
 
 IMPLEMENTATION NOTES:
+The page deliberately avoids calling the Stripe API (session retrieval would be payment-status verification = Task 4.7). RLS is leveraged as the confirmation gate: anon visibility of the row IS the signal that webhook processing completed. formatAmount follows existing component convention (en-US currency USD, zero fraction digits, cents->dollars). Build output confirms /success as Dynamic (server-rendered on demand). One Prettier auto-fix applied during development.
 
 RESULT:
+Implementation complete. Suite: 51/51 PASSED (43 bids + 8 checkout). typecheck/lint/format:check/build all PASSED. Static inspection confirmed: no Stripe calls on the page, authoritative-only rendering, sanitized references, neutral pending state.
 
 FILES ACTUALLY CHANGED:
+- src/app/success/page.tsx (new)
+- src/lib/bids.ts (additive getBidByStripeSessionId + BidWithCategory)
+- src/components/SuccessState.tsx (additive optional note prop; defaults preserve old copy)
+- src/lib/checkout.ts (success_url CHECKOUT_SESSION_ID template)
+- src/lib/checkout.test.ts (expected success_url updated)
+- src/lib/bids.test.ts (+5 tests for getBidByStripeSessionId)
+- docs/4.3.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 51/51 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED (/success dynamic route verified)
+- Live Stripe end-to-end: SKIPPED - requires live keys/webhooks; NOT faked
 
 KNOWN ISSUES:
+- None within scope. Note: until Tasks 4.5+ exist there is no webhook to convert pendings, so real checkouts would show the awaiting state indefinitely in production - expected at this stage of the plan.
 
 FOLLOW-UP:
+Task 4.4 - Cancel page

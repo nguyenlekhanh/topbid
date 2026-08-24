@@ -1418,6 +1418,41 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.3 — Success page
 
+### Task 4.3
+
+- **Date**: 2026-08-23
+- **Objective**: Add the /success post-checkout result page — UI only, authoritative data, no payment verification or status mutation
+- **Status**: Completed
+- **What was implemented**:
+  - src/app/success/page.tsx: async server component (dynamic route, confirmed by build) reading searchParams; renders via the Phase 1 SuccessState component with honest, overridden copy
+  - src/lib/bids.ts: additive getBidByStripeSessionId + BidWithCategory type — anon-client lookup by stripe_session_id embedding category; untrusted-input guards (blank/oversized -> null)
+  - Two-state rendering driven purely by RLS: a found row is already 'paid' (webhook processed) -> confirmed details (formatted amount, category name, reference); otherwise a neutral "Payment received / confirming" state with no amount/category — visiting the page can never fake or accelerate confirmation
+  - Untrusted URL parameter sanitized (trim + 64-char cap) before echo as reference text only
+  - Compatibility fixes required by this task: SuccessState gained an optional note prop (default preserves the original demo footnote); checkout success_url now appends ?session_id={CHECKOUT_SESSION_ID} so Stripe injects the identifier on redirect
+- **Files changed**:
+  - src/app/success/page.tsx (new)
+  - src/lib/bids.ts (additive query + type)
+  - src/components/SuccessState.tsx (additive optional note prop)
+  - src/lib/checkout.ts (success_url template)
+  - src/lib/checkout.test.ts (expected success_url updated)
+  - src/lib/bids.test.ts (+5 tests for getBidByStripeSessionId)
+  - docs/4.3.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 51/51 PASSED (43 bids + 8 checkout)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/success registered as dynamic server-rendered route)
+  - Live Stripe end-to-end: SKIPPED — requires live keys/webhooks; NOT faked
+- **Important technical decisions**:
+  - No Stripe API calls on the page — session retrieval would constitute payment-status verification (Task 4.7 territory)
+  - RLS doubles as the confirmation gate: public visibility of the row IS the signal that webhook processing completed
+  - Page reads exclusively through the anon client; no service-role usage
+- **Known limitations**: Until Tasks 4.5+ add the webhook, real checkouts would show the awaiting state indefinitely in production — expected at this stage of the plan
+- **Follow-up work**: Task 4.4 — Cancel page
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

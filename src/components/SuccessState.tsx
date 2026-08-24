@@ -6,6 +6,7 @@ interface SuccessStateProps {
   amount?: string;
   category?: string;
   reference?: string;
+  note?: string;
   onClose?: () => void;
   onViewLeaderboard?: () => void;
 }
@@ -30,6 +31,7 @@ export default function SuccessState({
   amount,
   category,
   reference,
+  note = 'Demo reference — not a real payment confirmation.',
   onClose,
   onViewLeaderboard,
 }: SuccessStateProps) {
@@ -70,9 +72,7 @@ export default function SuccessState({
               </div>
             )}
           </dl>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Demo reference — not a real payment confirmation.
-          </p>
+          <p className="mt-3 text-xs text-muted-foreground">{note}</p>
         </div>
       )}
 

@@ -191,7 +191,7 @@ describe('createCheckoutSession', () => {
           },
         },
       ],
-      success_url: 'https://topbid.lol/success',
+      success_url: 'https://topbid.lol/success?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://topbid.lol/cancel',
     });
 
