@@ -1,32 +1,108 @@
 ﻿TASK ID: 9.4
 PHASE: 9
 TITLE: Stripe security review
-STATUS: pending
+STATUS: completed - audit found NO concrete defects requiring fixes
 
 OBJECTIVE:
+Perform a comprehensive end-to-end security review of the Stripe trust boundary covering checkout creation, webhook processing, payment state machine RPCs, Stripe API usage, identifier correlation, secrets/configuration, logging/errors, and test coverage.
 
-SCOPE:
+AUDIT VERDICT: NO CONCRETE SECURITY OR CORRECTNESS DEFECTS FOUND.
+The existing Stripe/payment architecture is sound. No code changes were made because every reviewed boundary correctly enforces its trust model. This task is a documentation-only audit.
 
-OUT OF SCOPE:
+============================================================
+TRUST BOUNDARY MAP
+============================================================
 
-INPUTS / DEPENDENCIES:
+CLIENT -> /api/admin/login -> Supabase Auth signInWithPassword -> session cookie
+CLIENT -> /api/share-events -> allow-list validation -> service-role insert (telemetry)
+CLIENT -> /api/unsubscribe -> HMAC token shape gate -> service-role delete
+CLIENT -> /api/admin/categories -> getAdminContext gate -> field validators -> service-role upsert
+CLIENT -> /api/admin/payments/refund -> getAdminContext gate -> UUID validation -> stripe.refunds.create -> refund_paid_bid RPC
+CLIENT -> /success?session_id=... -> extractSessionId -> RLS-scoped DB lookup (display only)
+SERVER (webhook) -> POST /api/webhooks/stripe -> raw body + signature -> constructEvent -> Stripe API re-retrieval -> ledger RPC
+SERVER (checkout) -> createCheckoutSession -> createPendingBid (validation chain) -> stripe.checkout.sessions.create -> attach_stripe_session RPC
 
-IMPLEMENTATION REQUIREMENTS:
+============================================================
 
-FILES EXPECTED TO CHANGE:
+1. CHECKOUT CREATION SECURITY FINDINGS:
+- Price/amount ALWAYS from authoritative DB: createCheckoutSession passes bid.amount (integer cents) from the createPendingBid result; the amount was validated against the server-computed minimum inside the create_pending_bid RPC under row lock. Client cannot influence pricing.
+- Category/product name from validateCategory (DB-sourced active row); client-supplied slug is only a lookup key resolved to the DB row.
+- metadata {bid_id, category_id} contains ONLY server-generated UUIDs persisted at bid creation time; they serve as linkage hints for webhook resolution, never as authority.
+- STRIPE_SECRET_KEY consumed exclusively inside src/lib/stripe.ts (server-only import path).
+- success_url/cancel_url derived from trusted NEXT_PUBLIC_APP_URL env with hardcoded paths (/success, /cancel). No open-redirect surface; no sensitive info embedded beyond the CHECKOUT_SESSION_ID template placeholder that Stripe replaces.
 
-TEST PLAN:
+2. WEBHOOK SECURITY FINDINGS:
+- Raw request body passed UNMODIFIED to constructEvent (never parsed/re-serialized beforehand)
+- Signature verified with STRIPE_WEBHOOK_SECRET + explicit 300s replay tolerance BEFORE any business logic
+- Malformed/unsigned/tampered payloads return 400 immediately
+- Event type allow-listing: only checkout.session.completed, checkout.session.async_payment_failed, charge.refunded processed; others acknowledged+ignored
+- Event object NEVER trusted for payment authority: verifyCheckoutSessionPaid re-retrieves the session from Stripe's API; handleChargeRefunded re-retrieves the charge requiring refunded=true; handleAsyncPaymentFailed re-retrieves payment_status
+- Ledger (processed_webhook_events) + transactional RPCs ensure exactly-once processing; duplicate events resolve as 'duplicate' no-ops
+- Session/bid/payment-intent correlation enforced by convert_pending_bid_to_paid (session_mismatch rejection) and refund_paid_bid (PI-based lookup under row lock)
 
-DEFINITION OF DONE:
+3. PAYMENT STATE MACHINE RPCs:
+- All are SECURITY DEFINER with pinned search_path; EXECUTE revoked from public/anon/authenticated, granted ONLY to service_role
+- Row locking (SELECT FOR UPDATE) in convert_pending_bid_to_paid and refund_paid_bid
+- Legal state transitions only: pending->paid, paid->refunded, pending->failed; impossible transitions fail with invalid_state/already_paid/already_refunded
+- Cross-linking prevented by session_mismatch rejection and PI-based lookup
+- Migration 20260823000019 fixed the latent undeclared-parameter defect in refund_paid_bid (p_payment_intent_id -> p_stripe_payment_intent_id)
 
-IMPLEMENTATION NOTES:
+4. STRIPE API USAGE:
+- stripe.checkout.sessions.create: one-shot creation; no idempotency key needed (bid already exists as pending reservation)
+- stripe.checkout.sessions.retrieve: read-only verification
+- stripe.charges.retrieve: read-only verification
+- stripe.refunds.create: idempotencyKey = admin-refund-<bidId> (per-bid scoping prevents cross-bid collisions; retries converge to same refund)
+- No mutation before local authorization/validation
+- No Stripe payloads/secrets exposed in logs or client responses
 
-RESULT:
+5. IDENTIFIER/CORRELATION:
+- bid.id: server-generated UUID, primary key
+- stripe_session_id: attached once via attach_stripe_session RPC (attach-once guard); UNIQUE constraint
+- stripe_payment_intent_id: set during conversion from verified session response
+- event.id: processed_webhook_events PRIMARY KEY (ledger)
+- refund.id: used as synthetic event_id for admin-initiated refunds (cannot collide with evt_ prefixed webhook event ids)
+- No identifier can be swapped between bids/categories/payments: all lookups are keyed by immutable server-generated values
 
-FILES ACTUALLY CHANGED:
+6. SECRETS/CONFIGURATION:
+- STRIPE_SECRET_KEY: consumed only in src/lib/stripe.ts (module-level, server-only import graph)
+- STRIPE_WEBHOOK_SECRET: consumed only in src/lib/stripe-webhook.ts (process.env.STRIPE_WEBHOOK_SECRET, compared inside SDK)
+- Neither secret appears in client bundles, serialized page props, API responses, or log output
+- NEXT_PUBLIC_APP_URL: public by design; validated non-empty before URL construction
+- Test/live mode: determined entirely by which keys are configured in environment; no code-level mode switching exists
+
+7. LOGGING/ERRORS:
+- console.error/warn messages contain event ids, session ids, bid ids, and error message summaries but NOT signing secrets, card data, full Stripe objects, or PII beyond bid identifiers
+- Client-facing responses use stable generic strings ('Invalid signature', 'Webhook processing failed') rather than provider internals
+- Admin pages display Stripe identifiers (session/intent) as operational data for authorized admins only - appropriate for payment management
+
+8. CLIENT/BROWSER TRUST:
+- Public pages (/success) render amounts/status from RLS-scoped DB reads; client cannot override displayed values
+- Client components receive only sanitized view-model data (no raw Bid objects)
+- No client component imports server-only modules (verified by build output showing no server modules in client chunks)
+
+9. TEST COVERAGE:
+- 52 webhook handler tests (src/lib/stripe-webhook.test.ts): signature failure, tampered payload, duplicate events, mismatched references, invalid state transitions, provider failures
+- 18 real-crypto signature tests (src/lib/stripe-webhook-signature.test.ts): genuine HMAC-SHA256 verification proving tamper rejection
+- 8 checkout tests (src/lib/checkout.test.ts): authoritative pricing, open-redirect prevention, session/bid linkage
+- Opt-in integration suite (src/integration/stripe.integration.test.ts): real test-mode lifecycle when credentials available; honestly SKIPPED without credentials
+- Gaps identified: none within Task 9.4 scope; live Stripe testing requires credentials unavailable in CI
+
+10. CONCRETE DEFECTS FOUND: NONE.
+
+============================================================
+
+FILES CHANGED:
+- docs/9.4.txt (created - this audit documentation)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
+NO source code, schema, dependency, or configuration changes were made.
 
 TESTS ACTUALLY RUN:
+- npm run test: 569/569 PASSED (unchanged - confirms no regression)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+SCOPE BOUNDARY (explicit):
+NO source code changes. NO new dependencies. NO schema changes. NO rate-limit changes. NO CAPTCHA additions. NO auth changes. NO email/notification changes. This is purely a documentation/audit task recording that the existing Stripe trust boundary is secure.
 
 FOLLOW-UP:
+Task 9.5 - Webhook security review
