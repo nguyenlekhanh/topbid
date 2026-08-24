@@ -97,11 +97,62 @@ describe('buildOutbidEmail', () => {
     expect(Object.keys(sendShape).sort()).toEqual(['html', 'subject', 'text', 'to']);
   });
 
-  it('contains no bid-again link (Task 6.5 owns that scope)', () => {
+  it('contains no bid-again link when no URL is provided', () => {
     const email = buildOutbidEmail(BASE_INPUT);
 
     expect(email.html.toLowerCase()).not.toContain('href');
     expect(email.html.toLowerCase()).not.toContain('http');
     expect(email.text.toLowerCase()).not.toContain('http');
+  });
+
+  it('treats a blank bidAgainUrl as absent', () => {
+    const blank = buildOutbidEmail({ ...BASE_INPUT, bidAgainUrl: '   ' });
+
+    expect(blank.html).not.toContain('href');
+    expect(blank.text).not.toContain('Bid again:');
+  });
+});
+
+describe('buildOutbidEmail bid-again CTA (Task 6.5)', () => {
+  const BASE_WITH_CTA = {
+    ...BASE_INPUT,
+    bidAgainUrl: 'https://topbid.lol/#categories-heading',
+  };
+
+  it('appends the bid-again link to the HTML body pointing at the given destination', () => {
+    const email = buildOutbidEmail(BASE_WITH_CTA);
+
+    expect(email.html).toContain('<a href="https://topbid.lol/#categories-heading">Bid again</a>');
+  });
+
+  it('appends the raw URL to the plain-text body', () => {
+    const email = buildOutbidEmail(BASE_WITH_CTA);
+
+    expect(email.text).toContain('Bid again: https://topbid.lol/#categories-heading');
+  });
+
+  it('leaves subject and existing body content unchanged when the CTA is added', () => {
+    const without = buildOutbidEmail(BASE_INPUT);
+    const withCta = buildOutbidEmail(BASE_WITH_CTA);
+
+    expect(withCta.subject).toBe(without.subject);
+    expect(withCta.to).toBe(without.to);
+    expect(withCta.html.startsWith(without.html)).toBe(true);
+    expect(withCta.text.startsWith(without.text)).toBe(true);
+    expect(without.html.endsWith('</p>')).toBe(true);
+  });
+
+  it('escapes the URL for attribute context while keeping it raw in text', () => {
+    const email = buildOutbidEmail({
+      ...BASE_INPUT,
+      bidAgainUrl: 'https://topbid.lol/?a=1&b=2"onclick="x',
+    });
+
+    expect(email.html).toContain('href="https://topbid.lol/?a=1&amp;b=2&quot;onclick=&quot;x"');
+    expect(email.text).toContain('https://topbid.lol/?a=1&b=2"onclick="x');
+  });
+
+  it('keeps output deterministic for identical input including the CTA', () => {
+    expect(buildOutbidEmail(BASE_WITH_CTA)).toEqual(buildOutbidEmail(BASE_WITH_CTA));
   });
 });

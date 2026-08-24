@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sendOutbidNotification } from './outbid-notification';
 import { buildOutbidEmail } from './outbid-email-template';
@@ -52,13 +52,21 @@ const PREVIOUS_BIDDER = {
   amount: 125000,
 };
 
+const APP_URL = 'https://topbid.lol';
+const BID_AGAIN_URL = `${APP_URL}/#categories-heading`;
+
 beforeEach(() => {
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', APP_URL);
   bidsMock.getBidByStripeSessionId.mockReset();
   bidsMock.getBidByStripeSessionId.mockResolvedValue({ bid: NEW_BID_ROW, category: CATEGORY });
   bidsMock.getPreviousHighestBidder.mockReset();
   bidsMock.getPreviousHighestBidder.mockResolvedValue(PREVIOUS_BIDDER);
   resendMock.sendEmail.mockReset();
   resendMock.sendEmail.mockResolvedValue({ id: 'email-123' });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('sendOutbidNotification (Task 6.4)', () => {
@@ -80,6 +88,7 @@ describe('sendOutbidNotification (Task 6.4)', () => {
       previousAmount: 125000,
       newAmount: 150000,
       newBidderName: 'Challenger',
+      bidAgainUrl: BID_AGAIN_URL,
     });
 
     expect(resendMock.sendEmail).toHaveBeenCalledTimes(1);
@@ -90,6 +99,27 @@ describe('sendOutbidNotification (Task 6.4)', () => {
       recipient: 'champ@example.com',
       messageId: 'email-123',
     });
+  });
+
+  it('includes the bid-again CTA in the delivered email (Task 6.5)', async () => {
+    await sendOutbidNotification('cs_new');
+
+    const content = resendMock.sendEmail.mock.calls[0][0] as { html: string; text: string };
+
+    expect(content.html).toContain(
+      '<a href="https://topbid.lol/#categories-heading">Bid again</a>'
+    );
+    expect(content.text).toContain('Bid again: https://topbid.lol/#categories-heading');
+  });
+
+  it('normalizes a trailing slash on the configured base URL', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://topbid.lol/');
+
+    await sendOutbidNotification('cs_new');
+
+    const content = resendMock.sendEmail.mock.calls[0][0] as { html: string };
+
+    expect(content.html).toContain(`href="${BID_AGAIN_URL}"`);
   });
 
   it('composes from authoritative amounts and null names without inventing data', async () => {
@@ -114,6 +144,7 @@ describe('sendOutbidNotification (Task 6.4)', () => {
         previousAmount: 9900,
         newAmount: 150000,
         newBidderName: null,
+        bidAgainUrl: BID_AGAIN_URL,
       })
     );
   });
@@ -180,5 +211,14 @@ describe('sendOutbidNotification (Task 6.4)', () => {
     );
 
     expect(bidsMock.getPreviousHighestBidder).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails loudly when the base URL needed for the CTA is not configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '');
+
+    await expect(sendOutbidNotification('cs_new')).rejects.toThrow(
+      'Missing NEXT_PUBLIC_APP_URL: required to build the bid-again link'
+    );
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
   });
 });

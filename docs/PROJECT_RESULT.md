@@ -2093,6 +2093,37 @@ This file records what has actually been built, not what was planned.
   - Notification runs synchronously in the webhook request (two RLS queries + provider call); acceptable for MVP per no-queue scope rule
 - **Follow-up work**: Task 6.5 — Bid-again link in email
 
+### Task 6.5
+
+- **Date**: 2026-08-24
+- **Objective**: Add the bid-again CTA/link to the outbid notification email, pointing at the public bidding destination via existing URL conventions
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/outbid-email-template.ts: optional `bidAgainUrl` on OutbidEmailTemplateInput — when provided, appends an attribute-escaped HTML anchor (`<a href="...">Bid again</a>`) and a plain-text `Bid again: <url>` line; when absent/blank, output remains byte-identical to the pre-6.5 template (pinned by regression test)
+  - src/lib/outbid-notification.ts: buildBidAgainUrl() derives `{NEXT_PUBLIC_APP_URL}/#categories-heading` solely from trusted server configuration (trailing-slash normalized like checkout's URL building); missing env throws descriptively so a broken-CTA email is never silently sent
+  - Tests: anti-link scope guard replaced with absence/presence/attribute-escaping/determinism coverage; orchestration suite gained CTA-in-content, trailing-slash normalization, and missing-env failure tests
+- **Files changed**:
+  - src/lib/outbid-email-template.ts
+  - src/lib/outbid-email-template.test.ts
+  - src/lib/outbid-notification.ts
+  - src/lib/outbid-notification.test.ts
+  - docs/6.5.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: PASSED - 201/201 across 12 files (+9 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Destination `{NEXT_PUBLIC_APP_URL}/#categories-heading`: emails need absolute URLs; NEXT_PUBLIC_APP_URL is the single trusted base-URL env; `/#<section>-heading` anchors are an established convention (SuccessState's /#leaderboard-heading); CategoryCards exposes id="categories-heading". No per-category route exists yet (Task 7.4), and Navbar/Hero hrefs like `/categories` are unimplemented placeholders - inventing either would violate the task constraint
+  - Template stays pure: receives the ready-made URL string, only escapes it for attribute context (& -> &amp;, " -> &quot;); raw URL kept in the text body
+  - Client-supplied URLs cannot reach this path (env + constant fragment only); no second email client; 6.4 send/detection/webhook behavior untouched; no unsubscribe (6.6) or failure handling (6.7)
+- **Known limitations**:
+  - Link targets the categories grid rather than a per-category page until Task 7.4 introduces public category URLs
+- **Follow-up work**: Task 6.6 — Unsubscribe handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

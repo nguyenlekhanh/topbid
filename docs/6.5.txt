@@ -1,32 +1,71 @@
 ﻿TASK ID: 6.5
 PHASE: 6
 TITLE: Bid-again link in email
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add the bid-again CTA/link to the outbid notification email (Task 6.4's delivered message), pointing recipients at the public bidding destination using existing URL conventions.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "6.5 | Bid-again link in email | 6.4". The template's pre-existing scope-guard test explicitly reserved link work for this task.
 
 SCOPE:
+- src/lib/outbid-email-template.ts: optional bidAgainUrl input on OutbidEmailTemplateInput; when provided (non-blank), appends an HTML anchor (<a href="...">Bid again</a>, attribute-escaped) and a plain-text "Bid again: <url>" line; when absent the output remains byte-identical to the pre-6.5 template
+- src/lib/outbid-notification.ts: buildBidAgainUrl() derives the absolute destination solely from trusted server config - NEXT_PUBLIC_APP_URL (same base used for Checkout success/cancel URLs, trailing-slash normalized) + the established homepage section anchor /#categories-heading (mirrors the existing /#leaderboard-heading convention in SuccessState.tsx); missing env throws descriptively ('Missing NEXT_PUBLIC_APP_URL: required to build the bid-again link') rather than delivering a CTA-less/broken email
+- Tests updated/added in both suites
+
+PRESERVED / BOUNDARIES:
+- Template stays pure: no env access, no provider imports; it receives the ready-made URL string and only HTML-escapes it for attribute context (never rewrites or validates it)
+- No per-category route invented: no public category URL exists yet (future Task 7.4 territory); the categories grid anchor is the correct EXISTING destination
+- Client-provided URLs cannot reach this code path (env + constant fragment only)
+- 6.4 flow untouched elsewhere: same sendEmail boundary, same getPreviousHighestBidder detection, same skip reasons/self-notification guard; webhook wiring unchanged
+- Tasks 6.6 (unsubscribe) and 6.7 (failure handling) NOT implemented
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Unsubscribe handling (6.6), retry/failure flows (6.7), per-category deep links/route creation (7.4), UI changes, schema/migration changes
 
 FILES EXPECTED TO CHANGE:
+- src/lib/outbid-email-template.ts
+- src/lib/outbid-email-template.test.ts
+- src/lib/outbid-notification.ts
+- src/lib/outbid-notification.test.ts
+- docs/6.5.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
-
-DEFINITION OF DONE:
+1. npm run test (new CTA tests + updated expectations + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: purity preserved, URL derivation server-only, escaping correctness
 
 IMPLEMENTATION NOTES:
+Destination chosen as {NEXT_PUBLIC_APP_URL}/#categories-heading because emails require absolute URLs, NEXT_PUBLIC_APP_URL is the project's single trusted base-URL convention, and SuccessState already deep-links homepage sections via /#<section>-heading anchors; CategoryCards exposes id="categories-heading". Navbar/Hero hrefs like /categories are forward-looking placeholders whose routes do not exist yet, so they were not used. Optional (not required) bidAgainUrl keeps the composer pure and pins the exact pre-6.5 output shape with a regression test; the orchestrator always supplies the URL in production and fails loudly if configuration is missing. The old anti-link guard test was replaced by explicit absent/present tests plus attribute-escaping coverage (& -> &amp;, quotes -> &quot;) while text bodies keep raw URLs.
 
 RESULT:
+Implementation complete. Suite: 201/201 PASSED across 12 files (+9 net new tests: 5 template CTA tests replacing 1 guard, 4 orchestration additions incl. trailing-slash normalization and missing-env failure). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- src/lib/outbid-email-template.ts (optional bidAgainUrl + CTA rendering)
+- src/lib/outbid-email-template.test.ts (guard replaced by absence/presence/escaping/determinism tests)
+- src/lib/outbid-notification.ts (buildBidAgainUrl + passes bidAgainUrl)
+- src/lib/outbid-notification.test.ts (env stubs, expected-content updates, CTA/slash/env tests)
+- docs/6.5.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 201/201 PASSED across 12 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Real link click-through/delivery: N/A beyond unit level (no live email delivery; consistent with 6.2/6.4)
 
 KNOWN ISSUES:
+- Link targets the categories grid, not a per-category page - correct today by design; revisit when Task 7.4 introduces public category URLs
 
 FOLLOW-UP:
+Task 6.6 - Unsubscribe handling

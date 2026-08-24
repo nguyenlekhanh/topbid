@@ -21,10 +21,10 @@ import { sendEmail } from '@/lib/resend';
  * Server-only module: transitively imports Resend credentials and must never be
  * imported by client code.
  *
- * Deliberately out of scope (later tasks own them): the bid-again CTA/link (Task 6.5),
- * unsubscribe handling (Task 6.6), and retry/failure-policy flows beyond propagating
- * provider errors (Task 6.7). No queues, retries, scheduling, or notification state are
- * introduced.
+ * Deliberately out of scope (later tasks own them): unsubscribe handling (Task 6.6)
+ * and retry/failure-policy flows beyond propagating provider errors (Task 6.7). The
+ * bid-again CTA (Task 6.5) is built from trusted server configuration only. No queues,
+ * retries, scheduling, or notification state are introduced.
  */
 
 export type OutbidNotificationSkippedReason =
@@ -33,6 +33,29 @@ export type OutbidNotificationSkippedReason =
 export type OutbidNotificationResult =
   | { notified: true; recipient: string; messageId: string }
   | { notified: false; reason: OutbidNotificationSkippedReason };
+
+/**
+ * Build the absolute bid-again destination for the email CTA (Task 6.5).
+ *
+ * - Uses the existing NEXT_PUBLIC_APP_URL base (the same trusted configuration the
+ *   Checkout success/cancel URLs are built from) with the established homepage section
+ *   anchor convention (`/#categories-heading`, mirroring /#leaderboard-heading) - no
+ *   per-category public route exists yet, so the categories grid is the correct
+ *   existing bidding destination; a route is never invented here
+ * - Client-provided URLs can never reach this code path: the value is derived solely
+ *   from server environment configuration plus a constant fragment
+ * - A missing base URL throws descriptively (consistent with checkout URL building)
+ *   rather than silently sending an email whose primary action is broken
+ */
+function buildBidAgainUrl(): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!base || !base.trim()) {
+    throw new Error('Missing NEXT_PUBLIC_APP_URL: required to build the bid-again link');
+  }
+
+  return `${base.trim().replace(/\/+$/, '')}/#categories-heading`;
+}
 
 /**
  * Send the outbid notification for a newly paid bid identified by its Checkout Session
@@ -86,6 +109,7 @@ export async function sendOutbidNotification(
     previousAmount: previous.amount,
     newAmount: newBid.amount,
     newBidderName: newBid.bidder_name,
+    bidAgainUrl: buildBidAgainUrl(),
   });
 
   const sent = await sendEmail(email);
