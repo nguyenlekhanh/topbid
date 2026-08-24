@@ -2696,7 +2696,7 @@ _This file will be updated after each completed task with actual implementation 
   3. Admin login has Supabase Auth + generic error responses preventing enumeration
   4. Share events are non-authoritative telemetry with no economic impact
   5. Unsubscribe is capability-token gated + idempotent + rate limited
-  Adding a third-party CAPTCHA provider would introduce unnecessary availability dependency, privacy surface expansion, and verification complexity disproportionate to the current threat model.
+     Adding a third-party CAPTCHA provider would introduce unnecessary availability dependency, privacy surface expansion, and verification complexity disproportionate to the current threat model.
 - **Decision**: Documented intentionally-satisfied status. No code changes made.
 - **Files changed**: docs/9.3.txt (created), PROJECT_PROGRESS.md, PROJECT_RESULT.md
 - **Tests performed**: test 569/569 unchanged (no regression); typecheck/lint/format:check/build all PASSED
