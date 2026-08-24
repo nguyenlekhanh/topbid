@@ -1481,6 +1481,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 4.5 — Stripe webhook endpoint
 
+### Task 4.5
+
+- **Date**: 2026-08-23
+- **Objective**: Stripe webhook endpoint — raw-body signature verification, plan-required event routing, correct HTTP semantics (server-only)
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/stripe-webhook.ts: processStripeWebhook(payload, signature) containing the full trust boundary — raw payload passed UNPARSED into stripe.webhooks.constructEvent with STRIPE_WEBHOOK_SECRET; 400 on missing payload/signature or failed verification; 500 on unconfigured secret or unexpected processing failure; 200 for verified events
+  - Event routing per plan decomposition: checkout.session.completed acknowledged with linkage extraction (session id, client_reference_id, metadata.bid_id) logged for downstream tasks; all other types acknowledged+ignored (200 ignored:true)
+  - src/app/api/webhooks/stripe/route.ts: thin POST adapter reading request.text() RAW (never parsed/re-serialized before verification), runtime='nodejs' explicit; maps result to NextResponse status/body
+  - Boundary discipline: NO bid rows read/written and no payment-status checks — conversion is Task 4.8, status checks 4.7, signature review 4.6, event-id ledger 4.9
+- **Files changed**:
+  - src/lib/stripe-webhook.ts (new)
+  - src/app/api/webhooks/stripe/route.ts (new)
+  - src/lib/stripe-webhook.test.ts (new — 11 tests)
+  - docs/4.5.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated; also restored the missed 4.4 checklist line from the previous turn)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 62/62 PASSED (51 prior + 11 new webhook tests)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (six Prettier auto-fixes during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/api/webhooks/stripe registered as dynamic route)
+  - Live webhook delivery from Stripe: SKIPPED — Stripe CLI/test keys unavailable; NOT faked. Intended live check documented in docs/4.5.txt
+- **Important technical decisions**:
+  - Logic separated from transport (lib + thin route) so verification/routing is unit-testable without HTTP scaffolding
+  - Duplicate/replayed verified events asserted safe-by-construction at this stage (side-effect-free handling); the durable event-id idempotency ledger remains Task 4.9 as planned
+  - constructEvent asserted to receive the EXACT raw payload string, guarding against any future accidental pre-parsing
+- **Known limitations**: None within scope (live delivery verification deferred; conversion pending Task 4.8 by design)
+- **Follow-up work**: Task 4.6 — Verify webhook signature
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

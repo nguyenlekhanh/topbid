@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.4 completed** — Next recommended: 4.5
+**4.5 completed** — Next recommended: 4.6
 
 ## Completed Tasks
 
@@ -56,6 +56,8 @@
 - 4.1: Create Stripe Checkout session ✓
 - 4.2: Attach category/bid metadata ✓
 - 4.3: Success page ✓
+- 4.4: Cancel page ✓
+- 4.5: Stripe webhook endpoint ✓
 
 ## Tasks in Progress
 
@@ -124,6 +126,7 @@ _None_
 - Category/bid metadata linkage created (checkout sessions carry client_reference_id = bid id + metadata {bid_id, category_id}; migration 20260823000009 adds attach_stripe_session RPC persisting stripe_session_id onto pending bids with attach-once guard and race-safe duplicate surfacing; EXECUTE restricted to service_role)
 - Success page created (src/app/success/page.tsx: dynamic server-rendered /success route, authoritative getBidByStripeSessionId lookup via anon client under RLS, confirmed vs awaiting-confirmation states, no Stripe API calls, never marks bids paid; checkout success_url now carries the CHECKOUT_SESSION_ID template)
 - Cancel page created (src/app/cancel/page.tsx: static /cancel route with neutral informational card, honest no-payment-taken copy, zero data access; matches the checkout cancel_url from Task 4.1)
+- Stripe webhook endpoint created (src/lib/stripe-webhook.ts + src/app/api/webhooks/stripe/route.ts: raw-body signature verification against STRIPE_WEBHOOK_SECRET, checkout.session.completed acknowledged with linkage extraction, other events ignored, 400/500/200 semantics; conversion deferred to 4.8)
 
 ## Current Environment/Setup Status
 
@@ -141,7 +144,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.5 — Stripe webhook endpoint**
+**4.6 — Verify webhook signature**
 
 ## Notes
 
@@ -178,3 +181,5 @@ Task 4.2 completed successfully. Checkout sessions now carry client_reference_id
 Task 4.3 completed successfully. /success page added as a dynamic server-rendered route: authoritative lookup by session id through the anon client under RLS; renders confirmed bid details when visible or an honest awaiting-confirmation state otherwise; never verifies payments or marks bids paid; checkout success_url now includes the CHECKOUT_SESSION_ID template; 51/51 tests passing.
 
 Task 4.4 completed successfully. /cancel page added as a static prerendered route: neutral informational card stating no payment was taken, with Browse categories / View Leaderboard CTAs matching existing design conventions; zero data access and no changes to any completed task.
+
+Task 4.5 completed successfully. Stripe webhook endpoint added (src/app/api/webhooks/stripe + src/lib/stripe-webhook.ts): raw-body signature verification against STRIPE_WEBHOOK_SECRET, checkout.session.completed acknowledged with linkage extraction, other events ignored, correct 200/400/500 semantics; conversion deferred to Task 4.8; 62/62 tests passing.

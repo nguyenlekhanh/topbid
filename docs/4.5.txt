@@ -1,32 +1,78 @@
 ﻿TASK ID: 4.5
 PHASE: 4
 TITLE: Stripe webhook endpoint
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add the Stripe webhook endpoint: a server-only POST route that receives events, verifies signatures against STRIPE_WEBHOOK_SECRET using the raw request body, and routes only the plan-required event types with correct HTTP semantics.
 
 SCOPE:
+- New src/lib/stripe-webhook.ts - processStripeWebhook(payload, signature): WebhookProcessingResult containing ALL trust-boundary and routing logic (testable without HTTP)
+- New src/app/api/webhooks/stripe/route.ts - thin POST adapter: reads request.text() RAW (never parsed/re-serialized before verification), forwards signature header, maps result status/body to NextResponse; explicit runtime = 'nodejs'
+- Event routing: checkout.session.completed is acknowledged with linkage extraction (session id, client_reference_id, metadata.bid_id) logged for downstream tasks; all other types acknowledged+ignored (200)
+- HTTP semantics: 200 verified (handled or ignored); 400 missing payload/signature or failed verification; 500 missing webhook secret config or unexpected processing failure (Stripe retries)
 
-OUT OF SCOPE:
+OUT OF SCOPE (deliberate boundaries per plan decomposition):
+- Payment-status verification (Task 4.7), pending->paid conversion incl. stripe_payment_intent_id/is_highest writes (Task 4.8), event-id idempotency ledger (Task 4.9), failure/refund handling (4.10/4.11), deeper signature review/hardening (4.6)
+- Therefore NO bid rows are read or written by this task; duplicate/replayed events are inherently safe because handling is side-effect-free until 4.8 lands
 
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+TRUST & SECURITY MODEL:
+- Payloads untrusted until constructEvent succeeds; raw body passed straight into verification
+- STRIPE_WEBHOOK_SECRET / STRIPE_SECRET_KEY never leave server modules; no NEXT_PUBLIC_ exposure
+- RLS untouched; no service-role usage yet (arrives with 4.8's conversion write path)
 
 FILES EXPECTED TO CHANGE:
+- src/lib/stripe-webhook.ts (new)
+- src/app/api/webhooks/stripe/route.ts (new)
+- src/lib/stripe-webhook.test.ts (new)
+- docs/4.5.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (11 new tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build (verifies /api/webhooks/stripe registers as dynamic POST route)
+6. Static inspection: raw-body handling, secret confinement, boundary separation vs Tasks 4.6-4.9
 
 DEFINITION OF DONE:
+- Endpoint exists with correct verification/routing/HTTP semantics and focused unit coverage; completed tasks untouched; runnable checks green
+
+TEST COVERAGE (11 new tests):
+- 200 received for verified plan-required event; constructEvent called with EXACT raw payload + signature + secret
+- Raw-body passthrough assertion (no prior parsing)
+- 200 ignored:true for unsupported types (e.g., invoice.paid)
+- 400 invalid signature (constructEvent throws); 400 for missing/empty/null signature header; 400 for empty payload
+- 500 when STRIPE_WEBHOOK_SECRET unconfigured
+- Duplicate/replay of identical verified event: both attempts 200 with identical bodies, zero side effects (idempotency ledger still lands in Task 4.9)
+- 500 on unexpected processing failures (malformed event envelope) so Stripe retries
 
 IMPLEMENTATION NOTES:
+Logic lives in src/lib/stripe-webhook.ts so tests exercise it directly without HTTP scaffolding; the route is a thin adapter. console.info/error used for structured operational logging (appropriate pre-monitoring-tooling). Six Prettier formatting auto-fixes applied via lint:fix during development. Live Stripe webhook delivery NOT performed (no Stripe CLI/test keys available) - behavior verified at the mocked SDK boundary plus static inspection; documented honestly.
 
 RESULT:
+Implementation complete. Suite: 62/62 PASSED (51 prior + 11 new). typecheck/lint/format:check/build all PASSED; build output confirms f /api/webhooks/stripe dynamic route. Static inspection confirmed raw-body verification order, boundary separation vs Tasks 4.6-4.9, and secret confinement.
 
 FILES ACTUALLY CHANGED:
+- src/lib/stripe-webhook.ts (new)
+- src/app/api/webhooks/stripe/route.ts (new)
+- src/lib/stripe-webhook.test.ts (new)
+- docs/4.5.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 62/62 PASSED (3 files)
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED (/api/webhooks/stripe dynamic route verified)
+- Live webhook delivery from Stripe: SKIPPED - Stripe CLI/test keys unavailable; NOT faked. Intended live check when available: stripe listen --forward-to localhost:3000/api/webhooks/stripe with a real checkout.session.completed fixture asserting 200 + structured log.
 
 KNOWN ISSUES:
+- None within scope. Until Task 4.8, completed events are acknowledged but do not convert bids - expected mid-phase state, documented.
 
 FOLLOW-UP:
+Task 4.6 - Verify webhook signature
