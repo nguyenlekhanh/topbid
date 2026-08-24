@@ -1,32 +1,73 @@
 ﻿TASK ID: 6.7
 PHASE: 6
 TITLE: Email failure handling
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Give outbid notification emails a real failure model - classified failures, persisted delivery state, and eventual delivery via Stripe's own redelivery schedule - WITHOUT coupling email delivery to the payment transaction and WITHOUT inventing queue/scheduler infrastructure.
 
-SCOPE:
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "6.7 | Email failure handling | 6.6" - a single line. Architecture derived from audit findings: the only retry mechanism already available to this project is Stripe webhook redelivery, so the design makes safe use of it instead of building new infrastructure.
+
+PRE-IMPLEMENTATION AUDIT FINDINGS:
+- Payment idempotency (4.9): processed_webhook_events PK(event.id) + conversion in ONE transaction; duplicates answered 'duplicate' BEFORE any dispatch
+- Pre-6.7 behavior: failed emails were logged-and-lost forever; the webhook always answered 200 after conversion, so Stripe never retried and no retry path existed anywhere
+- No notification delivery state existed (the 6.6 table is opt-out state, not delivery state)
+- Resend boundary exposes exactly two REAL failure modes: API error-field rejections (definitively NOT sent) vs thrown transport errors (outcome UNKNOWN) - an honest terminal/retryable distinction with no invented taxonomy
+
+ARCHITECTURE CHOSEN:
+Persisted per-bid delivery record as the notification-attempt idempotency anchor, with Stripe redelivery as the retry driver.
+- supabase/migrations/20260823000016 creates outbid_notification_deliveries: bid_id PK/FK->bids ON DELETE CASCADE (one logical notification per bid), status CHECK ('pending'|'sent'|'failed_retryable'|'failed_permanent'), attempts, provider_message_id, last_error, timestamps; RLS enabled with ZERO policies (service-role only)
+- resend.ts: SendEmailError(message, kind) classifies 'provider_rejected' (terminal) vs 'send_unconfirmed' (retryable); messages unchanged
+- src/lib/notification-deliveries.ts (server-only): beginDeliveryAttempt (insert-or-resume, race-safe upsert + attempts increment), markDeliverySent, markDeliveryFailed
+- outbid-notification.ts: attempt gate AFTER detection/self/unsubscribe guards and BEFORE composition - 'sent' rows return 'already_sent', 'failed_permanent' returns 'already_handled'; send outcome recorded via markDelivery*; result union extended with {reason:'send_failed', retryable, attempts} plus skip reasons 'already_sent'/'already_handled'; unexpected infrastructure errors still THROW (never faked success)
+- stripe-webhook.ts: checkout.session.completed handler now resolves its FULL response; dispatch runs for 'converted' AND 'already_paid'/'duplicate' (redelivery = retry vehicle); transport-unconfirmed failures answer 500 {error:'Outbid notification retry scheduled'}; terminal/unexpected/skips keep prior 200 semantics
+
+FAILURE SCENARIO RESOLUTIONS:
+1. Provider failure after payment commit: bid stays paid (untouched); delivery row = failed_retryable; webhook answers 500 -> Stripe redelivers -> ledger answers 'duplicate' -> delivery gate retries the email. Eventual delivery driven entirely by Stripe's existing schedule (approx. 3-day window); if Stripe gives up, the loss is visible as persistent 500s/logs - documented limitation.
+2. Webhook duplicate after email failure: duplicate payment conversion impossible (ledger PK); the SAME redelivery reaches the notification layer where failed_retryable state authorizes exactly one more attempt. Payment idempotency and notification-attempt idempotency are separate domains (ledger keys on event.id; deliveries key on bid_id).
+3. Email succeeded but HTTP response lost: redelivery hits the gate; recorded 'sent' short-circuits ('already_sent') -> NO second email ever from this path.
+4. Permanent provider rejection: recorded 'failed_permanent', webhook answers 200 - no pointless retry storm.
+5. Transient/transport failure: 'failed_retryable' + 500 -> retried on redelivery; standard at-least-once email semantics (an unconfirmed timeout may rarely double-send - documented, industry-standard tradeoff).
+Email-provider idempotency: Resend's current integration exposes NO Idempotency-Key mechanism; strict non-duplication is guaranteed by the delivery state machine for all OBSERVED outcomes, with the unconfirmed-outcome caveat above.
+
+UNSUBSCRIBE INTERACTION (6.6 preserved):
+isUnsubscribed runs on EVERY invocation BEFORE beginDeliveryAttempt - a recipient who unsubscribes between attempts stops receiving mail immediately AND no further attempts are recorded; self_outbid/no_previous_bidder guards likewise precede any send.
+
+ERROR SEMANTICS:
+- success = notified:true + provider message id persisted
+- provider failure = typed SendEmailError classified at the boundary, persisted, surfaced as send_failed (never swallowed into success)
+- webhook: 200 for success/skips/terminal/unexpected; 500 ONLY for retryable failures after committed payment
+- repeated attempts: state machine converges - sent/permanent are absorbing states
+
+PRESERVED / BOUNDARIES:
+- Payment flow untouched: verification, ledger claim+conversion RPC, anomaly semantics identical; 500-on-email-failure is SAFE here precisely because the ledger makes redeliveries harmless
+- No queues/cron/workers/polling/Redis/BullMQ; no new provider client; template purity intact (no transport metadata); trigger location unchanged (same handler, widened outcomes)
+- Two superseded 6.4-era tests updated honestly: 'never dispatches on duplicates' became 'dispatches ... so failed notifications can retry' and its already_paid sibling - the old never-dispatch rule IS the thing Task 6.7 replaces
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
-
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
+- Outbox scheduler/cron/queue infrastructure, retry budgets beyond Stripe's own, analytics, preferences, Phase 7+
 
 RESULT:
+Implementation complete. Suite: 281/281 PASSED across 14 files (+29 net). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000016_create_outbid_notification_deliveries.sql (new)
+- src/lib/notification-deliveries.ts + test (new, 14 tests)
+- src/lib/resend.ts (+SendEmailError classification) + test (classified assertions)
+- src/lib/outbid-notification.ts (attempt gating/persistence/result variants) + test (+8/updated)
+- src/lib/stripe-webhook.ts (full-response handler, widened dispatch, retry 500) + test (+8 new, 2 superseded updated)
+- docs/6.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 281/281 PASSED across 14 files
+- npm run typecheck / lint / format:check / build: all PASSED
+- Live provider/redelivery behavior: SKIPPED honestly (requires real credentials + Stripe delivery events); all boundaries hermetic
 
 KNOWN ISSUES:
+- Eventual delivery depends on Stripe's redelivery window (~3 days); permanent silence afterwards (monitoring concern, not silently accepted)
+- Unconfirmed-timeout sends may rarely double-deliver (at-least-once semantics)
+- DB outage during bookkeeping degrades to logged best-effort (conversion would equally be failing)
 
 FOLLOW-UP:
+Phase 6 complete. Next: Phase 7 — Viral Sharing (Task 7.1 Bid success page)

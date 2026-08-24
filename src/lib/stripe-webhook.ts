@@ -1,4 +1,4 @@
-import { sendOutbidNotification } from '@/lib/outbid-notification';
+import { sendOutbidNotification, type OutbidNotificationResult } from '@/lib/outbid-notification';
 import { createServiceClient } from '@/lib/supabase-service';
 import { stripe } from '@/lib/stripe';
 
@@ -363,40 +363,64 @@ async function handleChargeRefunded(
 }
 
 /**
- * Deliver the outbid notification for a converted bid (Task 6.4).
+ * Deliver (or retry) the outbid notification for a converted bid (Tasks 6.4 + 6.7).
  *
- * - Invoked ONLY after processVerifiedEvent returned 'converted': the ledger's
- *   event.id PRIMARY KEY makes redelivered events return 'duplicate' before any
- *   conversion, so this path is unreachable for replays - duplicate deliveries can
- *   never double-send and no extra notification state is required
- * - Best-effort by design: the payment transaction has already committed, and failing
- *   the request (500) could not help - Stripe would retry into the ledger's
- *   'duplicate' branch and never re-attempt conversion or notification. Failures are
- *   logged for observability; retry/failure policy remains Task 6.7
+ * - Invoked for 'converted' AND for 'already_paid'/'duplicate' completions: the ledger
+ *   keeps conversion exactly-once (redelivered events answer 'duplicate' before
+ *   touching bids), while the per-bid delivery record inside sendOutbidNotification
+ *   decides whether the EMAIL may be attempted again. Payment idempotency and
+ *   notification-attempt idempotency are independent domains.
+ * - Returns the orchestration result; transport-unconfirmed failures carry
+ *   retryable=true so the completed-event handler can answer 500 and let Stripe's own
+ *   retry schedule redeliver the event - the only "scheduler" this architecture uses.
+ * - Provider-rejected failures are terminal (the request was definitively not sent) and
+ *   unexpected infrastructure errors stay best-effort: both log and return normally so
+ *   Stripe never retries pointlessly. No failure is ever reported as a successful send.
  */
-async function deliverOutbidNotification(sessionId: string): Promise<void> {
-  try {
-    const result = await sendOutbidNotification(sessionId);
+async function deliverOutbidNotification(
+  sessionId: string
+): Promise<OutbidNotificationResult | null> {
+  let result: OutbidNotificationResult;
 
-    if (!result.notified) {
-      console.info(
-        '[stripe-webhook] outbid notification skipped',
-        JSON.stringify({ sessionId, reason: result.reason })
-      );
-    }
+  try {
+    result = await sendOutbidNotification(sessionId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
     console.warn(
-      '[stripe-webhook] outbid notification failed (best-effort; payment already confirmed)',
+      '[stripe-webhook] outbid notification failed unexpectedly (best-effort; payment already confirmed)',
       JSON.stringify({ sessionId, error: message })
     );
+
+    return null;
   }
+
+  if (!result.notified && result.reason === 'send_failed' && !result.retryable) {
+    console.warn(
+      '[stripe-webhook] outbid email permanently rejected by provider - not retrying',
+      JSON.stringify({ sessionId, attempts: result.attempts })
+    );
+
+    return result;
+  }
+
+  if (!result.notified) {
+    console.info(
+      '[stripe-webhook] outbid notification skipped',
+      JSON.stringify({ sessionId, reason: result.reason })
+    );
+  }
+
+  return result;
 }
 
+/**
+ * Full response resolution for checkout.session.completed events (Tasks 4.5-4.9,
+ * extended by Task 6.7).
+ */
 async function handleCheckoutSessionCompleted(
   event: StripeLikeEvent
-): Promise<ConversionOutcome | 'unverified'> {
+): Promise<WebhookProcessingResult> {
   // Task 4.7: the event body only identifies WHICH session to inspect - authoritative
   // payment state comes from Stripe's server-side API via verifyCheckoutSessionPaid.
   const references = extractSessionReferences(event);
@@ -414,7 +438,7 @@ async function handleCheckoutSessionCompleted(
 
     // Unverified-but-valid events are legitimate states, not endpoint failures: no
     // conversion path is taken and nothing is claimed in the ledger.
-    return 'unverified';
+    return { status: 200, body: { received: 'true' } };
   }
 
   // Tasks 4.8+4.9: claim the event in the ledger and apply the verified conversion in
@@ -427,13 +451,49 @@ async function handleCheckoutSessionCompleted(
     verification.paymentIntentId
   );
 
-  // Task 6.4: only a first-time conversion crowns a new highest bid worth notifying
-  // about; duplicates/replays return outcomes that never reach this branch.
-  if (outcome === 'converted') {
-    await deliverOutbidNotification(verification.sessionId);
+  // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
+  // Stripe retries and monitoring surfaces them.
+  if (
+    outcome === 'bid_not_found' ||
+    outcome === 'invalid_state' ||
+    outcome === 'session_mismatch'
+  ) {
+    throw new Error(`Bid conversion failed with outcome "${outcome}"`);
   }
 
-  return outcome;
+  // Task 6.7: dispatch on first-time conversion AND on redelivery outcomes - the
+  // ledger keeps payment exactly-once while the delivery record gates the email, so
+  // redelivered events are the retry vehicle for transport-unconfirmed send failures.
+  if (outcome === 'converted' || outcome === 'already_paid' || outcome === 'duplicate') {
+    const notification = await deliverOutbidNotification(verification.sessionId);
+
+    if (
+      notification !== null &&
+      !notification.notified &&
+      notification.reason === 'send_failed' &&
+      notification.retryable
+    ) {
+      console.error(
+        '[stripe-webhook] outbid email retry pending - answering 500 so Stripe redelivers',
+        JSON.stringify({
+          eventId: event.id ?? 'unknown',
+          sessionId: verification.sessionId,
+          attempts: notification.attempts,
+        })
+      );
+
+      return {
+        status: 500,
+        body: { error: 'Outbid notification retry scheduled' },
+      };
+    }
+  }
+
+  // Task 4.9: replays are surfaced in the response so monitoring can distinguish
+  // first deliveries from duplicates; Stripe treats both as success and stops retrying.
+  return outcome === 'duplicate'
+    ? { status: 200, body: { received: 'true', duplicate: 'true' } }
+    : { status: 200, body: { received: 'true' } };
 }
 
 export async function processStripeWebhook(
@@ -484,12 +544,17 @@ export async function processStripeWebhook(
   }
 
   try {
+    if (event.type === 'checkout.session.completed') {
+      // Task 6.7: completed events resolve their FULL response (including email-retry
+      // scheduling) in one place - the ledger keeps conversion exactly-once while the
+      // delivery record gates whether the email may be attempted again.
+      return await handleCheckoutSessionCompleted(event);
+    }
+
     const outcome =
-      event.type === 'checkout.session.completed'
-        ? await handleCheckoutSessionCompleted(event)
-        : event.type === 'charge.refunded'
-          ? await handleChargeRefunded(event)
-          : await handleAsyncPaymentFailed(event);
+      event.type === 'charge.refunded'
+        ? await handleChargeRefunded(event)
+        : await handleAsyncPaymentFailed(event);
 
     // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
     // Stripe retries and monitoring surfaces them.

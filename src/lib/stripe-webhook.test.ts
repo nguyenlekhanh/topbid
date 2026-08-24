@@ -714,22 +714,27 @@ describe('outbid notification dispatch (Task 6.4)', () => {
     expect(outbidMock.sendOutbidNotification).toHaveBeenCalledWith('cs_test_abc');
   });
 
-  it('never dispatches on ledger-reported duplicates (replay-safe by construction)', async () => {
+  it('dispatches on ledger-reported duplicates so failed notifications can retry', async () => {
     enqueueConversionOutcome('duplicate');
 
     const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
+    // Task 6.7 supersedes the old never-dispatch-on-duplicates rule: redelivery is the
+    // retry vehicle, while the delivery record gates whether an email actually goes
+    // out (covered by the Task 6.7 suite below).
     expect(result.status).toBe(200);
-    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+    expect(outbidMock.sendOutbidNotification).toHaveBeenCalledTimes(1);
   });
 
-  it('does not re-dispatch when the bid was already paid by an earlier delivery', async () => {
+  it('dispatches on already_paid outcomes without re-converting the bid', async () => {
     enqueueConversionOutcome('already_paid');
 
     const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
     expect(result.status).toBe(200);
-    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+    expect(outbidMock.sendOutbidNotification).toHaveBeenCalledTimes(1);
+    expect(supabaseMock.state.calls.filter((call) => call.method === 'rpc')).toHaveLength(1);
   });
 
   it('does not dispatch for unverified sessions', async () => {
@@ -823,5 +828,149 @@ describe('outbid notification dispatch (Task 6.4)', () => {
       expect.stringContaining('outbid notification skipped'),
       expect.any(String)
     );
+  });
+});
+
+describe('email failure handling (Task 6.7)', () => {
+  it('answers 500 after conversion when the send failed with an unconfirmed outcome', async () => {
+    enqueueConversionOutcome('converted');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'send_failed',
+      retryable: true,
+      attempts: 1,
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: 'Outbid notification retry scheduled' });
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('answering 500 so Stripe redelivers'),
+      expect.any(String)
+    );
+  });
+
+  it('answers 200 for terminal provider rejections so Stripe stops retrying', async () => {
+    enqueueConversionOutcome('converted');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'send_failed',
+      retryable: false,
+      attempts: 1,
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('permanently rejected'),
+      expect.any(String)
+    );
+  });
+
+  it('retries the notification on duplicate deliveries of the same event', async () => {
+    enqueueConversionOutcome('duplicate');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: true,
+      recipient: 'prev@example.com',
+      messageId: 'email-retry-1',
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    // Payment stays exactly-once (ledger duplicate), while the email gets its retry.
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+    expect(outbidMock.sendOutbidNotification).toHaveBeenCalledTimes(1);
+    expect(lastRpcCall()?.args[0]).toBe('process_checkout_completed_event');
+  });
+
+  it('keeps requesting retries while duplicate deliveries still fail retryably', async () => {
+    enqueueConversionOutcome('duplicate');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'send_failed',
+      retryable: true,
+      attempts: 2,
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: 'Outbid notification retry scheduled' });
+  });
+
+  it('never resends an already-sent delivery on duplicate deliveries', async () => {
+    enqueueConversionOutcome('duplicate');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'already_sent',
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+    expect(console.info).toHaveBeenCalledWith(
+      expect.stringContaining('outbid notification skipped'),
+      expect.any(String)
+    );
+  });
+
+  it('uses already_paid redeliveries as a retry vehicle without re-converting', async () => {
+    enqueueConversionOutcome('already_paid');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'send_failed',
+      retryable: true,
+      attempts: 2,
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(supabaseMock.state.calls.filter((call) => call.method === 'rpc')).toHaveLength(1);
+  });
+
+  it('treats unexpected notification errors as best-effort and answers 200', async () => {
+    enqueueConversionOutcome('converted');
+    outbidMock.sendOutbidNotification.mockRejectedValue(new Error('database unavailable'));
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('failed unexpectedly'),
+      expect.any(String)
+    );
+  });
+
+  it('does not dispatch notifications for payment-failure events even on duplicates', async () => {
+    stripeMock.constructEvent.mockReturnValue({
+      id: 'evt_fail_10',
+      type: 'checkout.session.async_payment_failed',
+      data: {
+        object: {
+          id: 'cs_test_abc',
+          client_reference_id: 'bid-1000',
+          metadata: { bid_id: 'bid-1000' },
+        },
+      },
+    });
+    stripeMock.retrieveSession.mockResolvedValue({
+      id: 'cs_test_abc',
+      payment_status: 'unpaid',
+      client_reference_id: 'bid-1000',
+      metadata: { bid_id: 'bid-1000' },
+    });
+    supabaseMock.state.queue.push({ data: 'failed', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
   });
 });

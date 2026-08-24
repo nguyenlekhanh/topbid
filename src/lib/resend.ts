@@ -59,6 +59,27 @@ export type SentEmail = {
 };
 
 /**
+ * Classification of the two REAL failure modes of this integration (Task 6.7):
+ * - 'provider_rejected': Resend answered and rejected the request (invalid recipient,
+ *   from address, configuration) - the email was definitively NOT sent, so failures of
+ *   this kind are terminal
+ * - 'send_unconfirmed': the transport threw before a provider answer arrived
+ *   (timeout, connection failure) - the outcome is unknown, so callers may retry while
+ *   accepting standard at-least-once email semantics
+ */
+export type SendEmailErrorKind = 'provider_rejected' | 'send_unconfirmed';
+
+export class SendEmailError extends Error {
+  readonly kind: SendEmailErrorKind;
+
+  constructor(message: string, kind: SendEmailErrorKind) {
+    super(message);
+    this.name = 'SendEmailError';
+    this.kind = kind;
+  }
+}
+
+/**
  * Send an email through Resend. Returns the provider message id on success; throws a
  * descriptive error on provider failure so callers never mistake a failed send for a
  * delivered one.
@@ -72,18 +93,36 @@ export async function sendEmail({
 }: SendEmailParams): Promise<SentEmail> {
   const { client, fromAddress } = ensureConfigured();
 
-  const { data, error } = await client.emails.send({
-    from: fromAddress,
-    to,
-    subject,
-    html,
-    ...(text ? { text } : {}),
-    ...(headers ? { headers } : {}),
-  });
+  try {
+    const { data, error } = await client.emails.send({
+      from: fromAddress,
+      to,
+      subject,
+      html,
+      ...(text ? { text } : {}),
+      ...(headers ? { headers } : {}),
+    });
 
-  if (error) {
-    throw new Error(`Failed to send email: ${error.message}`);
+    if (error) {
+      // Resend answered and rejected the request: definitively not sent.
+      throw new SendEmailError(`Failed to send email: ${error.message}`, 'provider_rejected');
+    }
+
+    if (!data) {
+      // No answer and no rejection: outcome unknown.
+      throw new SendEmailError('Failed to send email: provider returned no id', 'send_unconfirmed');
+    }
+
+    return { id: data.id };
+  } catch (cause) {
+    // Classified failures pass through untouched; any transport throw that escaped the
+    // SDK (timeout, connection failure) failed before a provider answer arrived.
+    if (cause instanceof SendEmailError) {
+      throw cause;
+    }
+
+    const message = cause instanceof Error ? cause.message : String(cause);
+
+    throw new SendEmailError(`Failed to send email: ${message}`, 'send_unconfirmed');
   }
-
-  return { id: data.id };
 }

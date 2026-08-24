@@ -4,6 +4,12 @@ import { sendOutbidNotification } from './outbid-notification';
 import { buildOutbidEmail } from './outbid-email-template';
 
 /**
+ * The mocked Resend boundary exports a stand-in SendEmailError so the orchestrator's
+ * `instanceof` classification works against the SAME constructor the tests throw.
+ */
+type ResendModule = typeof import('./resend');
+
+/**
  * Task 6.4 — deterministic tests for the notification orchestration.
  *
  * The database boundaries (bids queries) and the email provider boundary (Resend) are
@@ -26,19 +32,45 @@ const unsubscribeMock = vi.hoisted(() => ({
   listUnsubscribeHeaders: vi.fn(),
 }));
 
+const deliveriesMock = vi.hoisted(() => ({
+  beginDeliveryAttempt: vi.fn(),
+  markDeliverySent: vi.fn(),
+  markDeliveryFailed: vi.fn(),
+}));
+
 vi.mock('@/lib/bids', () => ({
   getBidByStripeSessionId: bidsMock.getBidByStripeSessionId,
   getPreviousHighestBidder: bidsMock.getPreviousHighestBidder,
 }));
 
-vi.mock('@/lib/resend', () => ({
-  sendEmail: resendMock.sendEmail,
-}));
+vi.mock('@/lib/resend', () => {
+  class SendEmailError extends Error {
+    kind: string;
+
+    constructor(message: string, kind: string) {
+      super(message);
+      this.name = 'SendEmailError';
+      this.kind = kind;
+    }
+  }
+
+  return { sendEmail: resendMock.sendEmail, SendEmailError };
+});
+
+async function getResendModule(): Promise<ResendModule> {
+  return import('@/lib/resend');
+}
 
 vi.mock('@/lib/unsubscribe', () => ({
   isUnsubscribed: unsubscribeMock.isUnsubscribed,
   buildUnsubscribeUrl: unsubscribeMock.buildUnsubscribeUrl,
   listUnsubscribeHeaders: unsubscribeMock.listUnsubscribeHeaders,
+}));
+
+vi.mock('@/lib/notification-deliveries', () => ({
+  beginDeliveryAttempt: deliveriesMock.beginDeliveryAttempt,
+  markDeliverySent: deliveriesMock.markDeliverySent,
+  markDeliveryFailed: deliveriesMock.markDeliveryFailed,
 }));
 
 const CATEGORY = { id: 'cat-1', slug: 'retro-gaming', name: 'Retro Gaming' };
@@ -87,6 +119,12 @@ beforeEach(() => {
   unsubscribeMock.buildUnsubscribeUrl.mockReturnValue(UNSUBSCRIBE_URL);
   unsubscribeMock.listUnsubscribeHeaders.mockReset();
   unsubscribeMock.listUnsubscribeHeaders.mockReturnValue(LIST_UNSUBSCRIBE_HEADERS);
+  deliveriesMock.beginDeliveryAttempt.mockReset();
+  deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'fresh', attempts: 1 });
+  deliveriesMock.markDeliverySent.mockReset();
+  deliveriesMock.markDeliverySent.mockResolvedValue(undefined);
+  deliveriesMock.markDeliveryFailed.mockReset();
+  deliveriesMock.markDeliveryFailed.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -122,6 +160,8 @@ describe('sendOutbidNotification (Task 6.4)', () => {
     expect(resendMock.sendEmail).toHaveBeenCalledTimes(1);
     expect(resendMock.sendEmail).toHaveBeenCalledWith(expectedContent);
     expect(unsubscribeMock.listUnsubscribeHeaders).toHaveBeenCalledWith(UNSUBSCRIBE_URL);
+    expect(deliveriesMock.beginDeliveryAttempt).toHaveBeenCalledWith('bid-new');
+    expect(deliveriesMock.markDeliverySent).toHaveBeenCalledWith('bid-new', 'email-123');
 
     expect(result).toEqual({
       notified: true,
@@ -178,6 +218,19 @@ describe('sendOutbidNotification (Task 6.4)', () => {
     expect(result).toEqual({ notified: false, reason: 'self_outbid' });
     expect(unsubscribeMock.isUnsubscribed).not.toHaveBeenCalled();
     expect(resendMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('checks unsubscribe suppression on retry attempts too (Task 6.7 x 6.6)', async () => {
+    deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'retry', attempts: 2 });
+    unsubscribeMock.isUnsubscribed.mockResolvedValue(true);
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({ notified: false, reason: 'recipient_unsubscribed' });
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
+    // Suppression runs BEFORE the attempt gate, so no new attempt is recorded either.
+    expect(deliveriesMock.beginDeliveryAttempt).not.toHaveBeenCalled();
+    expect(deliveriesMock.markDeliveryFailed).not.toHaveBeenCalled();
   });
 
   it('normalizes a trailing slash on the configured base URL', async () => {
@@ -273,14 +326,88 @@ describe('sendOutbidNotification (Task 6.4)', () => {
     expect(resendMock.sendEmail).not.toHaveBeenCalled();
   });
 
-  it('propagates provider failures instead of pretending delivery succeeded', async () => {
-    resendMock.sendEmail.mockRejectedValue(new Error('Failed to send email: invalid from address'));
+  it('classifies transport-unconfirmed provider failures as retryable (Task 6.7)', async () => {
+    const { SendEmailError } = await getResendModule();
 
-    await expect(sendOutbidNotification('cs_new')).rejects.toThrow(
-      'Failed to send email: invalid from address'
+    resendMock.sendEmail.mockRejectedValue(
+      new SendEmailError('Failed to send email: fetch failed', 'send_unconfirmed')
     );
 
-    expect(bidsMock.getPreviousHighestBidder).toHaveBeenCalledTimes(1);
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({
+      notified: false,
+      reason: 'send_failed',
+      retryable: true,
+      attempts: 1,
+    });
+    expect(deliveriesMock.markDeliveryFailed).toHaveBeenCalledWith(
+      'bid-new',
+      'failed_retryable',
+      'Failed to send email: fetch failed'
+    );
+    expect(deliveriesMock.markDeliverySent).not.toHaveBeenCalled();
+  });
+
+  it('classifies provider rejections as terminal (Task 6.7)', async () => {
+    const { SendEmailError } = await getResendModule();
+
+    resendMock.sendEmail.mockRejectedValue(
+      new SendEmailError('Failed to send email: invalid recipient', 'provider_rejected')
+    );
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({
+      notified: false,
+      reason: 'send_failed',
+      retryable: false,
+      attempts: 1,
+    });
+    expect(deliveriesMock.markDeliveryFailed).toHaveBeenCalledWith(
+      'bid-new',
+      'failed_permanent',
+      'Failed to send email: invalid recipient'
+    );
+  });
+
+  it('rethrows unexpected infrastructure errors instead of faking a handled send', async () => {
+    deliveriesMock.markDeliverySent.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(sendOutbidNotification('cs_new')).rejects.toThrow('database unavailable');
+  });
+
+  it('never resends when the delivery for this bid was already recorded as sent', async () => {
+    deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'sent' });
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({ notified: false, reason: 'already_sent' });
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
+    expect(deliveriesMock.markDeliverySent).not.toHaveBeenCalled();
+  });
+
+  it('stops retrying terminally failed deliveries without sending again', async () => {
+    deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'failed_permanent' });
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({ notified: false, reason: 'already_handled' });
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('retries unconfirmed failures on later attempts with incremented attempt count', async () => {
+    deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'retry', attempts: 3 });
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(result).toEqual({
+      notified: true,
+      recipient: 'champ@example.com',
+      messageId: 'email-123',
+    });
+    expect(resendMock.sendEmail).toHaveBeenCalledTimes(1);
+    expect(unsubscribeMock.isUnsubscribed).toHaveBeenCalledWith('champ@example.com');
   });
 
   it('fails loudly when the base URL needed for the CTA is not configured', async () => {

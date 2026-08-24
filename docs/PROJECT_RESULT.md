@@ -2163,6 +2163,40 @@ This file records what has actually been built, not what was planned.
   - Well-shaped unknown tokens can insert harmless rows (grants nothing)
 - **Follow-up work**: Task 6.7 — Email failure handling
 
+### Task 6.7
+
+- **Date**: 2026-08-24
+- **Objective**: Give outbid emails a real failure model — classified failures, persisted delivery state, eventual delivery via Stripe's own redelivery schedule — without coupling email to the payment transaction or inventing queue/scheduler infrastructure
+- **Status**: Completed
+- **What was implemented**:
+  - Audit first: pre-6.7, failed emails were logged-and-lost forever (webhook always 200 after conversion → Stripe never retried); no delivery state existed; duplicates could never reach notification code
+  - supabase/migrations/20260823000016: outbid_notification_deliveries — bid_id PK/FK→bids ON DELETE CASCADE (one logical notification per bid), status CHECK (pending/sent/failed_retryable/failed_permanent), attempts, provider_message_id, last_error; RLS enabled, ZERO policies (service-role only)
+  - src/lib/resend.ts: SendEmailError classifying 'provider_rejected' (definitively not sent → terminal) vs 'send_unconfirmed' (transport threw → outcome unknown → retryable) — the two REAL modes of this integration, no invented taxonomy
+  - src/lib/notification-deliveries.ts: beginDeliveryAttempt (insert-or-resume, race-safe upsert + attempts increment), markDeliverySent, markDeliveryFailed — all service-role
+  - src/lib/outbid-notification.ts: attempt gate after detection/self/unsubscribe guards and before composition ('already_sent'/'already_handled' skips); outcomes persisted; result union extended with {reason:'send_failed', retryable, attempts}; unexpected infra errors still throw (never faked success)
+  - src/lib/stripe-webhook.ts: completed-event handler resolves its full response; dispatch widened to already_paid/duplicate so redelivery becomes the retry vehicle; transport-unconfirmed failures answer 500 {error:'Outbid notification retry scheduled'} AFTER payment has safely committed — the ledger makes that redelivery harmless ('duplicate') while the delivery gate prevents duplicate emails
+- **Files changed**:
+  - supabase/migrations/20260823000016_create_outbid_notification_deliveries.sql (created)
+  - src/lib/notification-deliveries.ts + test (created, 14 tests)
+  - src/lib/resend.ts + src/lib/resend.test.ts (classification + assertions)
+  - src/lib/outbid-notification.ts + src/lib/outbid-notification.test.ts (gating/persistence + new tests)
+  - src/lib/stripe-webhook.ts + src/lib/stripe-webhook.test.ts (+8 new tests; 2 superseded never-dispatch tests updated to the new contract honestly)
+  - docs/6.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 281/281 across 14 files (+29 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Idempotency domains separated: payment = ledger PK(event.id); notification-attempt = deliveries PK(bid_id); email-delivery = state machine for observed outcomes + documented at-least-once caveat only for unconfirmed timeouts (Resend exposes no Idempotency-Key)
+  - 500-on-email-failure is SAFE precisely because Phase 4's ledger makes redeliveries payment-inert; terminal rejections and unexpected errors stay 200 with loud logs (no pointless retry storms)
+  - Unsubscribe/self-outbid guards precede every attempt including retries
+- **Known limitations**:
+  - Eventual delivery bounded by Stripe's ~3-day redelivery window; persistent failures surface as repeated 500s/logs (monitoring concern)
+  - Unconfirmed-timeout sends may rarely double-deliver (standard transactional-email semantics)
+- **Follow-up work**: Phase 6 complete — next Task 7.1 (Bid success page, Phase 7 Viral Sharing)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

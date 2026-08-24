@@ -165,7 +165,7 @@ describe('resend email integration (Task 6.2)', () => {
     expect(resendMock.send).toHaveBeenCalledWith(expect.objectContaining({ headers }));
   });
 
-  it('propagates provider failures as descriptive errors', async () => {
+  it('propagates provider rejections as classified terminal errors', async () => {
     resendMock.send.mockResolvedValue({
       data: null,
       error: { message: 'invalid from address' },
@@ -173,8 +173,38 @@ describe('resend email integration (Task 6.2)', () => {
 
     const { sendEmail } = await importResendModule();
 
-    await expect(sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' })).rejects.toThrow(
-      'Failed to send email: invalid from address'
-    );
+    const error = (await sendEmail({
+      to: 'a@b.com',
+      subject: 'S',
+      html: '<p>H</p>',
+    }).then(
+      () => null,
+      (e: unknown) => e
+    )) as Error;
+
+    // vi.resetModules() re-evaluates the module, so instanceof across instances is
+    // unreliable - assert on the documented identity instead.
+    expect(error.name).toBe('SendEmailError');
+    expect(error.message).toBe('Failed to send email: invalid from address');
+    expect((error as Error & { kind: string }).kind).toBe('provider_rejected');
+  });
+
+  it('classifies transport throws as unconfirmed so callers may retry', async () => {
+    resendMock.send.mockRejectedValue(new Error('fetch failed'));
+
+    const { sendEmail } = await importResendModule();
+
+    const error = (await sendEmail({
+      to: 'a@b.com',
+      subject: 'S',
+      html: '<p>H</p>',
+    }).then(
+      () => null,
+      (e: unknown) => e
+    )) as Error;
+
+    expect(error.name).toBe('SendEmailError');
+    expect(error.message).toBe('Failed to send email: fetch failed');
+    expect((error as Error & { kind: string }).kind).toBe('send_unconfirmed');
   });
 });

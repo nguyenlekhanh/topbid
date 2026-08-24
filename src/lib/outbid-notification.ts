@@ -1,6 +1,11 @@
 import { getBidByStripeSessionId, getPreviousHighestBidder } from '@/lib/bids';
+import {
+  beginDeliveryAttempt,
+  markDeliveryFailed,
+  markDeliverySent,
+} from '@/lib/notification-deliveries';
 import { buildOutbidEmail } from '@/lib/outbid-email-template';
-import { sendEmail } from '@/lib/resend';
+import { sendEmail, SendEmailError } from '@/lib/resend';
 import { buildUnsubscribeUrl, isUnsubscribed, listUnsubscribeHeaders } from '@/lib/unsubscribe';
 
 /**
@@ -22,19 +27,33 @@ import { buildUnsubscribeUrl, isUnsubscribed, listUnsubscribeHeaders } from '@/l
  * Server-only module: transitively imports Resend credentials and must never be
  * imported by client code.
  *
- * Deliberately out of scope (later tasks own them): retry/failure-policy flows beyond
- * propagating provider errors (Task 6.7). The bid-again CTA (Task 6.5) is built from
- * trusted server configuration only. Unsubscribe handling (Task 6.6) enforces
- * application-managed suppression server-side BEFORE composition. No queues, retries,
- * scheduling, or notification-delivery state are introduced.
+ * Failure handling (Task 6.7): every send attempt is gated and recorded through
+ * notification-deliveries state keyed by bid id - 'sent' deliveries are NEVER resent,
+ * transport-unconfirmed failures are retried when Stripe redelivers the event, and
+ * provider-rejected requests are terminal. Payment idempotency (the webhook ledger)
+ * and notification-attempt idempotency (this table) are independent domains: a
+ * redelivered event answers 'duplicate' before touching bids while the delivery row
+ * alone decides whether the email may be attempted again.
  */
 
 export type OutbidNotificationSkippedReason =
-  'new_bid_not_found' | 'no_previous_bidder' | 'self_outbid' | 'recipient_unsubscribed';
+  | 'new_bid_not_found'
+  | 'no_previous_bidder'
+  | 'self_outbid'
+  | 'recipient_unsubscribed'
+  | 'already_sent'
+  | 'already_handled';
 
 export type OutbidNotificationResult =
   | { notified: true; recipient: string; messageId: string }
-  | { notified: false; reason: OutbidNotificationSkippedReason };
+  | { notified: false; reason: OutbidNotificationSkippedReason }
+  | {
+      notified: false;
+      reason: 'send_failed';
+      /** Transport-unconfirmed failures stay retryable via Stripe redelivery. */
+      retryable: boolean;
+      attempts: number;
+    };
 
 /**
  * Build the absolute bid-again destination for the email CTA (Task 6.5).
@@ -72,8 +91,16 @@ function buildBidAgainUrl(): string {
  *     ('self_outbid', case-insensitive email comparison - bidders outbidding themselves
  *     must never be told they were outbid)
  *   - the previous top bidder has unsubscribed from outbid notifications
- *     ('recipient_unsubscribed', Task 6.6 - checked authoritatively before composition)
- * - Throws when the email provider fails (propagated verbatim from sendEmail)
+ *     ('recipient_unsubscribed', Task 6.6 - checked authoritatively before composition,
+ *     on EVERY attempt including retries)
+ *   - a delivery for this bid was already recorded as sent ('already_sent' - the core
+ *     Task 6.7 guarantee that redelivered events can never duplicate an email) or as
+ *     terminally failed/abandoned ('already_handled')
+ * - Returns {reason:'send_failed', retryable, attempts} when the provider send fails:
+ *   transport-unconfirmed failures are retryable (Stripe redelivery re-enters this
+ *   flow); provider rejections are terminal. The failure is persisted before returning
+ * - Throws only on unexpected infrastructure errors (e.g. delivery-state database
+ *   failures), never mistaking them for successful sends
  */
 export async function sendOutbidNotification(
   stripeSessionId: string
@@ -114,6 +141,22 @@ export async function sendOutbidNotification(
     return { notified: false, reason: 'recipient_unsubscribed' };
   }
 
+  // Task 6.7: gate and record the attempt BEFORE composing - a recorded 'sent' or
+  // terminally failed delivery must never send again, no matter how often the
+  // triggering webhook event is redelivered.
+  const attempt = await beginDeliveryAttempt(newBid.id);
+
+  if (attempt.status === 'sent') {
+    return { notified: false, reason: 'already_sent' };
+  }
+
+  if (attempt.status === 'failed_permanent') {
+    return { notified: false, reason: 'already_handled' };
+  }
+
+  // Captured before the send: control-flow narrowing does not survive into catch.
+  const attemptNumber = attempt.attempts;
+
   const unsubscribeUrl = buildUnsubscribeUrl(previous.bidderEmail);
 
   if (!unsubscribeUrl) {
@@ -133,10 +176,31 @@ export async function sendOutbidNotification(
 
   // Task 6.6: advertise one-click unsubscription at the transport level. Headers are
   // transport metadata, so they are attached here - never inside the pure template.
-  const sent = await sendEmail({
-    ...email,
-    headers: listUnsubscribeHeaders(unsubscribeUrl),
-  });
+  try {
+    const sent = await sendEmail({
+      ...email,
+      headers: listUnsubscribeHeaders(unsubscribeUrl),
+    });
 
-  return { notified: true, recipient: previous.bidderEmail, messageId: sent.id };
+    await markDeliverySent(newBid.id, sent.id);
+
+    return { notified: true, recipient: previous.bidderEmail, messageId: sent.id };
+  } catch (error) {
+    // Task 6.7: classify the two real provider failure modes and persist the outcome.
+    // Only SendEmailError is a classified send failure; anything else is an unexpected
+    // infrastructure error that must never be reported as a handled send result.
+    if (!(error instanceof SendEmailError)) {
+      throw error;
+    }
+
+    const retryable = error.kind === 'send_unconfirmed';
+
+    await markDeliveryFailed(
+      newBid.id,
+      retryable ? 'failed_retryable' : 'failed_permanent',
+      error.message
+    );
+
+    return { notified: false, reason: 'send_failed', retryable, attempts: attemptNumber };
+  }
 }
