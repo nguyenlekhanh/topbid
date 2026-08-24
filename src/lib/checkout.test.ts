@@ -74,6 +74,12 @@ vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: () => supabaseMock.makeFakeClient(supabaseMock.serviceState),
 }));
 
+// Task 8.7: createPendingBid now consults the fraud blocklist; checkout tests are not
+// about bans, so the lookup is mocked to "not banned" by default.
+vi.mock('@/lib/email-bans', () => ({
+  isEmailBanned: vi.fn().mockResolvedValue(false),
+}));
+
 const stripeMock = vi.hoisted(() => ({
   createSession: vi.fn(),
 }));
