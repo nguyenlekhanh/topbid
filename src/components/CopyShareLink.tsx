@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { copyToClipboard } from '@/lib/copy-to-clipboard';
+import { trackShareEvent } from '@/lib/share-tracking';
 
 /**
  * Copy-share-link button (Task 7.3).
@@ -28,6 +29,11 @@ export default function CopyShareLink({ url }: { url: string }) {
 
   async function handleClick() {
     const outcome = await copyToClipboard(url);
+
+    // Task 7.7: track only SUCCESSFUL copies - failed clipboard access is not a share.
+    if (outcome === 'copied') {
+      trackShareEvent('copy_link');
+    }
 
     setStatus(outcome);
 

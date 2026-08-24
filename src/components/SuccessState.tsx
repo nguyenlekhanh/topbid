@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import CopyShareLink from '@/components/CopyShareLink';
+import XShareLink from '@/components/XShareLink';
 
 interface SuccessStateProps {
   title?: string;
@@ -27,25 +28,6 @@ function SuccessIcon() {
       aria-hidden="true"
     >
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon() {
-  return (
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-      />
     </svg>
   );
 }
@@ -120,17 +102,7 @@ export default function SuccessState({
             View Leaderboard
           </Link>
         )}
-        {xShareUrl && (
-          <a
-            href={xShareUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-medium text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-11"
-          >
-            <ExternalLinkIcon />
-            Share on X
-          </a>
-        )}
+        {xShareUrl && <XShareLink href={xShareUrl} />}
         {copyShareUrl && <CopyShareLink url={copyShareUrl} />}
         {onClose ? (
           <button

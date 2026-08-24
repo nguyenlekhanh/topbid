@@ -1,32 +1,55 @@
 ﻿TASK ID: 7.7
 PHASE: 7
 TITLE: Share tracking
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Count explicit user share actions from the bid success page - first-party only, minimally persisted, never authoritative - completing Phase 7.
 
-SCOPE:
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "7.7 | Share tracking | 7.2" - one line. The plan's tech-stack table names PostHog as "Analytics (future)" but no such integration exists in the repository (verified by full-tree grep), so per task constraints no third-party provider was added. The smallest architecture that makes "share tracking" meaningful is first-party event persistence behind an internal endpoint.
 
-OUT OF SCOPE:
+ARCHITECTURE CHOSEN:
+First-party event persistence.
+- supabase/migrations/20260823000017 creates share_events: identity PK, event CHECK IN ('x_share','copy_link'), created_at; RLS enabled with ZERO policies (service-role inserts via the endpoint; nothing in bidding/payment/notification/page-render logic ever reads it)
+- src/lib/share-tracking.ts (client-safe): SHARE_EVENTS allow-list + isShareEvent guard + trackShareEvent() fire-and-forget POST to /api/share-events with keepalive:true; every failure mode swallowed
+- src/app/api/share-events/route.ts: POST-only; JSON body {event} validated against the allow-list; service-role insert; 400 for malformed/unknown, 500 on DB failure without leaking internals
 
-INPUTS / DEPENDENCIES:
+EVENTS AND PAYLOAD (exact):
+- 'x_share' - dispatched when the user activates Share on X (target=_blank keeps the page alive so the keepalive POST completes)
+- 'copy_link' - dispatched ONLY after a SUCCESSFUL clipboard write (failed copies are not shares)
+- Payload is exactly {event} - nothing else. Deliberate omissions per data-minimization rules: category attribution (plan does not explicitly require it), URLs, session/payment/bid identifiers, emails, unsubscribe tokens, IP/user-agent/cookies/fingerprints.
 
-IMPLEMENTATION REQUIREMENTS:
+PRIVACY / DATA MINIMIZATION:
+Rows record which kind of share happened and when - nothing else. No third-party requests, no cookies/localStorage identifiers, no behavioral profiling.
 
-FILES EXPECTED TO CHANGE:
+FAILURE BEHAVIOR:
+trackShareEvent catches network errors and ignores non-2xx responses; the X navigation proceeds regardless of tracking state and CopyShareLink feedback is computed from the clipboard outcome alone. Endpoint errors answer 400/500 and are ignored by clients.
 
-TEST PLAN:
+DUPLICATE / IDEMPOTENCY BEHAVIOR:
+Every accepted POST inserts one row - repeated user actions intentionally count as separate events. No dedup rule was invented because neither the plan nor existing code implies one; documented here explicitly.
 
-DEFINITION OF DONE:
+BOUNDARIES HELD:
+- Tracking is pure observability: nothing authoritative reads share_events
+- 7.2/7.3 behavior preserved byte-for-byte except the minimal hooks (CopyShareLink fires after a successful copy; SuccessState's inline anchor became the client component XShareLink rendering identical markup plus the onClick dispatch)
+- No PostHog/analytics SDKs, no cookies/fingerprinting/IP/device tracking, no dashboards/admin UI (Phase 8), no changes to payment/email/category-page logic
 
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- supabase/migrations/20260823000017_create_share_events.sql (new)
+- src/lib/share-tracking.ts + test (new, 11 tests)
+- src/app/api/share-events/route.ts + route.test.ts (new, 8 tests)
+- src/components/XShareLink.tsx (new client anchor w/ dispatch)
+- src/components/CopyShareLink.tsx (+successful-copy dispatch)
+- src/components/SuccessState.tsx (inline anchor -> XShareLink component)
+- docs/7.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 391/391 PASSED across 23 files (+27 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/api/share-events registered dynamic)
 
 KNOWN ISSUES:
+- Client-side dispatch can be blocked (ad blockers); counts are directional, not exhaustive
+- No dashboard exists yet; Phase 8 admin scope
 
 FOLLOW-UP:
+Phase 7 complete. Next: Phase 8 - Admin (Task 8.1 Admin authentication)

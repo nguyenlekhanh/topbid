@@ -2371,4 +2371,38 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+### Task 7.7
+
+- **Date**: 2026-08-24
+- **Objective**: Count explicit user share actions (Share on X clicks, successful Copy-link writes) with first-party persistence - never authoritative, minimally persisted, no third-party provider
+- **Status**: Completed
+- **Audit finding**: no analytics infrastructure existed anywhere in the repository (PostHog appears only as an unrealized "future" tech-stack note), so the smallest meaningful architecture was first-party event persistence behind an internal endpoint
+- **What was implemented**:
+  - supabase/migrations/20260823000017: share_events (identity PK, event CHECK IN ('x_share','copy_link'), created_at; RLS enabled with ZERO policies - service-role inserts only)
+  - src/lib/share-tracking.ts (client-safe): SHARE_EVENTS allow-list + isShareEvent guard + trackShareEvent() fire-and-forget keepalive POST that swallows every failure mode
+  - src/app/api/share-events/route.ts: POST-only ingestion validating {event} against the allow-list; 400 malformed/unknown, 500 on DB failure without leaking internals
+  - src/components/XShareLink.tsx ('use client'): the 7.2 anchor extracted into a component dispatching x_share on user activation
+  - src/components/CopyShareLink.tsx: dispatches copy_link only after SUCCESSFUL clipboard writes
+- **Files changed**:
+  - supabase/migrations/20260823000017_create_share_events.sql (created)
+  - src/lib/share-tracking.ts + test (created, 11 tests)
+  - src/app/api/share-events/route.ts + route.test.ts (created, 8 tests)
+  - src/components/XShareLink.tsx (created), src/components/SuccessState.tsx (inline anchor -> XShareLink)
+  - src/components/CopyShareLink.tsx (+successful-copy dispatch)
+  - docs/7.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 391/391 across 23 files (+27 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/api/share-events registered dynamic)
+- **Important technical decisions**:
+  - Payload is event-name-only by design: category attribution omitted (plan does not explicitly require it); URLs/identifiers excluded wholesale
+  - Every accepted POST inserts one row - repeated actions intentionally count separately; no dedup rule invented
+  - Tracking failure can never affect share/copy UX or any authoritative flow; nothing reads share_events
+- **Known limitations**: client-side dispatch can be blocked by ad blockers (counts directional); no dashboard yet (Phase 8 scope)
+- **Follow-up work**: Phase 7 complete - next Phase 8 (Task 8.1 Admin authentication)
+
+---
+
 _This file will be updated after each completed task with actual implementation details._
