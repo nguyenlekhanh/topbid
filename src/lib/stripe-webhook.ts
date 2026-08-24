@@ -106,6 +106,8 @@ export type ConversionOutcome =
   | 'converted'
   | 'already_paid'
   | 'duplicate'
+  | 'failed'
+  | 'already_failed'
   | 'bid_not_found'
   | 'invalid_state'
   | 'session_mismatch';
@@ -114,6 +116,8 @@ const KNOWN_CONVERSION_OUTCOMES: readonly ConversionOutcome[] = [
   'converted',
   'already_paid',
   'duplicate',
+  'failed',
+  'already_failed',
   'bid_not_found',
   'invalid_state',
   'session_mismatch',
@@ -159,13 +163,52 @@ async function processVerifiedEvent(
 }
 
 /**
+ * Apply the verified failure transition at the database boundary (Task 4.10).
+ * - Delegates to the fail_pending_bid RPC: ledger claim + state transition in one
+ *   transaction; duplicate claims and already-settled bids return success/no-op
+ *   outcomes; anomalies raise inside the RPC, rolling back the claim so the event stays
+ *   retryable
+ * - RPC errors throw so the endpoint responds 500 and Stripe retries
+ */
+async function failVerifiedBid(
+  eventId: string,
+  eventType: string,
+  bidId: string,
+  sessionId: string
+): Promise<ConversionOutcome> {
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase.rpc('fail_pending_bid', {
+    p_event_id: eventId,
+    p_event_type: eventType,
+    p_bid_id: bidId,
+    p_stripe_session_id: sessionId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to process payment-failure event: ${error.message}`);
+  }
+
+  const outcome = data as ConversionOutcome;
+
+  if (!KNOWN_CONVERSION_OUTCOMES.includes(outcome)) {
+    throw new Error(`Failed to process payment-failure event: unknown outcome "${String(data)}"`);
+  }
+
+  return outcome;
+}
+
+/**
  * Replay-protection window for signature timestamps, in seconds.
  * This is Stripe's default tolerance, made explicit so review and tests can pin it;
  * events with older timestamps fail verification.
  */
 export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
 
-const SUPPORTED_EVENT_TYPES = new Set(['checkout.session.completed']);
+const SUPPORTED_EVENT_TYPES = new Set([
+  'checkout.session.completed',
+  'checkout.session.async_payment_failed',
+]);
 
 type StripeLikeEvent = {
   id?: string;
@@ -191,6 +234,47 @@ function extractSessionReferences(event: StripeLikeEvent): {
     clientReferenceId: object.client_reference_id ?? null,
     bidId: object.metadata?.bid_id ?? null,
   };
+}
+
+async function handleAsyncPaymentFailed(
+  event: StripeLikeEvent
+): Promise<ConversionOutcome | 'unverified'> {
+  // Task 4.10: authoritative check before mutating - a session Stripe reports as paid
+  // must never be failed, regardless of what the event claims.
+  const references = extractSessionReferences(event);
+  const sessionId = references.sessionId;
+
+  let paymentStatus: string | null | undefined;
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    paymentStatus = session.payment_status;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    throw new Error(`Failed to retrieve Checkout Session "${sessionId}": ${message}`);
+  }
+
+  if (paymentStatus === 'paid') {
+    console.warn(
+      '[stripe-webhook] async_payment_failed ignored - session is authoritatively paid',
+      JSON.stringify({ eventId: event.id ?? 'unknown', sessionId })
+    );
+
+    return 'already_paid';
+  }
+
+  if (!references.bidId) {
+    console.warn(
+      '[stripe-webhook] async_payment_failed without bid reference - nothing to fail',
+      JSON.stringify({ eventId: event.id ?? 'unknown', sessionId })
+    );
+
+    return 'unverified';
+  }
+
+  return failVerifiedBid(event.id ?? 'unknown', event.type!, references.bidId, sessionId);
 }
 
 async function handleCheckoutSessionCompleted(
@@ -275,7 +359,10 @@ export async function processStripeWebhook(
   }
 
   try {
-    const outcome = await handleCheckoutSessionCompleted(event);
+    const outcome =
+      event.type === 'checkout.session.completed'
+        ? await handleCheckoutSessionCompleted(event)
+        : await handleAsyncPaymentFailed(event);
 
     // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
     // Stripe retries and monitoring surfaces them.

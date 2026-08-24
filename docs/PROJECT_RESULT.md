@@ -1641,6 +1641,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live concurrency verification deferred to a real database environment)
 - **Follow-up work**: Task 4.10 — Payment failure handling
 
+### Task 4.10
+
+- **Date**: 2026-08-23
+- **Objective**: Handle authoritative payment failures — transition the linked pending bid to the schema-defined 'failed' status when Stripe reports the payment attempt failed
+- **Status**: Completed
+- **Requirement derivation**: plan gives only "Payment failure handling | 4.8"; schema already defines 'failed' (2.2/2.4) but nothing could set it. Smallest faithful implementation: handle checkout.session.async_payment_failed; session-expiry handling deliberately excluded (abandonment ≠ payment failure; documented follow-up)
+- **What was implemented**:
+  - Migration 20260823000012_fail_pending_bid_function.sql: fail_pending_bid(p_event_id, p_event_type, p_bid_id, p_stripe_session_id) returns text — ledger claim + state transition in ONE transaction (Task 4.9 pattern: unique_violation -> 'duplicate'; anomalies raise -> claim and effect roll back -> event retryable)
+  - Guards: bid_not_found raise; 'already_paid' no-op NEVER downgrades a paid bid; 'already_failed' no-op for repeats; invalid_state/session_mismatch raises; NULL session completes the Task 4.2 crash window
+  - src/lib/stripe-webhook.ts: async_payment_failed added to supported types; handleAsyncPaymentFailed retrieves the session authoritatively FIRST (a session Stripe reports paid is never failed), then failVerifiedBid applies the RPC via service-role client; ConversionOutcome gains 'failed'/'already_failed'
+- **Files changed**:
+  - supabase/migrations/20260823000012_fail_pending_bid_function.sql (new)
+  - src/lib/stripe-webhook.ts (failure routing/handler/wrapper + outcome extensions)
+  - src/lib/stripe-webhook.test.ts (+7 tests in new Task 4.10 describe)
+  - docs/4.10.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated; also restored missing 4.9 checklist line + stale Next Recommended section from previous turn)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 96/96 PASSED across 4 files (43 bids + 8 checkout + 37 webhook + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (CRLF normalization via lint:fix after PowerShell append)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL inspection: PASSED (claim/effect single transaction, never-downgrade guard, outcome set, grant signature match)
+  - Live Stripe async-failure delivery: SKIPPED — requires live keys/async payment methods; NOT faked
+- **Important technical decisions**:
+  - Test setup lesson captured: completed-flow retrieve mock defaults to 'paid', failure-flow tests must override to 'unpaid' — mirroring the real authoritative states each event carries
+  - Contradictory notices (async-failure for an authoritatively paid session) answered as success no-ops with zero mutation instead of errors
+  - Expiry cleanup of abandoned pendings documented as candidate follow-up (out of "payment failure" scope)
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.11 — Refund handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

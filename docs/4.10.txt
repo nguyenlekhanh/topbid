@@ -1,32 +1,77 @@
 ﻿TASK ID: 4.10
 PHASE: 4
 TITLE: Payment failure handling
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+When Stripe authoritatively reports a payment attempt failed (checkout.session.async_payment_failed), transition the linked PENDING bid to the schema-defined 'failed' status - freeing its reservation slot - using the same claim+effect idempotency and DB-boundary patterns as Tasks 4.8/4.9.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies only "4.10 | Payment failure handling | 4.8". The schema already defines the 'failed' status (migration 2.2, CHECK-constrained in 2.4) but nothing could ever set it. The smallest plan-faithful implementation is therefore: handle Stripe's Checkout payment-failure event and mark only the linked pending bid 'failed'. Session-expiry handling was deliberately NOT added (abandonment is not a payment failure; documented as possible follow-up).
 
 SCOPE:
+- New migration supabase/migrations/20260823000012_fail_pending_bid_function.sql - fail_pending_bid(p_event_id, p_event_type, p_bid_id, p_stripe_session_id) returns text
+  * Ledger claim + state transition in ONE transaction (Task 4.9 pattern): unique_violation -> 'duplicate'; anomalies raise -> BOTH effect and claim roll back -> event retryable
+  * Row-locked SELECT ... FOR UPDATE; guards: bid_not_found raise; status='paid' -> 'already_paid' no-op (never downgrade reality); status='failed' -> 'already_failed' no-op; other non-pending -> invalid_state raise; session mismatch -> session_mismatch raise; NULL session completes the Task 4.2 crash window
+  * SECURITY DEFINER + pinned search_path; EXECUTE service_role only
+- src/lib/stripe-webhook.ts:
+  * SUPPORTED_EVENT_TYPES gains checkout.session.async_payment_failed
+  * New handleAsyncPaymentFailed: authoritative retrieval FIRST (4.7 discipline) - if Stripe says the session is actually paid, the failure notice is contradictory and ignored as a no-op with zero mutation; missing bid reference -> warn + acknowledge without claiming
+  * failVerifiedBid invokes the new RPC via the existing service-role client; ConversionOutcome extended with 'failed'/'already_failed'; dispatcher routes by event type
+
+PRESERVED:
+- Task 4.6 raw-body signature verification (unchanged path; real-crypto suite green)
+- Task 4.7 authoritative verification for completed events (byte-for-byte)
+- Task 4.8 atomic conversion semantics (untouched)
+- Task 4.9 ledger/retry behavior (failure events now share it)
+- RLS/security boundaries; secrets server-only; no new dependencies
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Refund handling (Task 4.11), session-expiry cleanup of abandoned pendings, outbid notifications (Phase 6), UI changes (none required by the plan)
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000012_fail_pending_bid_function.sql (new)
+- src/lib/stripe-webhook.ts
+- src/lib/stripe-webhook.test.ts (+7 tests)
+- docs/4.10.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new suite + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static SQL inspection: claim/effect transaction, never-downgrade guard, outcome set, grant signature match
 
 DEFINITION OF DONE:
+- Authoritative payment failures transition only the linked pending bid to 'failed', idempotently and race-safely; successful flows unchanged; all repo checks green
 
 IMPLEMENTATION NOTES:
+Test development caught one setup gap: the shared retrieve mock defaults to payment_status 'paid' (completed-flow), so failure-path tests must override it to 'unpaid' - exactly the authoritative states each event type carries. The 'never fails an authoritatively paid session' test now sets that override explicitly. PowerShell Add-Content introduced CRLF endings in the appended test block - normalized by lint:fix. Static inspection confirmed: claim/effect single-transaction with rollback-on-anomaly, never-downgrade guard, outcome set validation, grant signature match.
 
 RESULT:
+Implementation complete. Suite: 96/96 PASSED across 4 files (43 bids + 8 checkout + 37 webhook + 8 real-crypto signature). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000012_fail_pending_bid_function.sql (new)
+- src/lib/stripe-webhook.ts (failure routing/handler/RPC wrapper + outcome extensions)
+- src/lib/stripe-webhook.test.ts (+7 tests in new Task 4.10 describe)
+- docs/4.10.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 96/96 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Stripe async-failure delivery: SKIPPED - requires live keys/async payment methods; NOT faked. Static inspection plus mocked-boundary tests stand in until Task 4.12.
 
 KNOWN ISSUES:
+- None within scope. Abandoned (expired-session) pendings still hold reservation slots - expiry handling was judged outside "payment failure" scope; documented as candidate follow-up.
 
 FOLLOW-UP:
+Task 4.11 - Refund handling

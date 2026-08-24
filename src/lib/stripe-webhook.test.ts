@@ -455,3 +455,119 @@ describe('bid conversion & idempotent processing (Tasks 4.8+4.9)', () => {
     expect(result.body).toEqual({ error: 'Webhook processing failed' });
   });
 });
+
+describe('payment failure handling (Task 4.10)', () => {
+  const FAILED_EVENT = {
+    id: 'evt_fail_1',
+    type: 'checkout.session.async_payment_failed',
+    data: {
+      object: {
+        id: 'cs_test_abc',
+        client_reference_id: 'bid-1000',
+        metadata: { bid_id: 'bid-1000' },
+      },
+    },
+  };
+
+  function enqueueFailedEvent() {
+    stripeMock.constructEvent.mockReturnValue(FAILED_EVENT);
+    // A failing async payment is authoritatively NOT paid - the default 'paid' mock
+    // belongs to the completed-event flow.
+    stripeMock.retrieveSession.mockResolvedValue({
+      id: 'cs_test_abc',
+      payment_status: 'unpaid',
+      client_reference_id: 'bid-1000',
+      metadata: { bid_id: 'bid-1000' },
+    });
+  }
+
+  it('marks the linked pending bid failed via the RPC with authoritative values', async () => {
+    enqueueFailedEvent();
+    supabaseMock.state.queue.push({ data: 'failed', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(stripeMock.retrieveSession).toHaveBeenCalledWith('cs_test_abc');
+    expect(lastRpcCall()?.args[0]).toBe('fail_pending_bid');
+    expect(lastRpcCall()?.args[1]).toEqual({
+      p_event_id: 'evt_fail_1',
+      p_event_type: 'checkout.session.async_payment_failed',
+      p_bid_id: 'bid-1000',
+      p_stripe_session_id: 'cs_test_abc',
+    });
+  });
+
+  it('never fails a bid whose session is authoritatively paid', async () => {
+    enqueueFailedEvent();
+    stripeMock.retrieveSession.mockResolvedValue({
+      id: 'cs_test_abc',
+      payment_status: 'paid',
+      client_reference_id: 'bid-1000',
+      metadata: { bid_id: 'bid-1000' },
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+
+  it('acknowledges ledger-reported duplicates for failure events', async () => {
+    enqueueFailedEvent();
+    supabaseMock.state.queue.push({ data: 'duplicate', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+  });
+
+  it('treats repeated failure events of the same session as success without re-failing', async () => {
+    enqueueFailedEvent();
+    supabaseMock.state.queue.push({ data: 'already_failed', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+  });
+
+  it('returns 500 when failing the bid reports an anomaly so Stripe retries', async () => {
+    enqueueFailedEvent();
+    supabaseMock.state.queue.push({ data: 'bid_not_found', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: 'Webhook processing failed' });
+  });
+
+  it('returns 500 when session retrieval fails on the failure path', async () => {
+    enqueueFailedEvent();
+    stripeMock.retrieveSession.mockRejectedValue(new Error('stripe unavailable'));
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+
+  it('acknowledges failure events without any bid reference and no mutation', async () => {
+    enqueueFailedEvent();
+    stripeMock.constructEvent.mockReturnValue({
+      ...FAILED_EVENT,
+      data: { object: { id: 'cs_test_abc', client_reference_id: null, metadata: null } },
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('without bid reference'),
+      expect.any(String)
+    );
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+});
