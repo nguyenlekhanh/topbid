@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.3 completed** — Next recommended: 4.4
+**4.4 completed** — Next recommended: 4.5
 
 ## Completed Tasks
 
@@ -123,6 +123,7 @@ _None_
 - Stripe Checkout session creation created (src/lib/checkout.ts: composes createPendingBid + Task 0.6 stripe client, payment-mode session priced at the validated integer-cent amount with DB-sourced product name, env-derived placeholder success/cancel URLs, union contract mirroring 3.5; metadata/session-id linkage deferred to 4.2)
 - Category/bid metadata linkage created (checkout sessions carry client_reference_id = bid id + metadata {bid_id, category_id}; migration 20260823000009 adds attach_stripe_session RPC persisting stripe_session_id onto pending bids with attach-once guard and race-safe duplicate surfacing; EXECUTE restricted to service_role)
 - Success page created (src/app/success/page.tsx: dynamic server-rendered /success route, authoritative getBidByStripeSessionId lookup via anon client under RLS, confirmed vs awaiting-confirmation states, no Stripe API calls, never marks bids paid; checkout success_url now carries the CHECKOUT_SESSION_ID template)
+- Cancel page created (src/app/cancel/page.tsx: static /cancel route with neutral informational card, honest no-payment-taken copy, zero data access; matches the checkout cancel_url from Task 4.1)
 
 ## Current Environment/Setup Status
 
@@ -140,7 +141,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.4 — Cancel page**
+**4.5 — Stripe webhook endpoint**
 
 ## Notes
 
@@ -175,3 +176,5 @@ Task 4.1 completed successfully. createCheckoutSession added in src/lib/checkout
 Task 4.2 completed successfully. Checkout sessions now carry client_reference_id = bid id plus metadata {bid_id, category_id}, and migration 20260823000009 adds attach_stripe_session (attach-once, race-safe, service_role-only) persisting stripe_session_id onto the bid row; 46/46 tests passing.
 
 Task 4.3 completed successfully. /success page added as a dynamic server-rendered route: authoritative lookup by session id through the anon client under RLS; renders confirmed bid details when visible or an honest awaiting-confirmation state otherwise; never verifies payments or marks bids paid; checkout success_url now includes the CHECKOUT_SESSION_ID template; 51/51 tests passing.
+
+Task 4.4 completed successfully. /cancel page added as a static prerendered route: neutral informational card stating no payment was taken, with Browse categories / View Leaderboard CTAs matching existing design conventions; zero data access and no changes to any completed task.

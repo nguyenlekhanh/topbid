@@ -1,32 +1,67 @@
 ﻿TASK ID: 4.4
 PHASE: 4
 TITLE: Cancel page
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add the /cancel route shown when a bidder closes Stripe Checkout without paying. Purely informational/UI-only: no data access, no state changes, no payment logic.
 
 SCOPE:
+- New src/app/cancel/page.tsx - static server component (no searchParams, no client interactivity)
+- Neutral informational card reusing existing design tokens/structure (muted styling, motion-safe scaleIn, role=status aria-live=polite, min-h-11 touch-target links) rather than misusing SuccessState (success semantics) or ErrorState (destructive/alert semantics)
+- Copy states plainly: checkout was closed before completing the bid; NO payment was taken; user can retry anytime
+- CTAs follow existing conventions: primary Browse categories (/), secondary View Leaderboard (/#leaderboard-heading)
 
 OUT OF SCOPE:
+- Webhook endpoint/signature verification/payment confirmation (Tasks 4.5+), refunds, retry-into-checkout deep links, new components added to the shared library without a second consumer
 
-INPUTS / DEPENDENCIES:
+PRESERVED / VERIFIED:
+- Checkout cancel_url already targets buildAppUrl('/cancel') since Task 4.1 - unchanged, no compatibility fix needed
+- No completed-task files modified at all this task
+- No secrets or service-role usage (page performs zero data access)
 
-IMPLEMENTATION REQUIREMENTS:
+TESTS DECISION:
+No unit tests added - the page contains zero logic (pure static markup); project test conventions target src/lib business logic. Regression suite still run in full (51/51).
 
 FILES EXPECTED TO CHANGE:
+- src/app/cancel/page.tsx (new)
+- docs/4.4.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build (verifies /cancel registers as static prerendered route)
+6. Static inspection: UI-only, honest copy, token reuse
 
 DEFINITION OF DONE:
+- /cancel renders an honest neutral cancellation result consistent with the design system; all repo checks green; nothing else touched
 
 IMPLEMENTATION NOTES:
+Chose a page-local neutral card over reusing SuccessState/ErrorState because both carry mismatched semantics (green success vs destructive alert) and modifying completed Phase 1 components was not justified for a single consumer. Four Prettier formatting auto-fixes applied via lint:fix during development. Build output confirms /cancel as Static (prerendered) alongside dynamic /success.
 
 RESULT:
+Implementation complete. Suite: 51/51 PASSED (unchanged). typecheck/lint/format:check/build all PASSED. Static inspection confirmed: UI-only, no data access, no state transitions, design-token consistency.
 
 FILES ACTUALLY CHANGED:
+- src/app/cancel/page.tsx (new)
+- docs/4.4.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 51/51 PASSED (regression)
+- npm run typecheck: PASSED
+- npm run lint: PASSED (formatting auto-fixed during development)
+- npm run format:check: PASSED
+- npm run build: PASSED (/cancel registered as static route)
+- Live Stripe verification of redirect behavior: SKIPPED - requires live keys; NOT faked
 
 KNOWN ISSUES:
+- None
 
 FOLLOW-UP:
+Task 4.5 - Stripe webhook endpoint

@@ -1453,6 +1453,34 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Until Tasks 4.5+ add the webhook, real checkouts would show the awaiting state indefinitely in production — expected at this stage of the plan
 - **Follow-up work**: Task 4.4 — Cancel page
 
+### Task 4.4
+
+- **Date**: 2026-08-23
+- **Objective**: Add the /cancel route shown when a bidder closes Stripe Checkout without paying — purely informational/UI-only
+- **Status**: Completed
+- **What was implemented**:
+  - src/app/cancel/page.tsx: static server component (prerendered, confirmed by build) with a neutral informational card — muted styling, motion-safe scaleIn icon, role=status/aria-live=polite, min-h-11 touch-target links
+  - Honest copy: checkout closed before completing the bid; NO payment taken; retry anytime
+  - CTAs per existing conventions: Browse categories (/) primary, View Leaderboard (/#leaderboard-heading) secondary
+  - Zero data access, no secrets/service-role usage, no state transitions invented
+- **Files changed**:
+  - src/app/cancel/page.tsx (new — only production file touched)
+  - docs/4.4.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 51/51 PASSED (regression; no new unit tests justified — pure static markup with zero logic, documented decision)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (four Prettier formatting auto-fixes during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/cancel registered as static prerendered route)
+  - Live Stripe redirect verification: SKIPPED — requires live keys; NOT faked
+- **Important technical decisions**:
+  - Page-local neutral card instead of reusing SuccessState (green success semantics) or ErrorState (destructive alert semantics) — both mismatched for a cancellation; modifying completed Phase 1 components was not justified for a single consumer
+  - No compatibility change needed: checkout cancel_url already targeted /cancel since Task 4.1
+- **Known limitations**: None
+- **Follow-up work**: Task 4.5 — Stripe webhook endpoint
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
