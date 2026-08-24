@@ -1,32 +1,71 @@
 ﻿TASK ID: 5.5
 PHASE: 5
 TITLE: Rank change animation
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add purely visual rank-movement animation to the live leaderboard: when the authoritative ranking changes between refreshes, rows visually indicate movement direction (up/down/new) while ordering, rank numbers, and #1 styling remain exactly as produced by the authoritative query.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "5.5 | Rank change animation | 5.4". Animation is visual only and must never affect ranking correctness or payment/state logic.
 
 SCOPE:
+- src/lib/rank-changes.ts (new) - detectRankChanges(previous, current): Map<id, RankDirection>; pure deterministic comparison by bid id: 'new' (not previously visible), 'up' (better/lower rank number), 'down', 'same'
+- src/components/Leaderboard.tsx - derives rankChanges via useMemo from the committed ranked rows using a previous-ranked ref updated post-commit (useEffect); applies motion-safe animation classes to <tr> elements: up -> slideDown (settles from above), down/new -> fadeInUp (settles from below); same -> none
+- Reuses existing keyframes from globals.css (slideDown/fadeInUp) and existing motion-safe:/motion-reduce conventions plus the global prefers-reduced-motion override - no new CSS keyframes or dependencies
+
+PRESERVED / BOUNDARIES:
+- Task 5.3 data flow unchanged: realtime events remain signals; entries always come from getLeaderboardEntries (RLS paid-only via anon client)
+- Ranking/order/rank numbers/#1 styling identical to Task 5.3 output
+- No setState-in-effect violations: detection derived during render via useMemo over state; ref written only in a post-commit effect
+- Tasks 1.1-5.4 otherwise untouched; no Stripe/payment/webhook/RLS/RPC/schema changes; no new dependencies
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- New #1 celebration (Task 5.6), reconnection UX (5.7), recent-bids animations, server-side changes, React testing infrastructure
 
 FILES EXPECTED TO CHANGE:
+- src/lib/rank-changes.ts (new)
+- src/lib/rank-changes.test.ts (new)
+- src/components/Leaderboard.tsx
+- docs/5.5.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (6 new pure-detection tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: detection purity, motion-safe/reduced-motion coverage, no ranking side effects
 
 DEFINITION OF DONE:
+- Deterministic rank-change labels drive visual-only animations on the live leaderboard; reduced-motion respected; all repo checks green
 
 IMPLEMENTATION NOTES:
+detectRankChanges compares by id against a Map of previous ranks: absent -> 'new'; equal -> 'same'; lower number -> 'up'; higher -> 'down'. Rows that drop off the visible board produce no entry (nothing to animate). Component wiring avoids reading refs during render (react-hooks/refs rule) and avoids setState directly inside effects (set-state-in-effect rule): detection runs during render via useMemo while the previous-ranking ref updates in a post-commit useEffect. Initial load animates all rows as 'new' - consistent with Phase 1 motion conventions.
 
 RESULT:
+Implementation complete. Suite: 135/135 PASSED across 9 files (+6 rank-changes tests). typecheck/lint/format:check/build all PASSED. Static inspection confirmed visual-only behavior, reduced-motion respect, and unchanged ranking semantics.
 
 FILES ACTUALLY CHANGED:
+- src/lib/rank-changes.ts (new)
+- src/lib/rank-changes.test.ts (new)
+- src/components/Leaderboard.tsx (animation wiring only; data flow unchanged)
+- docs/5.5.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 135/135 PASSED across 9 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Supabase Realtime delivery: SKIPPED - environment limitation carried from Task 5.1; NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 5.6 - New #1 state celebration

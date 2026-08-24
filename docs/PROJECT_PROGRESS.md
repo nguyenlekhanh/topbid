@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**5.4 completed** — Next recommended: 5.5
+**5.5 completed** — Next recommended: 5.6
 
 ## Completed Tasks
 
@@ -69,6 +69,7 @@
 - 5.2: Update highest bid display ✓
 - 5.3: Update leaderboard rankings ✓
 - 5.4: Recent bid updates ✓
+- 5.5: Rank change animation ✓
 
 ## Tasks in Progress
 
@@ -149,6 +150,7 @@ _None_
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 - Highest-bid display updated live (src/lib/bids-client.ts browser anon queries, src/lib/highest-bid-tracker.ts signal-driven authoritative refetch with burst coalescing and change-only notifications, src/components/HighestBidDisplay.tsx wired into CategoryCards cards replacing static Current Bid values)
 - Recent bid updates made live (getRecentBidEntries browser query, src/lib/recent-bids-tracker.ts with the same initial-load/coalesced-refetch/snapshot-change pattern, RecentBids.tsx converted to a live client component with loading/empty/error/retry states replacing the static mock feed)
+- Rank change animation added (src/lib/rank-changes.ts pure up/down/new/same detection by bid id; Leaderboard rows apply motion-safe slideDown/fadeInUp classes per direction with reduced-motion respected - purely visual, ordering untouched)
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
 ## Current Environment/Setup Status
@@ -167,7 +169,7 @@ _None_
 
 ## Next Recommended Task
 
-**5.5 — Rank change animation**
+**5.6 — New #1 state celebration**
 
 ## Notes
 
@@ -228,5 +230,7 @@ Task 5.2 completed successfully. Highest-bid display made live: bids-client.ts p
 Task 5.3 completed successfully. Leaderboard rankings made live: getLeaderboardEntries browser query added to bids-client.ts, leaderboard-tracker.ts performs the initial authoritative load plus coalesced signal-driven refetches, and Leaderboard.tsx now renders live rankings (loading/empty/error states, rank badges preserved); 122/122 tests passing.
 
 Task 5.4 completed successfully. Recent Bids feed made live: getRecentBidEntries browser query added to bids-client.ts and recent-bids-tracker.ts applies the same initial-load/coalesced-refetch/snapshot-change pattern; RecentBids.tsx converted to a live client component with loading/empty/error/retry states preserving the Phase 1 visual structure; 129/129 tests passing.
+
+Task 5.5 completed successfully. Rank change animation added: src/lib/rank-changes.ts provides pure per-bid up/down/new/same detection against the previously committed ranking, and Leaderboard rows apply motion-safe slideDown/fadeInUp classes by direction - purely visual, ordering and #1 styling untouched; 135/135 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

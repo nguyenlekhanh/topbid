@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { EmptyLeaderboard } from '@/components/EmptyState';
 import { LeaderboardError } from '@/components/ErrorState';
 import { getLeaderboardEntries, type LeaderboardEntryData } from '@/lib/bids-client';
 import { createLeaderboardTracker } from '@/lib/leaderboard-tracker';
+import { detectRankChanges, type RankDirection } from '@/lib/rank-changes';
 import { subscribeToBidChanges } from '@/lib/realtime';
+
+type LeaderboardRow = LeaderboardEntryData & { rank: number };
 
 function formatCurrency(cents: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -21,7 +24,7 @@ function getTimeAgo(createdAt: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000));
 
   if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 3600)} hours ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
 
   return `${Math.floor(seconds / 86400)} days ago`;
@@ -35,44 +38,58 @@ function getRankBadge(rank: number) {
   return 'bg-muted text-muted-foreground';
 }
 
+function getRankChangeClass(change: RankDirection | undefined): string {
+  // Task 5.5: purely visual movement cues - up-movers settle from above, down/new rows
+  // fade in from below. motion-safe prefixes plus the global reduced-motion override
+  // keep animations off for users who prefer reduced motion.
+  if (change === 'up') return 'motion-safe:animate-[slideDown_450ms_ease-out]';
+  if (change === 'down' || change === 'new') return 'motion-safe:animate-[fadeInUp_450ms_ease-out]';
+  return '';
+}
+
 export default function Leaderboard() {
-  const [entries, setEntries] = useState<LeaderboardEntryData[] | null>(null);
+  const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [rankChanges, setRankChanges] = useState<Map<string, RankDirection>>(new Map());
+
+  // Previous committed ranking, used solely inside callbacks/effects (never during render)
+  // to compute Task 5.5 movement directions.
+  const previousRowsRef = useRef<LeaderboardRow[] | null>(null);
+
+  const applyRows = useCallback((updated: LeaderboardEntryData[]) => {
+    const next = updated.map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+    setRankChanges(detectRankChanges(previousRowsRef.current, next));
+    previousRowsRef.current = next;
+    setRows(next);
+    setLoadFailed(false);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
       const fetched = await getLeaderboardEntries();
 
-      setEntries(fetched);
-      setLoadFailed(false);
+      applyRows(fetched);
     } catch (error) {
       console.error('[leaderboard] failed to load leaderboard', error);
       setLoadFailed(true);
     }
-  }, []);
+  }, [applyRows]);
 
   useEffect(() => {
-    // Task 5.3: realtime events are signals only - the tracker performs the initial
+    // Task 5.3 + 5.5: realtime events are signals only - the tracker performs the initial
     // authoritative load and re-fetches on every change (RLS paid-only via anon client),
-    // notifying this component through its callback.
+    // notifying this component through its callback. Rank-change detection runs inside
+    // that callback against the previously committed ranking.
     return createLeaderboardTracker({
       subscribe: subscribeToBidChanges,
       fetchLeaderboard: getLeaderboardEntries,
-      onLeaderboardChange: (updated) => {
-        setEntries(updated);
-        setLoadFailed(false);
-      },
+      onLeaderboardChange: applyRows,
       onError: () => setLoadFailed(true),
     });
-  }, []);
+  }, [applyRows]);
 
-  const ranked =
-    entries?.map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    })) ?? [];
-
-  if (loadFailed && entries === null) {
+  if (loadFailed && rows === null) {
     return (
       <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -82,7 +99,7 @@ export default function Leaderboard() {
     );
   }
 
-  if (entries !== null && entries.length === 0) {
+  if (rows !== null && rows.length === 0) {
     return (
       <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="leaderboard-heading">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -144,12 +161,12 @@ export default function Leaderboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {ranked.map((entry) => (
+              {(rows ?? []).map((entry) => (
                 <tr
                   key={entry.id}
                   className={`transition-colors duration-150 ease-out hover:bg-muted/50 motion-reduce:transition-none ${
                     entry.rank === 1 ? 'bg-primary/5 border-l-4 border-warning' : ''
-                  }`}
+                  } ${getRankChangeClass(rankChanges.get(entry.id))}`}
                 >
                   <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                     <span
@@ -204,7 +221,7 @@ export default function Leaderboard() {
             </tbody>
           </table>
 
-          {entries === null && (
+          {rows === null && (
             <p className="px-4 sm:px-6 py-4 text-sm text-muted-foreground" role="status">
               Loading leaderboard…
             </p>

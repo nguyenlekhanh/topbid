@@ -1867,6 +1867,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
 - **Follow-up work**: Task 5.5 — Rank change animation
 
+### Task 5.5
+
+- **Date**: 2026-08-23
+- **Objective**: Add purely visual rank-change animation to the live leaderboard while preserving authoritative ordering, rank numbers, and #1 styling
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/rank-changes.ts: detectRankChanges(previous, current) -> Map<bid id, RankDirection> — pure deterministic comparison by bid id producing 'new' / 'up' / 'down' / 'same' labels; rows dropping off the board produce no entry
+  - src/components/Leaderboard.tsx: rankChanges derived during render via useMemo over the committed ranked rows, previous ranking updated post-commit via useEffect+ref (no setState directly in effects, no refs read during render — satisfies react-hooks/refs and set-state-in-effect rules); motion-safe animation classes per direction reusing existing globals.css keyframes: up -> slideDown (settles from above), down/new -> fadeInUp (fades in from below), same -> none; global prefers-reduced-motion override plus motion-safe prefixes keep animations off for reduced-motion users
+- **Files changed**:
+  - src/lib/rank-changes.ts (new)
+  - src/lib/rank-changes.test.ts (new — 6 tests)
+  - src/components/Leaderboard.tsx (animation wiring only; Tasks 1.1–5.4 data flow unchanged)
+  - docs/5.5.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 135/135 PASSED across 9 files (+6 pure rank-change detection tests)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: detection purity, motion-safe + reduced-motion coverage, no ordering side effects
+  - Live Supabase Realtime delivery: SKIPPED — environment limitation carried from Task 5.1; NOT faked
+- **Important technical decisions**:
+  - Pure lib-level detection keeps animation labels fully unit-testable without React rendering infrastructure
+  - Render-phase derivation with a post-commit ref update chosen over setState-in-effect after the react-hooks v6 lint rules rejected the initial ref-read-during-render approach; both rules now satisfied
+  - Direction semantics documented: lower rank number = moved up = slideDown settle; higher = down = fadeInUp settle
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 5.6 — New #1 state celebration
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
