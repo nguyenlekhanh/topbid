@@ -2199,4 +2199,33 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+## Phase 7 — Viral Sharing
+
+### Task 7.1
+
+- **Date**: 2026-08-24
+- **Objective**: Provide the post-bid bid success page experience per PROJECT_PLAN.md ("7.1 | Bid success page | 4.3") as the baseline Tasks 7.2+ extend
+- **Status**: Completed
+- **Audit finding**: Task 4.3 already delivered the full baseline — dynamic server-rendered `/success`, untrusted `session_id`, authoritative DB-only lookup via getBidByStripeSessionId (anon client, RLS paid-only), confirmed vs awaiting states, never queries Stripe, never mutates payment state, responsive SuccessState card. Per the no-invention rule the page was NOT rebuilt.
+- **Delta implemented**:
+  - Real bug fixed: `searchParams` typed `{session_id?: string}` but Next.js actually delivers `string | string[] | undefined` — repeated query keys produced an array and `.trim()` crashed with a 500. New extractSessionId accepts only single string values, trims, rejects blank/>255 chars
+  - src/lib/bid-success.ts: pure resolveBidSuccessView mapping lookup results to confirmed/awaiting view models (behavior-preserving for all previously valid inputs)
+  - The previously absent deterministic suite (21 cases) now covers every §8 scenario: confirmed mapping incl. null-category fallback, pending/unknown/missing/blank/malformed/oversized/array-valued ids, 64-char reference truncation, client-data-cannot-produce-confirmation invariant
+- **Files changed**:
+  - src/lib/bid-success.ts + src/lib/bid-success.test.ts (created)
+  - src/app/success/page.tsx (consumes resolver; widened searchParams typing; identical rendered output)
+  - docs/7.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 302/302 across 15 files (+21 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Authoritative data source**: unchanged from 4.3 — local database under RLS (paid-only); Stripe is never queried by the page; visiting never confirms payment
+- **Scope guard**: NO 7.2-7.7 functionality (no share links, OG metadata, tracking, public category URLs)
+- **Known limitations**: failed-vs-pending indistinguishability remains the standing 4.3 decision (page deliberately does not consult Stripe)
+- **Follow-up work**: Task 7.2 — Share on X
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

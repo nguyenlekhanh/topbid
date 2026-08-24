@@ -1,32 +1,52 @@
 ﻿TASK ID: 7.1
 PHASE: 7
 TITLE: Bid success page
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Provide the post-bid success page experience required by PROJECT_PLAN.md Phase 7 ("7.1 | Bid success page | 4.3") as the baseline that Tasks 7.2-7.7 will extend with viral-sharing functionality.
 
-SCOPE:
+AUDIT OF EXISTING TASK 4.3 IMPLEMENTATION (read-only, before any change):
+- Route /success existed as a dynamic async server component reading searchParams
+- session_id treated as untrusted; authoritative DB-only lookup via getBidByStripeSessionId (anon client under RLS); the page NEVER calls Stripe and NEVER mutates payment state
+- Confirmed state (paid bid visible under RLS): amount/category/reference from the DB row
+- Awaiting state (missing id / unknown session / payment still pending webhook conversion - indistinguishable by RLS design): neutral copy + sanitized <=64-char reference echo
+- Responsive SuccessState card using established design tokens; View Leaderboard (/ #leaderboard-heading) + Continue Browsing (/) CTAs
+- Checkout success_url convention pinned by checkout.test.ts:194 (.../success?session_id={CHECKOUT_SESSION_ID})
+- NO deterministic tests existed for any of this logic
 
-OUT OF SCOPE:
+DELTA ACTUALLY IMPLEMENTED (4.3 -> 7.1):
+1. Query-param hardening (security requirement): Next.js searchParams really deliver string | string[] | undefined; the old narrow typing meant repeated keys (?session_id=a&session_id=b) produced an ARRAY at runtime and .trim() crashed the page (500). New extractSessionId() accepts only single string values, trims, rejects blank/>255 chars.
+2. Testability extraction per repo conventions: pure src/lib/bid-success.ts (extractSessionId + resolveBidSuccessView) now owns the decision logic; the page renders the returned view model. Behavior-preserving for all previously valid inputs.
+3. The missing deterministic test suite (21 cases) covering every §8 scenario.
+NO redesign, NO new route, NO new backend surface, NO sharing features (7.2+).
 
-INPUTS / DEPENDENCIES:
+AUTHORITATIVE DATA SOURCE:
+Unchanged from Task 4.3 - the local database via getBidByStripeSessionId (anon client, RLS status='paid' visibility). Client-supplied values are never rendered as bid facts; Stripe is never queried from the page; visiting never confirms payment.
 
-IMPLEMENTATION REQUIREMENTS:
+USER STATES HANDLED:
+- Successful payment (paid bid found): "Payment confirmed!" card with formatted amount, category name, session reference
+- Payment still pending webhook conversion / unknown session / missing-malformed-oversized identifier: neutral awaiting-confirmation card (indistinguishable by design - no existence leak)
+- Failed payments render identically to pending (not publicly readable; page deliberately does not consult Stripe) - unchanged 4.3 decision, documented
+- Server-rendered dynamic route: no separate loading state applies; mobile layout inherited from responsive SuccessState
 
-FILES EXPECTED TO CHANGE:
+SECURITY CONSIDERATIONS:
+- Only shape validation happens on the URL parameter; all displayed bid facts come from the DB row
+- No secrets or internal metadata exposed; reference echo truncated/sanitized
+- No public endpoint exposing arbitrary records: lookup is RLS-scoped to paid bids only
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/bid-success.ts (new, pure view resolution)
+- src/lib/bid-success.test.ts (new, 21 tests)
+- src/app/success/page.tsx (consumes resolver; widened searchParams typing; identical rendered states)
+- docs/7.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 302/302 PASSED across 15 files (+21 net)
+- npm run typecheck / lint / format:check / build: all PASSED
 
 KNOWN ISSUES:
+- None within scope. Failed-vs-pending indistinguishability is the standing 4.3 architectural decision (page never queries Stripe), reaffirmed here.
 
 FOLLOW-UP:
+Task 7.2 - Share on X (Twitter)
