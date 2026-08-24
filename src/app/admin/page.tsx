@@ -68,12 +68,6 @@ export default async function AdminDashboardPage() {
   const { data } = await supabase.auth.getUser();
   const email = data.user?.email ?? 'admin';
 
-  const futureSections = [
-    'Category management — coming soon',
-    'Bid management — coming soon',
-    'Payment management — coming soon',
-  ];
-
   return (
     <section className="py-12 sm:py-16" aria-label="Admin dashboard">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -150,9 +144,16 @@ export default async function AdminDashboardPage() {
         <div className="mt-10 rounded-xl border border-border bg-muted/40 p-5">
           <h2 className="text-base font-semibold text-foreground">Management sections</h2>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            {futureSections.map((section) => (
-              <li key={section}>{section}</li>
-            ))}
+            <li>
+              <Link
+                href="/admin/categories"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              >
+                Category management
+              </Link>
+            </li>
+            <li>Bid management — coming soon</li>
+            <li>Payment management — coming soon</li>
           </ul>
         </div>
 

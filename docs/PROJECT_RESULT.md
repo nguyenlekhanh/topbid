@@ -2472,4 +2472,35 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+### Task 8.3
+
+- **Date**: 2026-08-24
+- **Objective**: Give authorized administrators server-side create/update/activate/deactivate control over categories through the Task 8.1 boundary, with a minimal management UI
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/admin-category-management.ts (server-only): guard-gated createAdminCategory / updateAdminCategory / setCategoryActive / listAllCategoriesForAdmin; slug normalized kebab <=80 + IMMUTABLE after creation (public URL stability); name <=120; description <=500 blank-clears; dollars regex -> integer cents >=0; image_url optional http(s) <=2048; UNIQUE(slug) violations map to stable 'slug_taken' (code 23505 or legacy message); zero-row updates map to 'not_found' via .select('id'); updated_at maintained server-side; db failures logged + generic db_error
+  - POST /api/admin/categories: single endpoint, intent discriminator create|update|set_active; absent form keys normalized to undefined (optional semantics); redirects ?result=created|updated|activated|deactivated / ?error=<reason>
+  - src/app/admin/categories/page.tsx: banner feedback, create card, full list INCLUDING inactive rows (privileged read justified: public RLS hides deactivated categories), per-row activate/deactivate toggle forms and <details> edit forms posting to the endpoint
+  - Dashboard management list now links Category management
+- **Files changed**:
+  - src/lib/admin-category-management.ts + test (created, 41 tests)
+  - src/app/api/admin/categories/route.ts + route.test.ts (created, 8 tests)
+  - src/app/admin/categories/page.tsx (created)
+  - src/app/admin/page.tsx (management link)
+  - docs/8.3.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 477/477 across 27 files (+49 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/admin/categories + /api/admin/categories registered dynamic)
+- **Important technical decisions**:
+  - All mutations call getAdminAuthorization() first and fail closed without touching the DB for non-admins (pinned by tests)
+  - Service-role writes isolated in the server-only module per the established share-events pattern; public RLS and public category queries untouched
+  - No delete operation (plan does not require it; deletion would orphan shared URLs)
+- **Known limitations**: per-row <details> edit forms are deliberately minimal; slug renames unsupported by design
+- **Follow-up work**: Task 8.4 - Bid management
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

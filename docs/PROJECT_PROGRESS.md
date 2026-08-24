@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 8 in progress — 8.2 completed** — Next recommended: 8.3
+**Phase 8 in progress — 8.3 completed** — Next recommended: 8.4
 
 ## Completed Tasks
 
@@ -88,6 +88,7 @@
 - 7.7: Share tracking ✓ (Phase 7 complete)
 - 8.1: Admin authentication ✓
 - 8.2: Admin dashboard ✓
+- 8.3: Category management ✓
 
 ## Tasks in Progress
 
@@ -186,6 +187,7 @@ _None_
 - Share tracking added (first-party only: migration 20260823000017 share_events table - identity PK, event CHECK IN (x_share, copy_link), created_at, RLS zero policies; client-safe share-tracking.ts allow-list + fire-and-forget keepalive POST that swallows all failures; validating /api/share-events route inserts via service role with 400/500 semantics; XShareLink client component dispatches x_share on activation, CopyShareLink dispatches copy_link after successful clipboard writes; payload is event-name-only by design - no URLs/category attribution/identifiers; every explicit action counts as one row, no dedup invented)
 - Admin authentication added (Supabase Auth email/password + DB-backed membership: migration 20260823000018 admin_users keyed by auth.users id with self-read-only RLS policy (id = auth.uid()); server-only getAdminAuthorization guard fails closed on missing session/membership/DB errors and is the reusable boundary for 8.2+; /admin entry route enforces the guard server-side with redirect to /admin/login; minimal login page posts to POST /api/admin/login (signInWithPassword sets HttpOnly @supabase/ssr cookies; generic ?error=1 failures prevent existence leaks); sanitizeNextPath blocks absolute/'//'/\/ open-redirect tricks plus resolved-origin equality check; POST /api/admin/logout signs out; no middleware, no RBAC, no third-party provider, no dashboard)
 - Admin dashboard added (/admin upgraded from status card to operational overview behind the unchanged getAdminAuthorization boundary - redirect happens before any data loads; pure admin-dashboard.ts loadAdminOverview composes existing RLS-safe listCategories + getLeaderboard(10) + getRecentBids(10) in parallel into a view-model that structurally excludes emails/Stripe ids/internal bid ids; stat cards (active categories/top overall bid/recent count), top-bids and recent-bids summaries, coming-soon section placeholders without fake links; no service-role reads, no new SQL, no CRUD/actions/charts)
+- Category management added (server-only admin-category-management.ts: guard-gated create/update-details/activate-deactivate plus listAllCategoriesForAdmin privileged read including inactive rows; slug immutable after creation for URL stability; server validation - kebab slug <=80, name <=120, dollars regex -> integer cents >=0, optional http(s) image url; UNIQUE(slug) maps 23505/legacy duplicates to stable slug_taken, zero-row updates map to not_found via .select('id'); single POST /api/admin/categories endpoint with intent discriminator redirecting ?result=/ ?error= flags; /admin/categories page with create form, full list incl. inactive rows, per-row toggle and <details> edit forms; dashboard management list now links it)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -206,7 +208,7 @@ _None_
 
 ## Next Recommended Task
 
-**8.3 - Category management**
+**8.4 - Bid management**
 
 ## Notes
 
@@ -305,5 +307,7 @@ Task 7.7 completed successfully - Phase 7 complete. Share tracking added as firs
 Task 8.1 completed successfully. Admin authentication foundation established: migration 20260823000018 creates admin_users (auth.users id PK with self-read-only RLS policy id = auth.uid()); server-only getAdminAuthorization guard verifies session + membership per request and fails closed on any error - the reusable boundary Task 8.2+ must call; /admin entry route enforces it with server-side redirect to /admin/login (minimal credentials form posting to POST /api/admin/login using Supabase Auth signInWithPassword through @supabase/ssr cookie handling; generic ?error=1 failures prevent existence leaks); sanitizeNextPath + resolved-origin check block open redirects including the /\ protocol-relative bypass caught during test development; POST /api/admin/logout signs out; no dashboard/mgmt UI (Tasks 8.2+), no middleware, no RBAC, no third-party provider; public routes and payment/email/share flows untouched; 422/422 tests passing.
 
 Task 8.2 completed successfully. Admin dashboard added: /admin now renders an operational overview behind the unchanged getAdminAuthorization boundary (redirect precedes any data load); pure admin-dashboard.ts loadAdminOverview runs listCategories + getLeaderboard(10) + getRecentBids(10) in parallel and maps results into view-model types that structurally exclude emails/Stripe session ids/payment intent ids/internal bid ids; UI shows stat cards (active categories/top overall bid/recent paid count), top-bids and recent-bids summaries with empty states, identity line + sign-out carried from 8.1, and honest coming-soon placeholders for future sections; omitted metrics not cleanly available via public RLS (inactive/pending counts) documented rather than invented; no service-role reads, no new SQL, no CRUD; 428/428 tests passing.
+
+Task 8.3 completed successfully. Category management added: server-only admin-category-management.ts gates every operation through getAdminAuthorization (fail-closed) then persists via the established service-role pattern - create (normalized kebab slug/name/dollars->cents, UNIQUE(slug) maps 23505 to slug_taken), update-details patch (slug immutable, updated_at maintained, zero-row -> not_found via .select('id')), set_active toggle, and listAllCategoriesForAdmin privileged read including inactive rows; single POST /api/admin/categories endpoint routes create/update/set_active intents into stable ?result=/ ?error= redirects; /admin/categories page renders create form + full list with per-row activate/deactivate and <details> edit forms; dashboard links it; public category queries/RLS untouched; 477/477 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

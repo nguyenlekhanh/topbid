@@ -1,32 +1,51 @@
 ﻿TASK ID: 8.3
 PHASE: 8
 TITLE: Category management
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Give authorized administrators server-side create/update/activate/deactivate control over categories through the Task 8.1 authorization boundary, with a minimal management UI - no deletion, no 8.4+ scope.
 
-SCOPE:
+OPERATIONS IMPLEMENTED (exact):
+1. CREATE - slug (normalized lowercase kebab, unique), name, description?, starting_bid ($->cents), increment ($->cents), image_url?; is_active defaults true
+2. UPDATE DETAILS - name / description / starting_bid / increment / image_url as an explicit patch; slug is IMMUTABLE after creation (public /categories/[slug] URLs are shared assets); empty description clears it; at least one field required; updated_at maintained server-side
+3. ACTIVATE / DEACTIVATE - explicit desired state persisted with updated_at; deactivation hides the category from all public surfaces (grid + /categories/[slug] -> 404) while preserving row/bids
+NO DELETE: PROJECT_PLAN.md asks only for management of existing category lifecycle; deletion would orphan public URLs and is deferred.
 
-OUT OF SCOPE:
+AUTHORIZATION BOUNDARY (unchanged from 8.1):
+Every mutation AND the admin list call getAdminAuthorization() first and fail closed ({ok:false,reason:'unauthorized'}) without touching the database. The route re-surfaces unauthorized like any stable error flag.
 
-INPUTS / DEPENDENCIES:
+VALIDATION RULES (server-side; browser input untrusted):
+- slug: trim+lowercase, /^[a-z0-9]+(-[a-z0-9]+)*$/, <=80 chars
+- name: required non-blank <=120
+- description: optional <=500, blank clears
+- dollars: optional leading $, ^\d{1,7}(\.\d{1,2})?$, exact rounding to integer cents >=0
+- image_url: blank clears to null; otherwise must start http(s):// and be <=2048
+- id: strict UUID shape before any query
 
-IMPLEMENTATION REQUIREMENTS:
+PERSISTENCE / RLS MECHANISM:
+Service-role client inside the server-only module (established share-events pattern) because public RLS grants no write path and management REQUIRES seeing inactive rows that public RLS hides. listAllCategoriesForAdmin() is the isolated privileged read (select * ordered created_at asc); mutations are direct typed inserts/updates with .select('id') so zero-row updates map to 'not_found'. Public RLS policies untouched; public queries (getCategoryBySlug/listCategories) untouched.
 
-FILES EXPECTED TO CHANGE:
+DUPLICATE / CONCURRENCY HANDLING:
+UNIQUE(slug) remains the final authority for concurrent creates; Postgres 23505 violations (code or legacy message) map to stable 'slug_taken'. Zero-row updates race-safe via PK equality. No invented dedup beyond schema guarantees.
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/admin-category-management.ts (+test, 41 tests): guard-gated mutations/list, parseDollarsToCents, validation matrix incl. slug_taken both coded & legacy-message variants, not_found via .select('id'), db_error without detail leaks, slug-immutability pin, unauthorized-no-query pins
+- src/app/api/admin/categories/route.ts (+route.test.ts, 8 tests): single POST surface, intent discriminator (create|update|set_active), absent-form-keys normalized to undefined (optional semantics), stable redirect flags ?result=created|updated|activated|deactivated / ?error=<reason>
+- src/app/admin/categories/page.tsx (new): banner feedback, create card, full list incl. inactive with per-row toggle + <details> edit forms, back-to-dashboard
+- src/app/admin/page.tsx (management sections list now links Category management)
+- docs/8.3.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 477/477 PASSED across 27 files (+49 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/admin/categories + /api/admin/categories registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO 8.4 bid mgmt, NO 8.5 payment mgmt, NO 8.6 refund action, NO 8.7 fraud/banned-email mgmt, NO 8.8 audit logs; NO delete, NO pagination/search/filtering/bulk ops, NO audit logging, NO changes to getAdminAuthorization, bidding/payment/webhook/email/share flows, public category behavior, or RLS beyond the pre-existing design.
 
 KNOWN ISSUES:
+- Edit forms are per-row <details> sections rather than a modal/editor page (deliberately minimal).
+- Slug renames intentionally unsupported; changing a slug later would require a deliberate product decision about URL stability.
 
 FOLLOW-UP:
+Task 8.4 - Bid management
