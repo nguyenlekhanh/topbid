@@ -1,32 +1,76 @@
 ﻿TASK ID: 6.2
 PHASE: 6
 TITLE: Email provider integration (Resend)
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Integrate Resend as the project's server-only email provider boundary - configured client + typed sendEmail function - that Tasks 6.3 (template) and 6.4 (outbid notification flow) will compose on top of.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "6.2 | Email provider integration (Resend) | 6.1". The plan names the provider; the deliverable is the sending boundary itself - no notification triggering or template logic (Tasks 6.3/6.4 own those).
 
 SCOPE:
+- New dependency: resend SDK (^latest per project ^-convention)
+- .env.example gains RESEND_API_KEY and RESEND_FROM_EMAIL (server-only; no NEXT_PUBLIC_ prefix)
+- New src/lib/resend.ts:
+  * Eager module-scope validation of both variables with descriptive errors (misconfiguration fails at boot like stripe.ts, never mid-request pretending success)
+  * Private configured client; typed sendEmail(params): Promise<SentEmail> boundary returning the provider message id
+  * Provider failures propagate as descriptive errors so callers never mistake a failed send for a delivered one
+- src/lib/resend.test.ts - 8 deterministic tests, mocked 'resend' package (no real network/email delivery)
+
+PRESERVED / BOUNDARIES:
+- RESEND_API_KEY/FROM remain server-only (no NEXT_PUBLIC_ prefix); module documented as must-never-import-from-client
+- No notification triggering, template content, or outbid business logic (Tasks 6.3+)
+- Tasks 1.1-6.1 untouched except additive dependency/env entries
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Outbid notification flow (Task 6.4), templates (6.3), unsubscribe handling (6.6), email failure-handling flows beyond error propagation (6.7), live email delivery
 
 FILES EXPECTED TO CHANGE:
+- package.json + package-lock.json (resend dependency)
+- .env.example (two new server-only variables)
+- src/lib/resend.ts (new)
+- src/lib/resend.test.ts (new)
+- docs/6.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (8 new tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: secret confinement, eager validation, exact provider params, optional-text omission
 
 DEFINITION OF DONE:
+- Server-only Resend sending boundary exists with eager config validation and deterministic test coverage; no real emails sent during tests; all repo checks green
 
 IMPLEMENTATION NOTES:
+Eager module-scope validation chosen over lazy in-send checks (mirrors stripe.ts fail-at-boot philosophy; also caught by tests via dynamic-import-after-stubEnv pattern with vi.resetModules() to defeat ESM caching between env permutations). Optional text body is conditionally spread so the provider payload omits the field entirely rather than sending undefined. Test development caught two self-inflicted issues pre-commit: a missing afterEach import and ESM-cache staleness making env-permutation tests resolve the stale cached module - both fixed. Static inspection confirmed secret confinement (no NEXT_PUBLIC_ exposure path) and that no notification business logic leaked into this task.
 
 RESULT:
+Implementation complete. Suite: 160/160 PASSED across 10 files (+8 resend tests). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- package.json + package-lock.json (resend dependency)
+- .env.example (RESEND_API_KEY, RESEND_FROM_EMAIL)
+- src/lib/resend.ts (new)
+- src/lib/resend.test.ts (new)
+- docs/6.2.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 160/160 PASSED across 10 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live email delivery through Resend: SKIPPED - requires real API key/domain setup; NOT faked. Mocked at SDK instance boundary only.
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 6.3 - Outbid email template

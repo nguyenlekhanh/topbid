@@ -1992,6 +1992,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 6.2 — Email provider integration (Resend)
 
+### Task 6.2
+
+- **Date**: 2026-08-23
+- **Objective**: Integrate Resend as the server-only email provider boundary — configured client + typed sendEmail function — for Phase 6 outbid-notification tasks to compose on
+- **Status**: Completed
+- **What was implemented**:
+  - resend SDK dependency added (^-convention); .env.example gains RESEND_API_KEY and RESEND_FROM_EMAIL (server-only, no NEXT_PUBLIC_ prefix)
+  - src/lib/resend.ts: EAGER module-scope validation of both variables with descriptive errors (misconfiguration fails at boot like stripe.ts, never mid-request pretending success); private configured client; typed sendEmail({to,subject,html,text?}): Promise<SentEmail{id}> returning the provider message id; provider errors propagate as descriptive throws so callers never mistake failure for delivery
+  - Optional text body conditionally spread so the provider payload omits the field entirely rather than sending undefined
+  - No notification triggering, template content, or outbid business logic — strictly the sending boundary for Tasks 6.3/6.4
+- **Files changed**:
+  - package.json + package-lock.json (resend dependency)
+  - .env.example (+2 server-only variables)
+  - src/lib/resend.ts (new)
+  - src/lib/resend.test.ts (new — 8 tests)
+  - docs/6.2.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 160/160 PASSED across 10 files (+8 resend tests: missing/blank key and from-address import rejection, constructor-key capture, exact send params incl. sender, optional-text inclusion/omission, provider-error propagation)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live email delivery through Resend: SKIPPED — requires real API key/domain setup; NOT faked. Mocked at SDK instance boundary only.
+- **Important technical decisions**:
+  - Eager module-scope validation over lazy in-send checks: mirrors stripe.ts fail-at-boot philosophy; the initial lazy design was caught by tests resolving stale cached modules via dynamic-import + vi.resetModules pattern and was corrected to eager
+  - Official Resend SDK chosen per project's provider-SDK conventions (mirrors stripe.ts) over hand-rolled fetch
+  - Single resend.ts module holds both client and send boundary for Task 6.2 minimality; template composition arrives in 6.3 on top
+- **Known limitations**: None within scope (live delivery deferred pending real API key/domain)
+- **Follow-up work**: Task 6.3 — Outbid email template
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
