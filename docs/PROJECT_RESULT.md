@@ -1608,6 +1608,39 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.9 — Idempotent webhook handling
 
+### Task 4.9
+
+- **Date**: 2026-08-23
+- **Objective**: Make webhook event processing idempotent using Stripe's authoritative event ID, race-safe at the database boundary, without duplicating business effects or weakening Tasks 4.5–4.8
+- **Status**: Completed
+- **What was implemented**:
+  - Migration 20260823000011_processed_webhook_events.sql: ledger table processed_webhook_events(event_id text PRIMARY KEY, type text NOT NULL, processed_at timestamptz DEFAULT now()) + wrapper RPC process_checkout_completed_event(p_event_id, p_event_type, p_bid_id, p_stripe_session_id, p_stripe_payment_intent_id) returns text
+  - Atomic claim+effect: the ledger INSERT (claim) and the Task 4.8 conversion run in ONE transaction — conversion anomalies RAISE, rolling back both, so failed processing leaves events retryable; unique_violation on the claim returns outcome 'duplicate' — PK arbitration makes concurrent same-event deliveries safe with no application SELECT-then-insert
+  - src/lib/stripe-webhook.ts: processVerifiedEvent invokes the wrapper with event.id/event.type from the verified payload; ConversionOutcome gains 'duplicate'; dispatcher surfaces replays as 200 {received:'true', duplicate:'true'} while anomaly outcomes throw -> 500 inside the retryable try-block; unverified sessions use a distinct internal 'unverified' marker and never touch the ledger
+  - Unsupported events remain acknowledged WITHOUT ledger entries (no business effects to dedupe)
+- **Files changed**:
+  - supabase/migrations/20260823000011_processed_webhook_events.sql (new)
+  - src/lib/stripe-webhook.ts (ledger wiring + outcome-based response shaping)
+  - src/lib/stripe-webhook.test.ts (+2 tests, updated assertions)
+  - docs/4.9.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 89/89 PASSED across 4 files (43 bids + 8 checkout + 30 webhook + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL inspection: PASSED (PK claim arbitration, single-transaction claim+effect, rollback-on-anomaly path, grant signature match, migration ordering after 20260823000010)
+  - Live DB/concurrency verification: SKIPPED — local Supabase Docker unavailable; NOT claimed and NOT faked. Intended live check for Task 4.12 documented in docs/4.9.txt: two parallel deliveries of one signed event assert one 'converted' + one 'duplicate' with a single bid state change
+- **Important technical decisions**:
+  - Claim-and-effect-in-one-transaction chosen over claim-first: prevents permanently swallowing events whose business effect failed (explicitly required behavior)
+  - Ledger claims restricted to checkout.session.completed — the only plan-required type with business effects; unsupported types keep Task 4.5 acknowledgment semantics
+  - Distinct internal 'unverified' marker added so unverified sessions can never be conflated with 'already_paid' outcomes
+  - Development caught a refactor slip pre-commit (orphaned brace + temporarily dropped anomaly-throw); repaired before commit with regression tests updated to enforce the restored semantics
+- **Known limitations**: None within scope (live concurrency verification deferred to a real database environment)
+- **Follow-up work**: Task 4.10 — Payment failure handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

@@ -1,32 +1,81 @@
 ﻿TASK ID: 4.9
 PHASE: 4
 TITLE: Idempotent webhook handling
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Make Stripe webhook event processing idempotent using Stripe's authoritative event ID, with the database uniqueness constraint as the race-safe final arbiter - so duplicate/replayed deliveries can never duplicate business effects, and failed processing stays retryable.
+
+MECHANISM (each design question answered explicitly):
+- Ledger schema: new table processed_webhook_events(event_id text PRIMARY KEY, type text NOT NULL, processed_at timestamptz NOT NULL DEFAULT now()). Stripe's event.id is the identity; the PRIMARY KEY is the uniqueness rule. No payload storage (minimal).
+- Claim placement: claim INSERT and business effect run in the SAME transaction via wrapper RPC process_checkout_completed_event - a claim without its effect would permanently swallow retries if processing failed
+- Duplicate behavior: unique_violation on the claim -> outcome 'duplicate' -> endpoint answers 200 {received:'true', duplicate:'true'} so Stripe stops retrying; first delivery's effect stands
+- Failed processing: conversion anomalies ('bid_not_found','invalid_state','session_mismatch') RAISE inside the RPC -> the whole transaction rolls back INCLUDING the claim -> the event remains retryable and is answered 500
+- Atomicity/race-safety: concurrent deliveries serialize on the PK; no application SELECT-then-INSERT anywhere
+- Unsupported events: still acknowledged WITHOUT ledger entries (no business effects to dedupe; Task 4.5 semantics unchanged)
+- No client-controlled bypass: event.id/type are taken from the constructEvent-verified payload only, after Tasks 4.6+4.7
 
 SCOPE:
+- New migration supabase/migrations/20260823000011_processed_webhook_events.sql - ledger table + wrapper RPC process_checkout_completed_event(p_event_id, p_event_type, p_bid_id, p_stripe_session_id, p_stripe_payment_intent_id) returns text; reuses convert_pending_bid_to_paid (Task 4.8) verbatim as the business effect; SECURITY DEFINER + pinned search_path; EXECUTE revoked from public/anon/authenticated, granted ONLY to service_role
+- src/lib/stripe-webhook.ts - convertVerifiedBid replaced by processVerifiedEvent invoking the wrapper with event.id/event.type added to the parameters; ConversionOutcome gains 'duplicate'; handler returns its outcome and the dispatcher surfaces duplicates in the response body while anomaly outcomes throw inside the retryable try-block
+
+PRESERVED:
+- Task 4.6 raw-body signature verification exactly (unchanged code path + real-crypto suite green)
+- Task 4.7 verification-before-everything exactly (unverified sessions never reach the ledger)
+- Task 4.8 conversion semantics exactly (same inner function; already-paid same-session replays remain success/no-op)
+- RLS/security boundaries; secrets server-only; no new dependencies
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Task 4.10 payment-failure handling, refunds (4.11), integration testing (4.12), ledger retention/purge policy, monitoring/alerting tooling
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000011_processed_webhook_events.sql (new)
+- src/lib/stripe-webhook.ts
+- src/lib/stripe-webhook.test.ts
+- docs/4.9.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (updated/new suites + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static SQL inspection: PK arbitration, claim/effect transaction atomicity, rollback path, grant signature match
 
 DEFINITION OF DONE:
+- Same-event redeliveries cannot duplicate business effects; distinct event ids process independently; failed conversions leave events retryable; all prior suites green; no scope creep into 4.10+
+
+TEST COVERAGE (2 new tests + updated assertions):
+- Ledger-reported 'duplicate' -> 200 {received:'true', duplicate:'true'} with retrieval still performed (4.7 preserved) and zero mutation beyond the rolled-back/no-op claim
+- Distinct event ids process independently (two rpc invocations with different p_event_id values, both converted)
+- Updated: conversion/args assertions now target process_checkout_completed_event incl. p_event_id/p_event_type; replay regression covers converted->duplicate sequence both 200; anomaly outcomes still 500; RPC failure still 500
 
 IMPLEMENTATION NOTES:
+Development caught a refactor slip pre-commit: moving outcome-return into the handler initially orphaned a closing brace and dropped the anomaly-throw from the dispatcher - both repaired before any commit; a misleading 'already_paid' return for unverified sessions was replaced by a distinct internal 'unverified' marker. Static SQL inspection confirmed: PK-based claim arbitration, single-transaction claim+effect with rollback-on-anomaly, service_role-only EXECUTE matching prior migrations. Live DB/concurrency testing remains unavailable (no Docker) - honestly documented; unit-level duplicate reasoning plus the PK-arbitration design stand in until Task 4.12.
 
 RESULT:
+Implementation complete. Suite: 89/89 PASSED across 4 files (43 bids + 8 checkout + 30 webhook + 8 real-crypto signature). typecheck/lint/format:check/build all PASSED. Static inspection confirmed PK arbitration, atomic claim+effect with rollback, hardened privileges, and preserved 4.5-4.8 contracts.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000011_processed_webhook_events.sql (new)
+- src/lib/stripe-webhook.ts (ledger RPC wiring + duplicate response surfacing)
+- src/lib/stripe-webhook.test.ts (+2 tests, updated assertions)
+- docs/4.9.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 89/89 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live DB/concurrency verification: SKIPPED - local Supabase Docker unavailable; NOT claimed and NOT faked. Intended live check documented for Task 4.12: two parallel deliveries of one signed event assert one converted + one duplicate with a single bid state change.
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 4.10 - Payment failure handling

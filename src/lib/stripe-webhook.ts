@@ -103,43 +103,56 @@ export async function verifyCheckoutSessionPaid(
 }
 
 export type ConversionOutcome =
-  'converted' | 'already_paid' | 'bid_not_found' | 'invalid_state' | 'session_mismatch';
+  | 'converted'
+  | 'already_paid'
+  | 'duplicate'
+  | 'bid_not_found'
+  | 'invalid_state'
+  | 'session_mismatch';
 
 const KNOWN_CONVERSION_OUTCOMES: readonly ConversionOutcome[] = [
   'converted',
   'already_paid',
+  'duplicate',
   'bid_not_found',
   'invalid_state',
   'session_mismatch',
 ];
 
 /**
- * Apply the verified conversion at the database boundary (Task 4.8).
- * - Delegates to the convert_pending_bid_to_paid RPC (row-locked, attach-once session
- *   completion, typed outcomes) - never a check-then-update from application code
+ * Claim the event in the idempotency ledger and apply the verified conversion inside a
+ * single database transaction (Task 4.9).
+ * - The event.id PRIMARY KEY is the race-safe arbiter: concurrent deliveries serialize
+ *   on it and the loser receives outcome 'duplicate' without any business effect
+ * - Anomaly outcomes raise inside the RPC, rolling back BOTH the conversion AND the
+ *   ledger claim, so failed processing leaves the event retryable
  * - RPC errors throw so the endpoint responds 500 and Stripe retries
  */
-async function convertVerifiedBid(
+async function processVerifiedEvent(
+  eventId: string,
+  eventType: string,
   bidId: string,
   sessionId: string,
   paymentIntentId: string | null
 ): Promise<ConversionOutcome> {
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase.rpc('convert_pending_bid_to_paid', {
+  const { data, error } = await supabase.rpc('process_checkout_completed_event', {
+    p_event_id: eventId,
+    p_event_type: eventType,
     p_bid_id: bidId,
     p_stripe_session_id: sessionId,
     p_stripe_payment_intent_id: paymentIntentId,
   });
 
   if (error) {
-    throw new Error(`Failed to convert bid to paid: ${error.message}`);
+    throw new Error(`Failed to process webhook event: ${error.message}`);
   }
 
   const outcome = data as ConversionOutcome;
 
   if (!KNOWN_CONVERSION_OUTCOMES.includes(outcome)) {
-    throw new Error(`Failed to convert bid to paid: unknown outcome "${String(data)}"`);
+    throw new Error(`Failed to process webhook event: unknown outcome "${String(data)}"`);
   }
 
   return outcome;
@@ -180,7 +193,9 @@ function extractSessionReferences(event: StripeLikeEvent): {
   };
 }
 
-async function handleCheckoutSessionCompleted(event: StripeLikeEvent): Promise<void> {
+async function handleCheckoutSessionCompleted(
+  event: StripeLikeEvent
+): Promise<ConversionOutcome | 'unverified'> {
   // Task 4.7: the event body only identifies WHICH session to inspect - authoritative
   // payment state comes from Stripe's server-side API via verifyCheckoutSessionPaid.
   const references = extractSessionReferences(event);
@@ -196,33 +211,20 @@ async function handleCheckoutSessionCompleted(event: StripeLikeEvent): Promise<v
       })
     );
 
-    return;
+    // Unverified-but-valid events are legitimate states, not endpoint failures: no
+    // conversion path is taken and nothing is claimed in the ledger.
+    return 'unverified';
   }
 
-  // Task 4.8: apply the verified conversion atomically at the database boundary.
-  const outcome = await convertVerifiedBid(
+  // Tasks 4.8+4.9: claim the event in the ledger and apply the verified conversion in
+  // one atomic database transaction.
+  return processVerifiedEvent(
+    event.id ?? 'unknown',
+    event.type!,
     verification.bidReference,
     verification.sessionId,
     verification.paymentIntentId
   );
-
-  if (outcome === 'converted' || outcome === 'already_paid') {
-    console.info(
-      '[stripe-webhook] checkout.session.completed bid conversion settled',
-      JSON.stringify({
-        eventId: event.id ?? 'unknown',
-        sessionId: verification.sessionId,
-        bidReference: verification.bidReference,
-        outcome,
-      })
-    );
-
-    return;
-  }
-
-  // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
-  // Stripe retries and monitoring surfaces them.
-  throw new Error(`Bid conversion failed with outcome "${outcome}"`);
 }
 
 export async function processStripeWebhook(
@@ -273,7 +275,23 @@ export async function processStripeWebhook(
   }
 
   try {
-    await handleCheckoutSessionCompleted(event);
+    const outcome = await handleCheckoutSessionCompleted(event);
+
+    // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
+    // Stripe retries and monitoring surfaces them.
+    if (
+      outcome === 'bid_not_found' ||
+      outcome === 'invalid_state' ||
+      outcome === 'session_mismatch'
+    ) {
+      throw new Error(`Bid conversion failed with outcome "${outcome}"`);
+    }
+
+    // Task 4.9: replays are surfaced in the response so monitoring can distinguish
+    // first deliveries from duplicates; Stripe treats both as success and stops retrying.
+    return outcome === 'duplicate'
+      ? { status: 200, body: { received: 'true', duplicate: 'true' } }
+      : { status: 200, body: { received: 'true' } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -284,6 +302,4 @@ export async function processStripeWebhook(
       body: { error: 'Webhook processing failed' },
     };
   }
-
-  return { status: 200, body: { received: 'true' } };
 }

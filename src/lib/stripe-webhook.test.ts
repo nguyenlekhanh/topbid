@@ -374,15 +374,17 @@ describe('checkout.session.completed verification flow (Task 4.7)', () => {
   });
 });
 
-describe('bid conversion (Task 4.8)', () => {
-  it('converts the linked pending bid via the RPC with authoritative values', async () => {
+describe('bid conversion & idempotent processing (Tasks 4.8+4.9)', () => {
+  it('converts the linked pending bid via the ledger RPC with authoritative values', async () => {
     enqueueConversionOutcome('converted');
 
     const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
     expect(result.status).toBe(200);
-    expect(lastRpcCall()?.args[0]).toBe('convert_pending_bid_to_paid');
+    expect(lastRpcCall()?.args[0]).toBe('process_checkout_completed_event');
     expect(lastRpcCall()?.args[1]).toEqual({
+      p_event_id: 'evt_123',
+      p_event_type: 'checkout.session.completed',
       p_bid_id: 'bid-1000',
       p_stripe_session_id: 'cs_test_abc',
       p_stripe_payment_intent_id: 'pi_test_123',
@@ -396,10 +398,37 @@ describe('bid conversion (Task 4.8)', () => {
 
     expect(result.status).toBe(200);
     expect(lastRpcCall()?.args[1]).toEqual({
+      p_event_id: 'evt_123',
+      p_event_type: 'checkout.session.completed',
       p_bid_id: 'bid-1000',
       p_stripe_session_id: 'cs_test_abc',
       p_stripe_payment_intent_id: 'pi_test_123',
     });
+  });
+
+  it('acknowledges ledger-reported duplicates with 200 and no business effect', async () => {
+    enqueueConversionOutcome('duplicate');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+    expect(stripeMock.retrieveSession).toHaveBeenCalledWith('cs_test_abc');
+  });
+
+  it('keeps distinct event ids independently processable', async () => {
+    enqueueConversionOutcome('converted');
+    enqueueConversionOutcome('converted');
+
+    const first = await processStripeWebhook('raw-payload-a', VALID_SIGNATURE);
+    stripeMock.constructEvent.mockReturnValue({ ...COMPLETED_EVENT, id: 'evt_456' });
+    const second = await processStripeWebhook('raw-payload-b', VALID_SIGNATURE);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(supabaseMock.state.calls.filter((call) => call.method === 'rpc')).toHaveLength(2);
+    const [, secondArgs] = lastRpcCall()?.args ?? [];
+    expect((secondArgs as { p_event_id: string }).p_event_id).toBe('evt_456');
   });
 
   it.each(['bid_not_found', 'invalid_state', 'session_mismatch'])(
@@ -414,7 +443,7 @@ describe('bid conversion (Task 4.8)', () => {
     }
   );
 
-  it('returns 500 when the conversion RPC itself fails', async () => {
+  it('returns 500 when the processing RPC itself fails', async () => {
     supabaseMock.state.queue.push({
       data: null,
       error: { message: 'database unavailable' },

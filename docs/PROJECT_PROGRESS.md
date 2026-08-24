@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.8 completed** — Next recommended: 4.9
+**4.9 completed** — Next recommended: 4.10
 
 ## Completed Tasks
 
@@ -133,6 +133,7 @@ _None_
 - Webhook signature verification hardened (explicit 300s replay-window tolerance passed to constructEvent, blank signature/secret guards; new real-crypto test suite computing genuine HMAC signatures proves tamper rejection, wrong-secret rejection, staleness enforcement, and exact-raw-payload verification without live Stripe)
 - Payment status verification created (verifyCheckoutSessionPaid retrieves the Checkout Session from Stripe's server-side API by id and requires payment_status='paid' plus consistent client_reference_id/metadata.bid_id linkage; unverified sessions acknowledged without mutation; conversion deferred to 4.8)
 - Pending-to-paid conversion created (migration 20260823000010 adds convert_pending_bid_to_paid RPC: row-locked atomic transition setting status='paid', paid_at, stripe_payment_intent_id, completing NULL session linkage only; typed outcomes converted/already_paid/bid_not_found/invalid_state/session_mismatch with retry-safe idempotency via bid+session identity; EXECUTE restricted to service_role)
+- Idempotent webhook handling created (migration 20260823000011 adds processed_webhook_events ledger keyed by Stripe event.id PRIMARY KEY plus process_checkout_completed_event wrapper RPC claiming the event and applying conversion in one transaction - duplicates acknowledged via duplicate:'true', anomalies roll back claim+effect so events stay retryable)
 
 ## Current Environment/Setup Status
 
@@ -150,7 +151,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.9 — Idempotent webhook handling**
+**4.10 — Payment failure handling**
 
 ## Notes
 
@@ -195,3 +196,5 @@ Task 4.6 completed successfully. Signature verification hardened: explicit 300s 
 Task 4.7 completed successfully. verifyCheckoutSessionPaid added: after signature verification the Checkout Session is retrieved again from Stripe's server-side API and payment_status must be 'paid' with consistent client_reference_id/metadata.bid_id linkage; unverified sessions are acknowledged without any mutation; conversion deferred to Task 4.8; 81/81 tests passing.
 
 Task 4.8 completed successfully. Migration 20260823000010 adds convert_pending_bid_to_paid (row-locked, attach-once session completion, typed outcomes); the webhook handler applies the conversion after Task 4.7 verification with converted/already_paid answered 200 and anomalies answered 500 for retry; is_highest deliberately untouched; 87/87 tests passing.
+
+Task 4.9 completed successfully. Migration 20260823000011 adds the processed_webhook_events ledger (event.id PRIMARY KEY) and process_checkout_completed_event wrapper claiming events and converting in one atomic transaction - duplicates acknowledged with duplicate:'true', anomalies roll back claim+effect keeping events retryable; signature/payment/conversion semantics from Tasks 4.6-4.8 preserved; 89/89 tests passing.
