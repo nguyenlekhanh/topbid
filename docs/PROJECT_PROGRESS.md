@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 9 in progress — 9.1 completed** — Next recommended: 9.2
+**Phase 9 in progress — 9.2 completed** — Next recommended: 9.3
 
 ## Completed Tasks
 
@@ -95,6 +95,7 @@
 - 8.7: Fraud/banned email management ✓
 - 8.8: Audit logs ✓ (Phase 8 complete)
 - 9.1: Input validation review ✓
+- 9.2: Rate limiting ✓
 
 ## Tasks in Progress
 
@@ -217,7 +218,7 @@ _None_
 
 ## Next Recommended Task
 
-**9.2 - Rate limiting**
+**9.3 - CAPTCHA if needed**
 
 ## Notes
 

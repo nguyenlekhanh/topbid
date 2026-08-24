@@ -1,32 +1,51 @@
-﻿TASK ID: 9.2
+TASK ID: 9.2
 PHASE: 9
 TITLE: Rate limiting
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Cap abusive bursts on externally reachable mutation endpoints with the smallest architecture the repository and runtime can support - no Redis/Upstash/third-party providers, no queues/cron - enforced server-side with documented per-instance limitations.
 
-SCOPE:
+ENDPOINT INVENTORY AND DECISIONS:
+- POST /api/admin/login -> LIMITED: 10 attempts / 10 min / IP (unauthenticated credential-guessing target)
+- POST /api/share-events -> LIMITED: 30 / min / IP (public telemetry write flood cap)
+- POST /api/unsubscribe -> LIMITED: 10 / min / IP (public blocklist mutation flood cap)
+- POST /api/admin/payments/refund -> LIMITED: 20 / hour / admin identity (money movement bounded per administrator; key applied AFTER authorization so only real admins consume it)
+- POST /api/webhooks/stripe -> deliberately NOT limited: signature verification gates authenticity and dropping legitimate payment webhooks would violate correctness (retries/idempotency must keep flowing)
+- GET pages -> not limited (read-only surfaces)
 
-OUT OF SCOPE:
+ARCHITECTURE CHOSEN AND WHY:
+In-memory fixed-window limiter (src/lib/rate-limit.ts): createRateLimiter factory returning check(key, rule, now?) over a per-instance Map; injectable clock for deterministic tests; lazy pruning of expired windows; hard cap of tracked keys to bound memory.
+Documented limitation: on Vercel this state is per instance and resets on cold start - enforcement is best-effort rather than globally exact. A distributed limiter would require external infrastructure the plan does not mandate, so none was added; every guarded operation re-validates authorization/state independently, so correctness never depends on the limiter being exact.
 
-INPUTS / DEPENDENCIES:
+IDENTITY/KEY STRATEGY:
+- Public endpoints keyed by client IP (first x-forwarded-for entry as set by the hosting platform; unknown fallback)
+- Refund endpoint keyed by the authenticated admin user id from getAdminContext (applied after authorization), since the threat is per-admin money-movement volume
+- Share events remain event-name-only rows; rate limiting adds no new stored personal data
 
-IMPLEMENTATION REQUIREMENTS:
+FAILURE POLICY PER ENDPOINT:
+- Machine JSON API (/api/share-events): 429 {error:rate_limited} + Retry-After seconds (exact for fixed windows)
+- Browser form flows (login, unsubscribe): login returns 429 JSON + Retry-After (non-navigational brute-force responses); unsubscribe returns 429 JSON + Retry-After (client swallows; page state unchanged)
+- Refund endpoint: 303 redirect to /admin/payments?error=rate_limited preserving the existing banner UX
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/rate-limit.ts + test (new, 7 tests: allow-under-limit, block-at-limit with retryAfterSeconds, identity isolation, window expiry via injected clock, multi-rule sharing through one instance, documented rule constants)
+- src/app/api/admin/login/route.ts (+ per-IP limiter before parsing/auth; 429 JSON + Retry-After 600)
+- src/app/api/share-events/route.ts (+ per-IP limiter; 429 JSON + Retry-After 60)
+- src/app/api/unsubscribe/route.ts (+ per-IP limiter before token work; 429 JSON + Retry-After 60)
+- src/app/api/admin/payments/refund/route.ts (+ per-admin limiter after authorization; redirect ?error=rate_limited)
+- src/lib/rate-limit.test.ts covers allowed/blocked/isolation/window-reset/multi-rule/pinned rule constants
 
 TESTS ACTUALLY RUN:
+- npm run test: 569/569 PASSED across 34 files (+7 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NO CAPTCHA (9.3+), NO security review tasks (9.4+), NO Redis/Upstash/providers, NO queues/workers/cron, NO changes to payment/webhook correctness, email flows, share flows, auth internals, or public pages beyond additive limiter checks.
 
 KNOWN ISSUES:
+- Per-instance counters under-count global abuse across many serverless instances (documented tradeoff; upgrade path is a shared store behind the same interface)
+- Legitimate users behind shared NATs share an IP bucket on public endpoints
 
 FOLLOW-UP:
+Task 9.3 - CAPTCHA if needed

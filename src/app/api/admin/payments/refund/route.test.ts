@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetRateLimiters } from '@/lib/rate-limit';
 import { POST } from '@/app/api/admin/payments/refund/route';
 
 /**
@@ -15,6 +16,12 @@ vi.mock('@/lib/admin-refunds', () => ({
   initiateAdminRefund: actionMock.initiateAdminRefund,
 }));
 
+vi.mock('@/lib/admin-auth', () => ({
+  getAdminContext: vi
+    .fn()
+    .mockResolvedValue({ authorized: true, userId: 'admin-1', email: 'admin@topbid.lol' }),
+}));
+
 function postRequest(body: string, contentType = 'application/json'): Request {
   return new Request('http://localhost/api/admin/payments/refund', {
     method: 'POST',
@@ -24,6 +31,7 @@ function postRequest(body: string, contentType = 'application/json'): Request {
 }
 
 beforeEach(() => {
+  resetRateLimiters();
   actionMock.initiateAdminRefund.mockReset();
   // Default for unspecified flows: invalid/absent input is rejected by the action.
   actionMock.initiateAdminRefund.mockResolvedValue({ ok: false, reason: 'invalid_bid_id' });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { getClientIp, RATE_LIMIT_RULES, rateLimiters } from '@/lib/rate-limit';
 import { sanitizeNextPath } from '@/lib/admin-auth';
 import { createClient } from '@/lib/supabase-server';
 
@@ -23,6 +24,14 @@ const MAX_CREDENTIAL_LENGTH = 320;
  */
 export async function POST(request: Request) {
   const requestUrl = new URL(request.url);
+
+  // Task 9.2: per-IP brute-force cap on credential attempts (fail closed).
+  if (!rateLimiters.adminLogin.check(getClientIp(request), RATE_LIMIT_RULES.adminLogin).allowed) {
+    return NextResponse.json(
+      { error: 'rate_limited' },
+      { status: 429, headers: { 'Retry-After': '600' } }
+    );
+  }
 
   let form: FormData;
 

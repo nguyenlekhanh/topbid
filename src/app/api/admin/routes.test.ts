@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetRateLimiters } from '@/lib/rate-limit';
 import { POST as loginPost } from '@/app/api/admin/login/route';
 import { POST as logoutPost } from '@/app/api/admin/logout/route';
 
@@ -33,6 +34,7 @@ function postForm(fields: Record<string, string>): Request {
 }
 
 beforeEach(() => {
+  resetRateLimiters();
   mocks.signInWithPassword.mockReset();
   mocks.signOut.mockReset();
   mocks.signInWithPassword.mockResolvedValue({

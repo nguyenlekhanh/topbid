@@ -6,6 +6,8 @@ This file records what has actually been built, not what was planned.
 
 ## Phase 0 — Project Setup
 
+---
+
 ### Task 0.1
 
 - **Date**: 2026-08-23
@@ -36,6 +38,8 @@ This file records what has actually been built, not what was planned.
   - npm warnings about eslint version and engine requirements (non-blocking)
 - **Follow-up work**: Task 0.2 - Verify TypeScript strict mode configuration
 
+---
+
 ### Task 0.2
 
 - **Date**: 2026-08-23
@@ -52,6 +56,8 @@ This file records what has actually been built, not what was planned.
   - No additional strict options needed
 - **Known limitations**: None
 - **Follow-up work**: Task 0.3 - Configure Tailwind CSS
+
+---
 
 ### Task 0.3
 
@@ -72,6 +78,8 @@ This file records what has actually been built, not what was planned.
   - Geist fonts via CSS variables
 - **Known limitations**: None
 - **Follow-up work**: Task 0.4 - Configure ESLint + Prettier
+
+---
 
 ### Task 0.4
 
@@ -97,6 +105,8 @@ This file records what has actually been built, not what was planned.
   - Format scripts: format, format:check, lint:fix
 - **Known limitations**: None
 - **Follow-up work**: Task 0.5 - Configure Supabase client
+
+---
 
 ### Task 0.5
 
@@ -124,6 +134,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 0.6 - Configure Stripe SDK
 
+---
+
 ### Task 0.6
 
 - **Date**: 2026-08-23
@@ -149,6 +161,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 0.7 - Configure environment variables
 
+---
+
 ### Task 0.7
 
 - **Date**: 2026-08-23
@@ -172,6 +186,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 0.8 - Configure Git + initial commit
 
+---
+
 ### Task 0.8
 
 - **Date**: 2026-08-23
@@ -182,6 +198,8 @@ This file records what has actually been built, not what was planned.
 - **Tests performed**:
   - `git status`: Clean working tree after commits
 - **Follow-up work**: Task 0.9 - Configure Vercel deployment
+
+---
 
 ### Task 0.9
 
@@ -207,6 +225,8 @@ This file records what has actually been built, not what was planned.
   - Vercel project must be created and connected to Git repository
   - Environment variables must be manually configured in Vercel dashboard
 - **Follow-up work**: Task 0.10 - Create AGENTS.md and documentation workflow
+
+---
 
 ### Task 0.10
 
@@ -238,6 +258,8 @@ This file records what has actually been built, not what was planned.
 ---
 
 ## Phase 1 — UI / Design
+
+---
 
 ### Task 1.1
 
@@ -271,6 +293,8 @@ This file records what has actually been built, not what was planned.
   - No design system, typography, or color palette defined yet
 - **Known limitations**: None
 - **Follow-up work**: Task 1.2 - Typography and design system
+
+---
 
 ### Task 1.2
 
@@ -307,6 +331,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.3 - Navbar
 
+---
+
 ### Task 1.3
 
 - **Date**: 2026-08-23
@@ -342,6 +368,8 @@ This file records what has actually been built, not what was planned.
   - Mobile menu closes on link click
 - **Known limitations**: None
 - **Follow-up work**: Task 1.4 - Hero section
+
+---
 
 ### Task 1.4
 
@@ -380,6 +408,8 @@ This file records what has actually been built, not what was planned.
   - All interactive elements have focus-visible states
 - **Known limitations**: None
 - **Follow-up work**: Task 1.5 - Category cards
+
+---
 
 ### Task 1.5
 
@@ -424,6 +454,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.6 - Leaderboard
 
+---
+
 ### Task 1.6
 
 - **Date**: 2026-08-23
@@ -467,6 +499,8 @@ This file records what has actually been built, not what was planned.
   - Uses design system tokens: warning, primary, foreground, muted-foreground, border, background, muted, ring, transitions
 - **Known limitations**: None
 - **Follow-up work**: Task 1.7 - Bid button
+
+---
 
 ### Task 1.7
 
@@ -514,6 +548,8 @@ This file records what has actually been built, not what was planned.
   - Warning about window.location.href for navigation (acceptable for mock UI-only task)
 - **Follow-up work**: Task 1.8 - Bid modal
 
+---
+
 ### Task 1.8
 
 - **Date**: 2026-08-23
@@ -549,6 +585,8 @@ This file records what has actually been built, not what was planned.
   - CategoryCards fragment wrapper to include BidModal sibling to section
 - **Known limitations**: None
 - **Follow-up work**: Task 1.9 - Recent bids feed
+
+---
 
 ### Task 1.9
 
@@ -587,6 +625,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.10 - Empty states
 
+---
+
 ### Task 1.10
 
 - **Date**: 2026-08-23
@@ -622,6 +662,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.11 - Loading states
 
+---
+
 ### Task 1.11
 
 - **Date**: 2026-08-23
@@ -653,6 +695,8 @@ This file records what has actually been built, not what was planned.
   - Preserved Phase 1 work, added only presentation layer
 - **Known limitations**: None
 - **Follow-up work**: Task 1.12 - Error states
+
+---
 
 ### Task 1.12
 
@@ -688,6 +732,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None
 - **Follow-up work**: Task 1.13 - Success state (post-bid)
 
+---
+
 ### Task 1.13
 
 - **Date**: 2026-08-23
@@ -722,6 +768,8 @@ This file records what has actually been built, not what was planned.
   - Reuse design system, no extra deps
 - **Known limitations**: None
 - **Follow-up work**: Task 1.14 - Responsive mobile design
+
+---
 
 ### Task 1.14
 
@@ -761,6 +809,8 @@ This file records what has actually been built, not what was planned.
   - w-full sm:w-auto pattern for CTAs preserves desktop inline while mobile full-width for thumb reach
 - **Known limitations**: None
 - **Follow-up work**: Task 1.15 - UI polish (animations, transitions)
+
+---
 
 ### Task 1.15
 
@@ -808,6 +858,8 @@ This file records what has actually been built, not what was planned.
 
 ## Phase 2 — Database
 
+---
+
 ### Task 2.1
 
 - **Date**: 2026-08-23
@@ -835,6 +887,8 @@ This file records what has actually been built, not what was planned.
   - Version-controlled migration reproducible
 - **Known limitations**: None (requires supabase db push to apply remotely; local docker not required for validation)
 - **Follow-up work**: Task 2.2 — Bids schema + migration
+
+---
 
 ### Task 2.2
 
@@ -864,6 +918,8 @@ This file records what has actually been built, not what was planned.
   - Kept status as plain TEXT DEFAULT 'pending' (CHECK added in 2.4)
 - **Known limitations**: None (requires supabase db push after 2.1 to apply)
 - **Follow-up work**: Task 2.3 — Database indexes
+
+---
 
 ### Task 2.3
 
@@ -896,6 +952,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (one redundancy documented as noted)
 - **Follow-up work**: Task 2.4 — Constraints
 
+---
+
 ### Task 2.4
 
 - **Date**: 2026-08-23
@@ -927,6 +985,8 @@ This file records what has actually been built, not what was planned.
   - Used public.categories/public.bids qualified, additive ALTER TABLE ADD CONSTRAINT
 - **Known limitations**: None (requires supabase db push to apply; local docker not available for full lint)
 - **Follow-up work**: Task 2.5 — RLS / security policies
+
+---
 
 ### Task 2.5
 
@@ -962,6 +1022,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply; local docker not available for full policy test)
 - **Follow-up work**: Task 2.6 — Seed categories
 
+---
+
 ### Task 2.6
 
 - **Date**: 2026-08-23
@@ -992,6 +1054,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (requires supabase db push to apply)
 - **Follow-up work**: Task 2.7 — Category queries (list, get)
 
+---
+
 ### Task 2.7
 
 - **Date**: 2026-08-23
@@ -1021,6 +1085,8 @@ This file records what has actually been built, not what was planned.
   - Kept queries out of components per task, reusable lib
 - **Known limitations**: None (DB integration requires supabase db push + Docker; Phase 1 UI still uses mockCategories until real data wiring later)
 - **Follow-up work**: Task 2.8 — Highest bid query
+
+---
 
 ### Task 2.8
 
@@ -1053,6 +1119,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live DB verification requires supabase db push + Docker; Phase 1 UI still mock-driven until wiring tasks later)
 - **Follow-up work**: Task 2.9 — Leaderboard query
 
+---
+
 ### Task 2.9
 
 - **Date**: 2026-08-23
@@ -1082,6 +1150,8 @@ This file records what has actually been built, not what was planned.
   - Kept leaderboard query in the existing bids module (no new files/deps) consistent with categories.ts/bids.ts conventions
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 2.10 — Recent bids query
+
+---
 
 ### Task 2.10
 
@@ -1113,6 +1183,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Phase 2 complete — Task 3.1 — Calculate minimum bid (no existing bids)
 
+---
+
 ### Task 3.1
 
 - **Date**: 2026-08-23
@@ -1141,6 +1213,8 @@ This file records what has actually been built, not what was planned.
   - No pure passthrough helper added — starting_bid already satisfies the rule; unit-testable composition arrives with Tasks 3.2/3.8
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.2 — Calculate minimum bid (existing bids)
+
+---
 
 ### Task 3.2
 
@@ -1171,6 +1245,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.3 — Validate bid amount server-side
 
+---
+
 ### Task 3.3
 
 - **Date**: 2026-08-23
@@ -1200,6 +1276,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.4 — Validate category server-side
 
+---
+
 ### Task 3.4
 
 - **Date**: 2026-08-23
@@ -1228,6 +1306,8 @@ This file records what has actually been built, not what was planned.
   - Stable string-literal failure reasons for later API-route mapping; Zod layering deferred to Phase 9
 - **Known limitations**: None (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.5 — Create pending bid record
+
+---
 
 ### Task 3.5
 
@@ -1261,6 +1341,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None beyond documented concurrency/duplicate deferral to Tasks 3.6/3.7 (live verification requires supabase db push + Docker)
 - **Follow-up work**: Task 3.6 — Handle concurrent bids (DB locking)
 
+---
+
 ### Task 3.6
 
 - **Date**: 2026-08-23
@@ -1291,6 +1373,8 @@ This file records what has actually been built, not what was planned.
   - Abandoned pendings hold their slot until Phase 4 expiry/failure handling exists — documented interaction, not silently ignored
 - **Known limitations**: Live concurrency behavior unverified until a real database environment is available (honestly documented); abandoned-reservation slot holding until Phase 4
 - **Follow-up work**: Task 3.7 — Prevent duplicate transactions
+
+---
 
 ### Task 3.7
 
@@ -1325,6 +1409,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Live duplicate/conflict verification pending a real database environment (honestly documented)
 - **Follow-up work**: Task 3.8 — Bid engine unit tests
 
+---
+
 ### Task 3.8
 
 - **Date**: 2026-08-23
@@ -1354,6 +1440,8 @@ This file records what has actually been built, not what was planned.
   - Strict FIFO queues make unexpected extra queries fail loudly rather than silently pass; scope limited to the bid engine (leaderboard/recent-bids suites remain out of scope)
 - **Known limitations**: None (live integration coverage remains deferred to a real database environment)
 - **Follow-up work**: Phase 3 complete — Task 4.1 — Create Stripe Checkout session
+
+---
 
 ### Task 4.1
 
@@ -1386,6 +1474,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live Stripe verification deferred as documented)
 - **Follow-up work**: Task 4.2 — Attach category/bid metadata
 
+---
+
 ### Task 4.2
 
 - **Date**: 2026-08-23
@@ -1417,6 +1507,8 @@ This file records what has actually been built, not what was planned.
   - Additive-only result field keeps Task 4.1 callers compatible
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.3 — Success page
+
+---
 
 ### Task 4.3
 
@@ -1453,6 +1545,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Until Tasks 4.5+ add the webhook, real checkouts would show the awaiting state indefinitely in production — expected at this stage of the plan
 - **Follow-up work**: Task 4.4 — Cancel page
 
+---
+
 ### Task 4.4
 
 - **Date**: 2026-08-23
@@ -1480,6 +1574,8 @@ This file records what has actually been built, not what was planned.
   - No compatibility change needed: checkout cancel_url already targeted /cancel since Task 4.1
 - **Known limitations**: None
 - **Follow-up work**: Task 4.5 — Stripe webhook endpoint
+
+---
 
 ### Task 4.5
 
@@ -1512,6 +1608,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery verification deferred; conversion pending Task 4.8 by design)
 - **Follow-up work**: Task 4.6 — Verify webhook signature
 
+---
+
 ### Task 4.6
 
 - **Date**: 2026-08-23
@@ -1541,6 +1639,8 @@ This file records what has actually been built, not what was planned.
   - Explicit numeric tolerance chosen over SDK default so review/tests pin the window; no other verification mechanism changed
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.7 — Verify payment status
+
+---
 
 ### Task 4.7
 
@@ -1572,6 +1672,8 @@ This file records what has actually been built, not what was planned.
   - The signature suite's network boundary mock (spyOn on the real client) keeps Task 4.6 crypto testing genuine while isolating API availability — its initial failure ("Invalid API Key" surfacing as a correct 500) validated the new flow end-to-end before the mock was added
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.8 — Convert pending bid to paid
+
+---
 
 ### Task 4.8
 
@@ -1608,6 +1710,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.9 — Idempotent webhook handling
 
+---
+
 ### Task 4.9
 
 - **Date**: 2026-08-23
@@ -1641,6 +1745,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live concurrency verification deferred to a real database environment)
 - **Follow-up work**: Task 4.10 — Payment failure handling
 
+---
+
 ### Task 4.10
 
 - **Date**: 2026-08-23
@@ -1673,6 +1779,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.11 — Refund handling
 
+---
+
 ### Task 4.11
 
 - **Date**: 2026-08-23
@@ -1703,6 +1811,8 @@ This file records what has actually been built, not what was planned.
   - Test development caught retrieveCharge mock-call accumulation across tests — fixed by adding it to the shared beforeEach reset block
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.12 — Stripe integration tests
+
+---
 
 ### Task 4.12
 
@@ -1739,6 +1849,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: The five guarded scenarios await a disposable test-mode environment (Stripe sk_test_/whsec_ + Supabase project); they execute unchanged once available
 - **Follow-up work**: Phase 4 complete — Task 5.1 — Supabase realtime subscription
 
+---
+
 ### Task 5.1
 
 - **Date**: 2026-08-23
@@ -1769,6 +1881,8 @@ This file records what has actually been built, not what was planned.
   - Test fake captures the .on() postgres_changes filter (not channel config) matching how supabase-js actually receives it
 - **Known limitations**: Live delivery verification deferred until a real database environment exists; no UI consumes the subscription yet (by design until 5.2+)
 - **Follow-up work**: Task 5.2 — Update highest bid display
+
+---
 
 ### Task 5.2
 
@@ -1803,6 +1917,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Mock categories use non-UUID ids ('1'..'6'), so the tracker receives no matching events in the current mock-driven UI; it activates fully once real category ids flow through — consistent with the documented Phase 1 mock state
 - **Follow-up work**: Task 5.3 — Update leaderboard rankings
 
+---
+
 ### Task 5.3
 
 - **Date**: 2026-08-23
@@ -1834,6 +1950,8 @@ This file records what has actually been built, not what was planned.
   - Any bid change triggers a global ranking refetch (rankings are global); per-category filtering remains specific to the Task 5.2 tracker
 - **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
 - **Follow-up work**: Task 5.4 — Recent bid updates
+
+---
 
 ### Task 5.4
 
@@ -1867,6 +1985,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
 - **Follow-up work**: Task 5.5 — Rank change animation
 
+---
+
 ### Task 5.5
 
 - **Date**: 2026-08-23
@@ -1896,6 +2016,8 @@ This file records what has actually been built, not what was planned.
   - Direction semantics documented: lower rank number = moved up = slideDown settle; higher = down = fadeInUp settle
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 5.6 — New #1 state celebration
+
+---
 
 ### Task 5.6
 
@@ -1927,6 +2049,8 @@ This file records what has actually been built, not what was planned.
   - Celebration is additive styling on the existing #1 row; no bid/ranking state is mutated and no payment logic touched
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 5.7 — Connection/reconnection handling
+
+---
 
 ### Task 5.7
 
@@ -1960,6 +2084,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Phase 5 complete — Task 6.1 — Detect previous highest bidder
 
+---
+
 ### Task 6.1
 
 - **Date**: 2026-08-23
@@ -1991,6 +2117,8 @@ This file records what has actually been built, not what was planned.
   - Deliberately no notifications/emails/badges implemented — strictly the 6.1 primitive for Tasks 6.2+
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 6.2 — Email provider integration (Resend)
+
+---
 
 ### Task 6.2
 
@@ -2024,6 +2152,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery deferred pending real API key/domain)
 - **Follow-up work**: Task 6.3 — Outbid email template
 
+---
+
 ### Task 6.3
 
 - **Date**: 2026-08-23
@@ -2055,6 +2185,8 @@ This file records what has actually been built, not what was planned.
   - Bid-again CTA deliberately absent with a scope-guard test — Task 6.5 owns it
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 6.4 — Send outbid notification
+
+---
 
 ### Task 6.4
 
@@ -2093,6 +2225,8 @@ This file records what has actually been built, not what was planned.
   - Notification runs synchronously in the webhook request (two RLS queries + provider call); acceptable for MVP per no-queue scope rule
 - **Follow-up work**: Task 6.5 — Bid-again link in email
 
+---
+
 ### Task 6.5
 
 - **Date**: 2026-08-24
@@ -2123,6 +2257,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**:
   - Link targets the categories grid rather than a per-category page until Task 7.4 introduces public category URLs
 - **Follow-up work**: Task 6.6 — Unsubscribe handling
+
+---
 
 ### Task 6.6
 
@@ -2163,6 +2299,8 @@ This file records what has actually been built, not what was planned.
   - Well-shaped unknown tokens can insert harmless rows (grants nothing)
 - **Follow-up work**: Task 6.7 — Email failure handling
 
+---
+
 ### Task 6.7
 
 - **Date**: 2026-08-24
@@ -2201,6 +2339,8 @@ This file records what has actually been built, not what was planned.
 
 ## Phase 7 — Viral Sharing
 
+---
+
 ### Task 7.1
 
 - **Date**: 2026-08-24
@@ -2225,6 +2365,8 @@ This file records what has actually been built, not what was planned.
 - **Scope guard**: NO 7.2-7.7 functionality (no share links, OG metadata, tracking, public category URLs)
 - **Known limitations**: failed-vs-pending indistinguishability remains the standing 4.3 decision (page deliberately does not consult Stripe)
 - **Follow-up work**: Task 7.2 — Share on X
+
+---
 
 ### Task 7.2
 
@@ -2254,6 +2396,8 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**:
   - Shared destination points at the global leaderboard; revisit once Task 7.4 introduces public per-category URLs
 - **Follow-up work**: Task 7.3 — Copy share link
+
+---
 
 ### Task 7.3
 
@@ -2406,6 +2550,8 @@ This file records what has actually been built, not what was planned.
 ---
 
 ## Phase 8 - Admin
+
+---
 
 ### Task 8.1
 
@@ -2562,53 +2708,28 @@ This file records what has actually been built, not what was planned.
 
 ---
 
-### Task 8.8
+### Task 8.6
 
 - **Date**: 2026-08-24
-- **Objective**: Add an immutable first-party audit trail for administrative mutations - who/what/target/when plus structured context - with a bounded newest-first admin read surface
+- **Objective**: Let authorized administrators issue full Stripe refunds for PAID payments, transitioning bids to refunded exclusively through the authoritative Task 4.11 ledger+transition RPC
 - **Status**: Completed
+- **Audit finding (Phase-4 defect fixed)**: refund_paid_bid referenced undeclared p_payment_intent_id in its WHERE clause (declared parameter: p_stripe_payment_intent_id), so every runtime invocation errored - latent because unit tests mocked Supabase and the integration suite skips without credentials. Migration 20260823000019 re-issues the function with the corrected reference; signature/locking/state machine/idempotency/grants unchanged
 - **What was implemented**:
-  - supabase/migrations/20260823000021_create_audit_logs.sql: audit_logs (identity PK; actor_user_id NOT NULL from the verified Supabase Auth session - never a client claim; actor_email snapshot; action CHECK allow-list covering exactly the seven Phase-8 mutation types; target_type/target_id from server-side results; detail jsonb; created_at) + idx_audit_logs_created_at DESC; RLS enabled with ZERO policies (service-role only)
-  - src/lib/audit-log.ts (server-only): writeAuditLog (allow-list validated insert that NEVER throws - failures logged loudly and reported false), readAuditLogs newest-first bounded guard-gated reader
-  - src/lib/admin-auth.ts: additive getAdminContext() exposing userId + email in one pass; getAdminAuthorization reimplemented on top (public contract unchanged)
-  - Audit wiring after successful mutations: category.create/update/activate/deactivate (admin-category-management), payment.refund incl. already_refunded/duplicate no-ops and refund_submitted deferrals (admin-refunds), banned_email.ban/unban (email-bans); failed validations/refusals record nothing
-  - /admin/audit-logs page: newest-first bounded list (actor email, action, target, truncated detail context) behind the same authorization gate
-- **Files changed**: migration 20260823000021; src/lib/audit-log.ts + test (9 tests); admin-category-management.ts/.test.ts, admin-refunds.ts/.test.ts, email-bans.ts/.test.ts (audit wiring/assertions); src/app/admin/audit-logs/page.tsx (created); src/app/admin/page.tsx (link); docs/8.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
-- **Tests performed**: test 552/552 across 33 files (+9 net); typecheck/lint/format:check/build all PASSED (/admin/audit-logs registered dynamic)
+  - src/lib/admin-refunds.ts (server-only): initiateAdminRefund - guard first; strict-UUID bid lookup requiring paid status + persisted PaymentIntent + amount > 0; stripe.refunds.create through the existing server-only Stripe client with per-bid idempotency key admin-refund-<bidId>; then refund_paid_bid ledger claim + row-locked transition keyed event_id = Stripe refund id / event_type admin.refund; non-terminal Stripe statuses report refund_submitted and defer to the charge.refunded webhook
+  - POST /api/admin/payments/refund: accepts JSON or form bid_id; redirects 303 back to /admin/payments with stable result/error flags; unauthorized redirects to login
+  - src/app/admin/payments/page.tsx: per-row Refund buttons rendered ONLY for status=paid rows with a PaymentIntent, plus result/error banner mapping
+- **Files changed**: migration 20260823000019; src/lib/admin-refunds.ts + test (19 tests); src/app/api/admin/payments/refund/route.ts + route.test.ts (11 tests); src/app/admin/payments/page.tsx; docs/8.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 521/521 across 30 files (+30 net); typecheck/lint/format:check/build all PASSED (/api/admin/payments/refund registered dynamic)
 - **Important technical decisions**:
-  - Actor identity exclusively from getAdminContext (verified session); client claims never trusted; unknown actions rejected pre-query
-  - Best-effort audit inserts immediately after successful mutations; failures loud-logged and never masquerade as success or failure of the business operation
-  - processed_webhook_events remains the payment ledger and is NOT duplicated as an audit log; share_events remains product telemetry
-- **Known limitations**: best-effort writes can be lost on DB failure (loud-logged); detail payloads intentionally minimal
-- **Follow-up work**: Phase 9 - Security and Reliability (Task 9.1 Input validation review)
-- **Follow-up work**: Task 9.2 - Rate limiting
+  - Stripe refunded FIRST via the existing server-only client with idempotency key admin-refund-<bidId>: double-clicks/retries resolve to the SAME Stripe refund; only then does the authoritative ledger+transition RPC run, so no parallel state machine and no direct bid-row writes exist anywhere
+  - Webhook races converge: the later charge.refunded resolves already_refunded/duplicate as no-ops against the row lock and ledger PK
+  - Provider failure records nothing locally (money has not moved); RPC failure after provider success honestly reports db_pending - retry-safe because the idempotency key and ledger duplicate no-op converge, and the webhook reconciles independently
+- **Known limitations**: db_pending outcomes rely on endpoint retry or webhook reconciliation - alerting recommended; payments without a persisted PaymentIntent cannot be refunded by design
+- **Follow-up work**: Task 8.7 - Fraud/banned email management
 
 ---
 
-## Phase 9 - Security and Reliability
-
-### Task 9.1
-
-- **Date**: 2026-08-24
-- **Objective**: Review every externally-influenced input entering server-side code, classify findings, and fix only concrete input-validation gaps - no payment/webhook/email/share behavior changes, no new dependencies
-- **Status**: Completed
-- **Audit scope**: Stripe webhook payload/signature; success/unsubscribe/admin banner search params; admin login credentials + next redirects; category mutation fields; refund bid_id (JSON+form); share-event JSON; banned-email values; audit-log inputs; all public bid/category queries; RLS/RPC second lines of defense
-- **Findings classification**:
-  - A (already validated, no change): webhook SDK signature parsing + authoritative Stripe re-retrieval; createPendingBid amount matrix (finite/integer/positive) with RPC re-validation under lock; slug normalization + active-only filters; extractSessionId; unsubscribe token shape gate; canonicalizeEmail; sanitizeNextPath incl. /\\ protocol-relative trick; normalizeBidId strict UUID; writeAuditLog action allow-list; trackShareEvent allow-list + server JSON try/catch -> 400
-  - B (fixed): prototype-chain record indexing on the three admin banner pages - RESULT_MESSAGES/ERROR_MESSAGES indexed with search-param strings let inherited keys (**proto**/constructor/toString) resolve truthy through the prototype chain, defeating ?? fallbacks and crashing React rendering; plus a duplicated weaker inline sanitizer on the login page missing the backslash protocol-relative case
-  - C/D (documented only): int4 upper bound surfaces as generic infra error (fails closed); abandoned pending reservations elevate floors indefinitely; Number(row.amount) in bids-client is a safe no-op cast on NOT NULL columns; login email format delegated to Supabase Auth authoritatively; repeated share events intentionally counted separately
-- **What was implemented**:
-  - src/lib/safe-lookup.ts: lookupRecordValue(record, key, fallback) - hasOwnProperty-based prototype-safe map lookup used by every search-param-driven message map
-  - src/app/admin/login/page.tsx: sanitizer deduplicated onto the shared guard (adds the missing backslash case at this surface)
-  - src/app/admin/categories|payments|banned pages: banner lookups switched to the helper (identical output for valid input)
-  - src/lib/safe-lookup.test.ts (created, 10 tests)
-- **Files changed**: src/lib/safe-lookup.ts + test (created); src/app/admin/{categories,payments,banned}/page.tsx + src/app/admin/login/page.tsx (hardening/dedupe); docs/9.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
-- **Tests performed**: test 562/562 across 34 files (+10 net); typecheck/lint/format:check/build all PASSED
-- **Important technical decisions**:
-  - No validation library introduced; small pure helpers match the established testable-lib convention
-  - TypeScript types alone are not validation - runtime guards remain the enforcement layer at every untrusted boundary, verified by the inventory above
-- **Known limitations**: none blocking; remaining observations are documented as non-blocking defense-in-depth notes
-- **Follow-up work**: Task 9.2 - Rate limiting
+_This file will be updated after each completed task with actual implementation details._
 
 ---
 
@@ -2634,24 +2755,55 @@ This file records what has actually been built, not what was planned.
 
 ---
 
-### Task 8.6
+### Task 8.8
 
 - **Date**: 2026-08-24
-- **Objective**: Let authorized administrators issue full Stripe refunds for PAID payments, transitioning bids to refunded exclusively through the authoritative Task 4.11 ledger+transition RPC
+- **Objective**: Add an immutable first-party audit trail for administrative mutations - who/what/target/when plus structured context - with a bounded newest-first admin read surface
 - **Status**: Completed
-- **Audit finding (Phase-4 defect fixed)**: refund_paid_bid referenced undeclared p_payment_intent_id in its WHERE clause (declared parameter: p_stripe_payment_intent_id), so every runtime invocation errored - latent because unit tests mocked Supabase and the integration suite skips without credentials. Migration 20260823000019 re-issues the function with the corrected reference; signature/locking/state machine/idempotency/grants unchanged
 - **What was implemented**:
-  - src/lib/admin-refunds.ts (server-only): initiateAdminRefund - guard first; strict-UUID bid lookup requiring paid status + persisted PaymentIntent + amount > 0; stripe.refunds.create through the existing server-only Stripe client with per-bid idempotency key admin-refund-<bidId>; then refund_paid_bid ledger claim + row-locked transition keyed event_id = Stripe refund id / event_type admin.refund; non-terminal Stripe statuses report refund_submitted and defer to the charge.refunded webhook
-  - POST /api/admin/payments/refund: accepts JSON or form bid_id; redirects 303 back to /admin/payments with stable result/error flags; unauthorized redirects to login
-  - src/app/admin/payments/page.tsx: per-row Refund buttons rendered ONLY for status=paid rows with a PaymentIntent, plus result/error banner mapping
-- **Files changed**: migration 20260823000019; src/lib/admin-refunds.ts + test (19 tests); src/app/api/admin/payments/refund/route.ts + route.test.ts (11 tests); src/app/admin/payments/page.tsx; docs/8.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
-- **Tests performed**: test 521/521 across 30 files (+30 net); typecheck/lint/format:check/build all PASSED (/api/admin/payments/refund registered dynamic)
+  - supabase/migrations/20260823000021_create_audit_logs.sql: audit_logs (identity PK; actor_user_id NOT NULL from the verified Supabase Auth session - never a client claim; actor_email snapshot; action CHECK allow-list covering exactly the seven Phase-8 mutation types; target_type/target_id from server-side results; detail jsonb; created_at) + idx_audit_logs_created_at DESC; RLS enabled with ZERO policies (service-role only)
+  - src/lib/audit-log.ts (server-only): writeAuditLog (allow-list validated insert that NEVER throws - failures logged loudly and reported false), readAuditLogs newest-first bounded guard-gated reader
+  - src/lib/admin-auth.ts: additive getAdminContext() exposing userId + email in one pass; getAdminAuthorization reimplemented on top (public contract unchanged)
+  - Audit wiring after successful mutations: category.create/update/activate/deactivate (admin-category-management), payment.refund incl. already_refunded/duplicate no-ops and refund_submitted deferrals (admin-refunds), banned_email.ban/unban (email-bans); failed validations/refusals record nothing
+  - /admin/audit-logs page: newest-first bounded list (actor email, action, target, truncated detail context) behind the same authorization gate
+- **Files changed**: migration 20260823000021; src/lib/audit-log.ts + test (9 tests); admin-category-management.ts/.test.ts, admin-refunds.ts/.test.ts, email-bans.ts/.test.ts (audit wiring/assertions); src/app/admin/audit-logs/page.tsx (created); src/app/admin/page.tsx (link); docs/8.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 552/552 across 33 files (+9 net); typecheck/lint/format:check/build all PASSED (/admin/audit-logs registered dynamic)
 - **Important technical decisions**:
-  - Stripe refunded FIRST via the existing server-only client with idempotency key admin-refund-<bidId>: double-clicks/retries resolve to the SAME Stripe refund; only then does the authoritative ledger+transition RPC run, so no parallel state machine and no direct bid-row writes exist anywhere
-  - Webhook races converge: the later charge.refunded resolves already_refunded/duplicate as no-ops against the row lock and ledger PK
-  - Provider failure records nothing locally (money has not moved); RPC failure after provider success honestly reports db_pending - retry-safe because the idempotency key and ledger duplicate no-op converge, and the webhook reconciles independently
-- **Known limitations**: db_pending outcomes rely on endpoint retry or webhook reconciliation - alerting recommended; payments without a persisted PaymentIntent cannot be refunded by design
-- **Follow-up work**: Task 8.7 - Fraud/banned email management
+  - Actor identity exclusively from getAdminContext (verified session); client claims never trusted; unknown actions rejected pre-query
+  - Best-effort audit inserts immediately after successful mutations; failures loud-logged and never masquerade as success or failure of the business operation
+  - processed_webhook_events remains the payment ledger and is NOT duplicated as an audit log; share_events remains product telemetry
+- **Known limitations**: best-effort writes can be lost on DB failure (loud-logged); detail payloads intentionally minimal
+- **Follow-up work**: Phase 9 - Security and Reliability (Task 9.1 Input validation review)
+- **Follow-up work**: Task 9.2 - Rate limiting
+
+---
+
+## Phase 9 - Security and Reliability
+
+---
+
+### Task 9.1
+
+- **Date**: 2026-08-24
+- **Objective**: Review every externally-influenced input entering server-side code, classify findings, and fix only concrete input-validation gaps - no payment/webhook/email/share behavior changes, no new dependencies
+- **Status**: Completed
+- **Audit scope**: Stripe webhook payload/signature; success/unsubscribe/admin banner search params; admin login credentials + next redirects; category mutation fields; refund bid_id (JSON+form); share-event JSON; banned-email values; audit-log inputs; all public bid/category queries; RLS/RPC second lines of defense
+- **Findings classification**:
+  - A (already validated, no change): webhook SDK signature parsing + authoritative Stripe re-retrieval; createPendingBid amount matrix (finite/integer/positive) with RPC re-validation under lock; slug normalization + active-only filters; extractSessionId; unsubscribe token shape gate; canonicalizeEmail; sanitizeNextPath incl. /\\ protocol-relative trick; normalizeBidId strict UUID; writeAuditLog action allow-list; trackShareEvent allow-list + server JSON try/catch -> 400
+  - B (fixed): prototype-chain record indexing on the three admin banner pages - RESULT_MESSAGES/ERROR_MESSAGES indexed with search-param strings let inherited keys (**proto**/constructor/toString) resolve truthy through the prototype chain, defeating ?? fallbacks and crashing React rendering; plus a duplicated weaker inline sanitizer on the login page missing the backslash protocol-relative case
+  - C/D (documented only): int4 upper bound surfaces as generic infra error (fails closed); abandoned pending reservations elevate floors indefinitely; Number(row.amount) in bids-client is a safe no-op cast on NOT NULL columns; login email format delegated to Supabase Auth authoritatively; repeated share events intentionally counted separately
+- **What was implemented**:
+  - src/lib/safe-lookup.ts: lookupRecordValue(record, key, fallback) - hasOwnProperty-based prototype-safe map lookup used by every search-param-driven message map
+  - src/app/admin/login/page.tsx: sanitizer deduplicated onto the shared guard (adds the missing backslash case at this surface)
+  - src/app/admin/categories|payments|banned pages: banner lookups switched to the helper (identical output for valid input)
+  - src/lib/safe-lookup.test.ts (created, 10 tests)
+- **Files changed**: src/lib/safe-lookup.ts + test (created); src/app/admin/{categories,payments,banned}/page.tsx + src/app/admin/login/page.tsx (hardening/dedupe); docs/9.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 562/562 across 34 files (+10 net); typecheck/lint/format:check/build all PASSED
+- **Important technical decisions**:
+  - No validation library introduced; small pure helpers match the established testable-lib convention
+  - TypeScript types alone are not validation - runtime guards remain the enforcement layer at every untrusted boundary, verified by the inventory above
+- **Known limitations**: none blocking; remaining observations are documented as non-blocking defense-in-depth notes
+- **Follow-up work**: Task 9.2 - Rate limiting
 
 ---
 
