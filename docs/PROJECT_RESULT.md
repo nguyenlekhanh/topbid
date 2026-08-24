@@ -2284,6 +2284,39 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**:
   - Destination remains the global leaderboard until Task 7.4 lands per-category URLs
   - Insecure contexts (non-https) lack the Clipboard API → visible 'Copy failed'
+- **Follow-up work**: Task 7.4 — Public category URL
+
+---
+
+### Task 7.4
+
+- **Date**: 2026-08-24
+- **Objective**: Introduce the project's first public category-specific URL, resolving identity exclusively through the authoritative slug query with uniform not-found behavior
+- **Status**: Completed
+- **What was implemented**:
+  - Route `/categories/[slug]` (dynamic server component) - shape chosen because the plural prefix already existed in Hero/CategoryCards hrefs; no aliases
+  - src/lib/category-page.ts: loadCategoryPageData(slug) composes the existing getCategoryBySlug (trim/lowercase normalization of untrusted slug, app-level + RLS is_active=true enforcement) and getHighestBidForCategory (paid-only); returns null for missing/inactive/malformed slugs, and the page maps null to Next.js notFound()
+  - Page renders only DB-sourced public facts: name, description (nullable), current highest paid bid ("No bids yet" when none), starting bid, increment; static metadata title only; React-escaped rendering
+  - Sharing integration decision Option A: Tasks 7.2/7.3 remain unchanged (leaderboard-anchor URL still valid; per-category sharing is an improvement, not a 7.4 correctness requirement) - documented as deferred
+  - Justified collateral fix: creating the route activated Next's no-html-link-for-pages rule on two pre-existing dead placeholder links (Hero "Start Bidding", CategoryCards "View All Categories"); converted to next/link pointing at "/" (the real homepage categories grid)
+- **Files changed**:
+  - src/app/categories/[slug]/page.tsx (created)
+  - src/lib/category-page.ts + src/lib/category-page.test.ts (created, 8 tests)
+  - src/components/Hero.tsx, src/components/CategoryCards.tsx (placeholder link conversion)
+  - docs/7.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 338/338 across 19 files (+11 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/categories/[slug] registered as dynamic route)
+- **Important technical decisions**:
+  - Slug is a lookup key, never authoritative content: every displayed fact is read back from DB rows under RLS; service role never used for public reads
+  - nonexistent/inactive/malformed collapse into one not-found outcome (no existence leak); inactive categories are never exposed even though their rows exist
+  - No OG metadata/images/tracking (7.5+), no bidding flows, no admin features
+- **Known limitations**:
+  - Bare /categories index page does not exist (out of scope); converted links point at the homepage grid instead of a dead route
+  - 7.2/7.3 share destinations intentionally unchanged until a future task re-points them at /categories/[slug]
 - **Follow-up work**: Task 7.5 — Open Graph metadata
 
 ---
@@ -2320,36 +2353,21 @@ This file records what has actually been built, not what was planned.
 
 ---
 
-### Task 7.4
+### Task 7.6
 
 - **Date**: 2026-08-24
-- **Objective**: Introduce the project's first public category-specific URL, resolving identity exclusively through the authoritative slug query with uniform not-found behavior
+- **Objective**: Generate a dynamic OG image for public category pages via the framework-native mechanism, fed by the existing authoritative loader - no tracking (7.7), no new dependencies
 - **Status**: Completed
 - **What was implemented**:
-  - Route `/categories/[slug]` (dynamic server component) - shape chosen because the plural prefix already existed in Hero/CategoryCards hrefs; no aliases
-  - src/lib/category-page.ts: loadCategoryPageData(slug) composes the existing getCategoryBySlug (trim/lowercase normalization of untrusted slug, app-level + RLS is_active=true enforcement) and getHighestBidForCategory (paid-only); returns null for missing/inactive/malformed slugs, and the page maps null to Next.js notFound()
-  - Page renders only DB-sourced public facts: name, description (nullable), current highest paid bid ("No bids yet" when none), starting bid, increment; static metadata title only; React-escaped rendering
-  - Sharing integration decision Option A: Tasks 7.2/7.3 remain unchanged (leaderboard-anchor URL still valid; per-category sharing is an improvement, not a 7.4 correctness requirement) - documented as deferred
-  - Justified collateral fix: creating the route activated Next's no-html-link-for-pages rule on two pre-existing dead placeholder links (Hero "Start Bidding", CategoryCards "View All Categories"); converted to next/link pointing at "/" (the real homepage categories grid)
-- **Files changed**:
-  - src/app/categories/[slug]/page.tsx (created)
-  - src/lib/category-page.ts + src/lib/category-page.test.ts (created, 8 tests)
-  - src/components/Hero.tsx, src/components/CategoryCards.tsx (placeholder link conversion)
-  - docs/7.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
-- **Tests performed**:
-  - `npm run test`: PASSED - 338/338 across 19 files (+11 net)
-  - `npm run typecheck`: PASSED
-  - `npm run lint`: PASSED
-  - `npm run format:check`: PASSED
-  - `npm run build`: PASSED (/categories/[slug] registered as dynamic route)
-- **Important technical decisions**:
-  - Slug is a lookup key, never authoritative content: every displayed fact is read back from DB rows under RLS; service role never used for public reads
-  - nonexistent/inactive/malformed collapse into one not-found outcome (no existence leak); inactive categories are never exposed even though their rows exist
-  - No OG metadata/images/tracking (7.5+), no bidding flows, no admin features
-- **Known limitations**:
-  - Bare /categories index page does not exist (out of scope); converted links point at the homepage grid instead of a dead route
-  - 7.2/7.3 share destinations intentionally unchanged until a future task re-points them at /categories/[slug]
-- **Follow-up work**: Task 7.5 — Open Graph metadata
+  - src/app/categories/[slug]/opengraph-image.tsx: Next.js opengraph-image convention with ImageResponse from next/og; 1200x630 PNG (size/contentType exports); runtime nodejs (proven Supabase server path) + dynamic force-dynamic (image embeds leaderboard-changing data, renders per request, no custom invalidation)
+  - src/lib/category-og-image.ts: pure buildOgImageContent content model - brand wordmark, category name truncated at 60 chars, description tagline truncated at 120, amount block labeled "Current highest bid" when a PAID bid exists vs "Starting bid" fallback (pending can never appear - loader is paid-only), whole-dollar USD formatting
+  - Unresolvable slugs render a neutral brand-only dark card containing zero category data (same no-existence-leak boundary as the page notFound)
+  - Metadata integration: framework auto-attaches og:image/twitter:image for the route, so Task 7.5 metadata required zero changes
+- **Files changed**: src/lib/category-og-image.ts + test (created, 13 tests); src/app/categories/[slug]/opengraph-image.tsx (created); docs/7.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 364/364 across 21 files (+13); typecheck/lint/format:check/build all PASSED (/categories/[slug]/opengraph-image registered dynamic)
+- **Important technical decisions**: Node runtime over edge reuses the exact Supabase query path; no runtime font fetching (satori bundled default keeps Vercel reliability); monochrome palette mirrors globals.css tokens; sensitive fields literally do not exist on the content model; database strings render through satori text primitives only
+- **Known limitations**: default satori font trades typographic fidelity for reliability; per-request generation favors freshness over caching
+- **Follow-up work**: Task 7.7 Share tracking
 
 ---
 

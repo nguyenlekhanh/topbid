@@ -1,32 +1,50 @@
 ﻿TASK ID: 7.6
 PHASE: 7
 TITLE: Dynamic OG image
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Generate a dynamic Open Graph image for public category pages using the framework-native mechanism, fed by the existing authoritative category loader - with no share tracking (7.7), no analytics, and no new dependencies.
 
-SCOPE:
+FRAMEWORK MECHANISM:
+Next.js App Router convention src/app/categories/[slug]/opengraph-image.tsx using ImageResponse from next/og. Next automatically attaches the generated image to the route's og:image/twitter:image metadata, so Task 7.5 metadata fields required NO manual changes.
 
-OUT OF SCOPE:
+RUNTIME DECISION:
+runtime = 'nodejs' + dynamic = 'force-dynamic'. Node is the proven path for every existing route (Supabase server query path); edge offers no benefit here. force-dynamic because the image embeds leaderboard-changing data - it renders per request rather than being statically cached; no custom invalidation system, queues, or cron.
 
-INPUTS / DEPENDENCIES:
+DIMENSIONS/FORMAT:
+1200x630 PNG (standard social preview), exported via size/contentType from OG_IMAGE_SIZE.
 
-IMPLEMENTATION REQUIREMENTS:
+AUTHORITATIVE DATA FLOW:
+URL slug -> loadCategoryPageData(slug) -> getCategoryBySlug (active-only app filter + RLS) -> getHighestBidForCategory (paid-only) -> pure buildOgImageContent -> ImageResponse. No query-parameter data accepted; no SQL duplicated.
 
-FILES EXPECTED TO CHANGE:
+VISUAL/DATA CONTENT (monochrome brand identity #0a0a0a/#ffffff/#f5f5f5/#737373/#e5e5e5 mirroring globals.css tokens):
+- Topbid.lol wordmark
+- Category name (deterministic 60-char truncation)
+- Description tagline when present (120-char truncation)
+- Amount block: "Current highest bid" + whole-dollar USD when a PAID highest bid exists; "Starting bid" + starting_bid when none - labels make explicit that a starting bid is not an actual bid
+- topbid.lol footer
+NO bidder email/name, Stripe session/payment ids, internal bid ids, unsubscribe tokens, pending bids, or winner/rank claims anywhere in the content model (fields literally do not exist on it).
 
-TEST PLAN:
+NO-BID BEHAVIOR:
+No paid bids -> "Starting bid" label with categories.starting_bid. Pending bids can never appear (loader surfaces status='paid' only).
 
-DEFINITION OF DONE:
+ERROR / NOT-FOUND BEHAVIOR:
+Unresolvable slugs render a neutral brand-only dark card containing ZERO category data - identical no-existence-leak boundary as the page's notFound(). DB failures surface as route errors per project conventions (no fake data substituted).
 
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FONT HANDLING:
+No runtime font fetching - satori's bundled default font keeps the route reliable on Vercel without network dependencies.
 
 TESTS ACTUALLY RUN:
+- npm run test: 364/364 PASSED across 21 files (+13 new pure content-model tests: paid-vs-starting labeling incl. pending-cannot-be-paid pin, USD formatting, 60/120-char deterministic truncations, blank-description omission, raw-text pass-through safety (framework escapes rendering), branding presence, sensitive-identifier absence, size constant, determinism). ImageResponse rendering itself is framework territory; every data decision the pixels depend on is unit-pinned.
+- npm run typecheck / lint / format:check / build: all PASSED; build registers /categories/[slug]/opengraph-image as dynamic route.
+
+SCOPE BOUNDARY (explicit):
+NO 7.7 share tracking/click analytics/counters/referrer tracking/tracking params. NO PostHog/analytics SDKs. No changes to 7.2 Share on X, 7.3 Copy link, payment flows, or email flows. No heavyweight image dependencies (next/og ships with Next.js).
 
 KNOWN ISSUES:
+- Default satori font limits typographic fidelity to the site's Geist fonts (acceptable trade-off for reliability).
+- Per-request generation trades caching for freshness; add framework revalidation later if traffic warrants.
 
 FOLLOW-UP:
+Task 7.7 - Share tracking

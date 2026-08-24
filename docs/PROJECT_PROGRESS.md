@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 7 in progress — 7.5 completed** — Next recommended: 7.6
+**Phase 7 in progress — 7.6 completed** — Next recommended: 7.7
 
 ## Completed Tasks
 
@@ -84,6 +84,7 @@
 - 7.3: Copy share link ✓
 - 7.4: Public category URL ✓
 - 7.5: Open Graph metadata ✓
+- 7.6: Dynamic OG image ✓
 
 ## Tasks in Progress
 
@@ -178,6 +179,7 @@ _None_
 - Copy share link added (pure share-url.ts buildPublicShareUrl = single source for the canonical {APP_URL}/#leaderboard-heading feeding BOTH the X intent and the clipboard; outcome-based copy-to-clipboard.ts abstraction (injected writer for tests, navigator.clipboard in prod, never throws); 'use client' CopyShareLink button with idle/copied/failed feedback + cleanup-safe 2s reset rendered via optional SuccessState prop; copied string pinned to contain no session_id/cs_/pi_/email/token; no toast library, no dependency, no 7.4+ scope)
 - Public category URL added (new dynamic route /categories/[slug] matching the pre-existing /categories href prefix; pure category-page.ts loader composes authoritative getCategoryBySlug (active-only, normalized slug, RLS) + getHighestBidForCategory (paid-only) with null -> notFound() collapsing nonexistent/inactive/malformed slugs; page renders DB-sourced name/description/highest-bid/starting-bid/increment only; static metadata title, NO OG/7.5+; 7.2/7.3 share URLs deliberately unchanged per Option A; collateral lint-activated fix converted two dead <a href="/categories"> placeholders to Link "/" )
 - Open Graph metadata added (server-side generateMetadata on /categories/[slug] built from the same loadCategoryPageData authority - unresolvable slugs return empty metadata and fall through to not-found; pure category-metadata.ts buildCategoryMetadata emits title "{name} — Topbid.lol", authoritative-or-fallback description, canonical {APP_URL}/categories/{encoded-slug}, openGraph title/description/url/siteName/type, twitter summary card; no winner/rank claims, no images field (7.6), no tracking (7.7); buildCategoryUrl added to share-url.ts for encoded canonical paths; 7.2/7.3 share destinations untouched)
+- Dynamic OG image added (framework-native opengraph-image.tsx + next/og ImageResponse at /categories/[slug]/opengraph-image; 1200x630 PNG; nodejs runtime + force-dynamic reusing loadCategoryPageData authority; pure category-og-image.ts content model: brand wordmark, truncated name/description, labeled amount - Current highest bid when a PAID bid exists vs Starting bid fallback, whole-dollar USD; unresolvable slugs render neutral brand-only card with zero category data; satori default font, no runtime font fetching or new dependencies; Next auto-attaches og:image/twitter:image so 7.5 metadata untouched)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -198,7 +200,7 @@ _None_
 
 ## Next Recommended Task
 
-**7.6 — Dynamic OG image**
+**7.7 — Share tracking**
 
 ## Notes
 
@@ -289,5 +291,7 @@ Task 7.3 completed successfully. Copy share link added: canonical URL extracted 
 Task 7.4 completed successfully. Public category URL introduced: dynamic /categories/[slug] route (matching the pre-existing /categories href prefix) backed by pure category-page.ts loader composing getCategoryBySlug (authoritative, active-only, normalized slug, RLS) + getHighestBidForCategory (paid-only) with null collapsing to notFound() for nonexistent/inactive/malformed slugs; page renders only DB-sourced public facts (name/description/highest bid with No-bids-yet state/starting bid/increment); static metadata title only - NO OG metadata/images/tracking (7.5+); 7.2/7.3 share destinations deliberately unchanged per Option A; collateral fix converted two dead placeholder <a href="/categories"> links to Link "/"; 338/338 tests passing.
 
 Task 7.5 completed successfully. Open Graph metadata added to /categories/[slug]: server-side generateMetadata reuses the loadCategoryPageData authority and delegates to pure category-metadata.ts buildCategoryMetadata emitting title "{name} — Topbid.lol", authoritative-or-deterministic-fallback description, canonical alternates URL via new percent-encoding buildCategoryUrl, openGraph block (title/description/url/siteName/type website) and twitter summary card; unresolvable categories produce empty metadata and standard not-found (no existence leak); serialized output pinned free of session/payment/bidder identifiers and winner claims; NO OG image generation or tracking (7.6/7.7); 351/351 tests passing.
+
+Task 7.6 completed successfully. Dynamic OG image added: src/app/categories/[slug]/opengraph-image.tsx renders a 1200x630 PNG via next/og ImageResponse on the nodejs runtime with force-dynamic freshness; data flows through the existing loadCategoryPageData authority (active-only category + paid-only highest bid); pure category-og-image.ts content model labels the amount Current-highest-bid vs Starting-bid (pending never treated as paid), truncates long text deterministically, and exposes no sensitive fields at all; unresolvable slugs render a neutral brand-only card; Next auto-attaches og:image/twitter:image so 7.5 metadata needed no changes; no runtime font fetching, no new dependencies, NO tracking of any kind (7.7); 364/364 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
