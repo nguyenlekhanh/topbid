@@ -15,3 +15,12 @@
 export function buildPublicShareUrl(baseUrl: string): string {
   return `${baseUrl.trim().replace(/\/+$/, '')}/#leaderboard-heading`;
 }
+
+/**
+ * Canonical public URL for a category page (Task 7.4 route, consumed by Task 7.5
+ * metadata). The slug is percent-encoded so any character arriving from the URL can
+ * never break out of its path segment.
+ */
+export function buildCategoryUrl(baseUrl: string, slug: string): string {
+  return `${baseUrl.trim().replace(/\/+$/, '')}/categories/${encodeURIComponent(slug)}`;
+}

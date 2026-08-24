@@ -2284,7 +2284,39 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**:
   - Destination remains the global leaderboard until Task 7.4 lands per-category URLs
   - Insecure contexts (non-https) lack the Clipboard API → visible 'Copy failed'
-- **Follow-up work**: Task 7.4 — Public category URL
+- **Follow-up work**: Task 7.5 — Open Graph metadata
+
+---
+
+### Task 7.5
+
+- **Date**: 2026-08-24
+- **Objective**: Serve deterministic Open Graph metadata for the public category route, built exclusively from authoritative database fields - no OG image generation (7.6), no share tracking (7.7)
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/category-metadata.ts: pure buildCategoryMetadata({category, baseUrl}) emitting Next Metadata — title "{name} — Topbid.lol"; description from authoritative category.description with deterministic fallback; alternates.canonical + openGraph.url = {APP_URL}/categories/{percent-encoded slug}; openGraph siteName/type website; twitter summary card
+  - src/lib/share-url.ts: buildCategoryUrl(baseUrl, slug) with established trailing-slash normalization and encodeURIComponent slug
+  - src/app/categories/[slug]/page.tsx: static metadata export replaced by server-side generateMetadata reusing loadCategoryPageData; unresolvable categories return empty metadata and fall through to standard not-found
+- **Files changed**:
+  - src/lib/category-metadata.ts + test (created, 11 tests)
+  - src/lib/share-url.ts + test (+2 cases)
+  - src/app/categories/[slug]/page.tsx (generateMetadata)
+  - docs/7.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 351/351 across 20 files (+13 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Metadata generated ONLY for resolvable active categories; nonexistent/inactive/malformed slugs produce empty metadata (no existence leak) while the page renders notFound()
+  - No highest-bid/rank claims in metadata: PROJECT_PLAN.md does not require dynamic bid claims and stable copy is more share-friendly; no images field exists until Task 7.6
+  - Serialized output pinned by tests free of session ids/payment intent ids/bidder emails/unsubscribe tokens/internal bid ids; framework serializes the object - raw <meta>/<head> HTML never hand-built
+  - Missing NEXT_PUBLIC_APP_URL throws descriptively, consistent with all other URL builders
+- **Known limitations**:
+  - generateMetadata and the page each invoke loadCategoryPageData (two identical reads per request); request-level caching is a future optimization
+  - 7.2/7.3 share destinations remain the leaderboard anchor per Task 7.4's Option-A decision
+- **Follow-up work**: Task 7.6 — Dynamic OG image
 
 ---
 

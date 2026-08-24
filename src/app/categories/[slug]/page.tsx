@@ -3,11 +3,41 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { loadCategoryPageData } from '@/lib/category-page';
+import { buildCategoryMetadata } from '@/lib/category-metadata';
 
-// Static title only - dynamic/OG metadata is Task 7.5 scope and deliberately absent.
-export const metadata: Metadata = {
-  title: 'Category — Topbid.lol',
-};
+/**
+ * Public category page (Task 7.4) with Open Graph metadata (Task 7.5).
+ *
+ * - Identity resolves exclusively through the authoritative slug query
+ *   (getCategoryBySlug via loadCategoryPageData): active-only at the app level and
+ *   under RLS, so nonexistent/inactive/malformed slugs uniformly render notFound()
+ *   with no existence leak
+ * - Every displayed fact comes from database rows; bid data is PAID-only public
+ *   leaderboard data (no pending bids, no bidder emails, no Stripe identifiers)
+ * - Metadata (Task 7.5) is generated server-side from the same authoritative loader;
+ *   unresolvable categories never produce category metadata - they fall through to
+ *   the default not-found handling. No OG image is generated (Task 7.6); no share
+ *   tracking exists (Task 7.7)
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const data = await loadCategoryPageData(slug);
+
+  if (!data) {
+    // Unresolvable categories get no public category metadata; the page renders the
+    // standard not-found response.
+    return {};
+  }
+
+  return buildCategoryMetadata({
+    category: data.category,
+    baseUrl: process.env.NEXT_PUBLIC_APP_URL ?? '',
+  });
+}
 
 function formatAmount(amountCents: number): string {
   return new Intl.NumberFormat('en-US', {

@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 7 in progress — 7.4 completed** — Next recommended: 7.5
+**Phase 7 in progress — 7.5 completed** — Next recommended: 7.6
 
 ## Completed Tasks
 
@@ -83,6 +83,7 @@
 - 7.2: Share on X (Twitter) ✓
 - 7.3: Copy share link ✓
 - 7.4: Public category URL ✓
+- 7.5: Open Graph metadata ✓
 
 ## Tasks in Progress
 
@@ -176,6 +177,7 @@ _None_
 - Share on X added (pure x-share.ts: buildXShareText composes claim-free copy from authoritative amount/category only - no winner claims; buildXShareUrl emits canonical percent-encoded https://x.com/intent/tweet intent; shared URL = {NEXT_PUBLIC_APP_URL}/#leaderboard-heading, an existing valid public destination that leaks no session/payment identifiers; optional xShareUrl prop renders a Share-on-X anchor inside SuccessState's existing action group with inline SVG icon; built server-side so no secrets enter the client bundle; no route invented for 7.4, no copy-link/tracking for 7.3/7.7)
 - Copy share link added (pure share-url.ts buildPublicShareUrl = single source for the canonical {APP_URL}/#leaderboard-heading feeding BOTH the X intent and the clipboard; outcome-based copy-to-clipboard.ts abstraction (injected writer for tests, navigator.clipboard in prod, never throws); 'use client' CopyShareLink button with idle/copied/failed feedback + cleanup-safe 2s reset rendered via optional SuccessState prop; copied string pinned to contain no session_id/cs_/pi_/email/token; no toast library, no dependency, no 7.4+ scope)
 - Public category URL added (new dynamic route /categories/[slug] matching the pre-existing /categories href prefix; pure category-page.ts loader composes authoritative getCategoryBySlug (active-only, normalized slug, RLS) + getHighestBidForCategory (paid-only) with null -> notFound() collapsing nonexistent/inactive/malformed slugs; page renders DB-sourced name/description/highest-bid/starting-bid/increment only; static metadata title, NO OG/7.5+; 7.2/7.3 share URLs deliberately unchanged per Option A; collateral lint-activated fix converted two dead <a href="/categories"> placeholders to Link "/" )
+- Open Graph metadata added (server-side generateMetadata on /categories/[slug] built from the same loadCategoryPageData authority - unresolvable slugs return empty metadata and fall through to not-found; pure category-metadata.ts buildCategoryMetadata emits title "{name} — Topbid.lol", authoritative-or-fallback description, canonical {APP_URL}/categories/{encoded-slug}, openGraph title/description/url/siteName/type, twitter summary card; no winner/rank claims, no images field (7.6), no tracking (7.7); buildCategoryUrl added to share-url.ts for encoded canonical paths; 7.2/7.3 share destinations untouched)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -196,7 +198,7 @@ _None_
 
 ## Next Recommended Task
 
-**7.5 — Open Graph metadata**
+**7.6 — Dynamic OG image**
 
 ## Notes
 
@@ -285,5 +287,7 @@ Task 7.2 completed successfully. Share on X added without touching Task 7.4's sc
 Task 7.3 completed successfully. Copy share link added: canonical URL extracted into pure share-url.ts buildPublicShareUrl so the X intent and the clipboard share a single source ({APP_URL}/#leaderboard-heading - unchanged from 7.2, no 7.4 route invented); outcome-based copy-to-clipboard.ts never throws and degrades to honest 'Copy failed' feedback when the API is unavailable or rejects; new client component CopyShareLink renders via optional SuccessState prop with cleanup-safe auto-reset feedback; copied value pinned by tests to contain zero payment identifiers; no toast/clipboard dependencies; 327/327 tests passing.
 
 Task 7.4 completed successfully. Public category URL introduced: dynamic /categories/[slug] route (matching the pre-existing /categories href prefix) backed by pure category-page.ts loader composing getCategoryBySlug (authoritative, active-only, normalized slug, RLS) + getHighestBidForCategory (paid-only) with null collapsing to notFound() for nonexistent/inactive/malformed slugs; page renders only DB-sourced public facts (name/description/highest bid with No-bids-yet state/starting bid/increment); static metadata title only - NO OG metadata/images/tracking (7.5+); 7.2/7.3 share destinations deliberately unchanged per Option A; collateral fix converted two dead placeholder <a href="/categories"> links to Link "/"; 338/338 tests passing.
+
+Task 7.5 completed successfully. Open Graph metadata added to /categories/[slug]: server-side generateMetadata reuses the loadCategoryPageData authority and delegates to pure category-metadata.ts buildCategoryMetadata emitting title "{name} — Topbid.lol", authoritative-or-deterministic-fallback description, canonical alternates URL via new percent-encoding buildCategoryUrl, openGraph block (title/description/url/siteName/type website) and twitter summary card; unresolvable categories produce empty metadata and standard not-found (no existence leak); serialized output pinned free of session/payment/bidder identifiers and winner claims; NO OG image generation or tracking (7.6/7.7); 351/351 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

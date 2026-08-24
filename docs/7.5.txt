@@ -1,32 +1,49 @@
 ﻿TASK ID: 7.5
 PHASE: 7
 TITLE: Open Graph metadata
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Serve deterministic Open Graph metadata for the public category route /categories/[slug], built exclusively from authoritative database category fields and the trusted base URL - with no OG image generation (7.6) and no share tracking (7.7).
 
-SCOPE:
+TARGET ROUTE:
+/categories/[slug] only. Homepage/success/cancel/unsubscribe keep their existing static metadata; adding metadata elsewhere was not required by the task.
 
-OUT OF SCOPE:
+AUTHORITATIVE DATA SOURCE:
+The same loadCategoryPageData loader the page renders from (getCategoryBySlug active-only under RLS + getHighestBidForCategory paid-only). Metadata is generated ONLY when the category resolves; unresolvable slugs (nonexistent/inactive/malformed) return empty metadata and fall through to standard not-found handling - no existence leak, no stale category facts.
 
-INPUTS / DEPENDENCIES:
+FIELDS IMPLEMENTED:
+- title: "{category.name} — Topbid.lol" (matches existing page-title convention)
+- description: authoritative category.description; deterministic fallback "Bid on {name} on Topbid.lol - place your bid to claim the top spot." when absent/blank
+- alternates.canonical: {APP_URL}/categories/{slug} (slug percent-encoded)
+- openGraph: title/description/url/siteName "Topbid.lol"/type website
+- twitter: card summary + title/description (natural part of the same metadata requirement)
+- Deliberately NO highest-bid/rank claims in metadata: PROJECT_PLAN.md does not require dynamic bid claims and stable copy is more share-friendly; also NO images field (no image exists until Task 7.6)
 
-IMPLEMENTATION REQUIREMENTS:
+CANONICAL URL STRATEGY:
+New pure buildCategoryUrl(baseUrl, slug) added to share-url.ts (the existing public-URL module) reusing the established trailing-slash normalization and percent-encoding the slug. The X intent (7.2), clipboard (7.3), and canonical URL remain independent consumers by design - 7.2/7.3 were NOT changed per the Option-A decision recorded in 7.4.
 
-FILES EXPECTED TO CHANGE:
+NEXT.JS MECHANISM:
+Server-side generateMetadata() in src/app/categories/[slug]/page.tsx replacing the previous static export. Metadata construction itself lives in pure src/lib/category-metadata.ts (testable-lib convention) returning a Next Metadata object - the framework serializes it; raw <meta>/<head> HTML is never hand-built.
 
-TEST PLAN:
+SECURITY:
+All category text treated as untrusted DB content - rendered/serialized only through Next's metadata model, never injected as raw HTML. Serialized output pinned by tests to contain no session ids/payment intent ids/bidder emails/unsubscribe tokens/internal bid ids, and to make no winner/#1 claims. Missing NEXT_PUBLIC_APP_URL throws descriptively (consistent with every other URL builder); server secrets never enter the object.
 
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/category-metadata.ts + test (new, 11 tests)
+- src/lib/share-url.ts (+buildCategoryUrl) + test (+2 cases)
+- src/app/categories/[slug]/page.tsx (static metadata -> generateMetadata)
+- docs/7.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 351/351 PASSED across 20 files (+13 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NO opengraph-image.tsx / ImageResponse / generated assets (7.6). NO tracking pixels, analytics, or share-tracking parameters (7.7). No changes to 7.2 Share on X, 7.3 Copy link, payment flows, or email flows.
 
 KNOWN ISSUES:
+- generateMetadata and the page each invoke loadCategoryPageData (two identical reads per request); React-level request dedup/cache is a future optimization, harmless for MVP.
 
 FOLLOW-UP:
+Task 7.6 - Dynamic OG image
