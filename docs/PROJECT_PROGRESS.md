@@ -220,7 +220,7 @@ _None_
 
 ## Next Recommended Task
 
-**9.5 - Webhook security review**
+**9.6 - Database security review**
 
 ## Notes
 
