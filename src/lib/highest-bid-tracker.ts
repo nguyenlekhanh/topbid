@@ -1,4 +1,4 @@
-import type { BidChangePayload } from './realtime';
+import type { BidChangePayload, RealtimeConnectionStatus } from './realtime';
 
 /**
  * Live highest-bid tracking for a single category (Task 5.2).
@@ -7,13 +7,21 @@ import type { BidChangePayload } from './realtime';
  * the displayed value is always re-fetched from the authoritative paid-bids query.
  * Events for other categories are ignored, bursts are coalesced, and the callback fires
  * only when the authoritative amount actually changes.
+ *
+ * Task 5.7: an optional onConnectionChange receives connected/disconnected signals;
+ * 'connected' (recovery after a known outage) triggers an immediate coalesced refetch so
+ * changes missed while disconnected are not silently lost.
  */
 export type HighestBidTrackerOptions = {
   categoryId: string;
   initialAmount?: number | null;
-  subscribe: (onChange: (payload: BidChangePayload) => void) => () => void;
+  subscribe: (
+    onChange: (payload: BidChangePayload) => void,
+    onStatusChange?: (status: RealtimeConnectionStatus) => void
+  ) => () => void;
   fetchHighest: (categoryId: string) => Promise<number | null>;
   onHighestChange: (amount: number | null) => void;
+  onConnectionChange?: (status: RealtimeConnectionStatus) => void;
 };
 
 function isRelevantEvent(payload: BidChangePayload, categoryId: string): boolean {
@@ -65,11 +73,21 @@ export function createHighestBidTracker(options: HighestBidTrackerOptions): () =
     }
   };
 
-  return options.subscribe((payload) => {
-    if (!isRelevantEvent(payload, options.categoryId)) {
-      return;
-    }
+  return options.subscribe(
+    (payload) => {
+      if (!isRelevantEvent(payload, options.categoryId)) {
+        return;
+      }
 
-    void refetch();
-  });
+      void refetch();
+    },
+    (status) => {
+      // Task 5.7: recovered connection -> resync anything missed while offline.
+      if (status === 'connected') {
+        void refetch();
+      }
+
+      options.onConnectionChange?.(status);
+    }
+  );
 }

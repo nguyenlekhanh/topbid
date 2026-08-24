@@ -1928,6 +1928,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 5.7 — Connection/reconnection handling
 
+### Task 5.7
+
+- **Date**: 2026-08-23
+- **Objective**: Handle Supabase Realtime connection failures and recovery for the bids subscription — deduplicate outage signals, detect genuine recovery, and resync authoritative data so changes missed while disconnected are not silently lost
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/realtime.ts: RealtimeConnectionStatus ('connected' | 'disconnected') + optional onStatusChange parameter on subscribeToBidChanges; closure-level hasDisconnected guard maps raw channel statuses to deduplicated signals — CHANNEL_ERROR/TIMED_OUT/CLOSED -> 'disconnected' once per outage; SUBSCRIBED after such an outage -> 'connected' (recovery); the initial SUBSCRIBED emits nothing (consumers own their first fetch)
+  - All three trackers (highest-bid/leaderboard/recent-bids) gained optional onConnectionChange forwarded through the subscribe contract; 'connected' triggers each tracker's existing coalesced authoritative refetch, recovering anything missed while offline — single implementation per tracker, no component changes, no duplicated reconnection logic
+  - Unsubscribe severs both change and status paths (fake parity verified), preventing duplicate subscriptions/stale listeners across reconnect cycles
+- **Files changed**:
+  - src/lib/realtime.ts (status mapping/dedup + onStatusChange)
+  - src/lib/highest-bid-tracker.ts / leaderboard-tracker.ts / recent-bids-tracker.ts (onConnectionChange forwarding + recovery refetch)
+  - src/lib/realtime.test.ts (+5 connection-transition tests)
+  - src/lib/highest-bid-tracker.test.ts (+2 recovery tests; harness captures status handlers)
+  - docs/5.7.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 147/147 PASSED across 9 files
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: status mapping matches installed supabase-js channel API (SUBSCRIBED/CHANNEL_ERROR/TIMED_OUT/CLOSED), dedup guards, optional-callback safety, cleanup correctness
+  - Live outage/recovery verification against real infrastructure: SKIPPED — Docker/remote test project unavailable; NOT claimed and NOT faked
+- **Important technical decisions**:
+  - Recovery-as-refetch chosen over payload replay: authoritative queries inherently recover missed changes without buffering or replaying events
+  - Deduplication lives in realtime.ts's wrapper (once-per-outage) rather than in every consumer
+  - No visible offline banners added — data-correctness handling is this task's scope; UI indication would be polish beyond it
+- **Known limitations**: None within scope
+- **Follow-up work**: Phase 5 complete — Task 6.1 — Detect previous highest bidder
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

@@ -11,6 +11,15 @@ import { createClient } from '@/lib/supabase';
  * - The row shape is declared structurally here instead of importing ./bids: bids.ts
  *   pulls in server-only modules (service-role Stripe/Supabase paths) that must never
  *   enter the browser bundle.
+ *
+ * Task 5.7 - connection/reconnection handling:
+ * - The underlying supabase-js socket reconnects automatically; this wrapper translates
+ *   the raw channel statuses into a deduplicated connected/disconnected signal:
+ *     CHANNEL_ERROR / TIMED_OUT / CLOSED -> 'disconnected' (once per outage)
+ *     SUBSCRIBED after such an outage    -> 'connected'   (recovery)
+ * - The initial SUBSCRIBED does not emit anything: consumers already fetch initial data
+ *   themselves, so only genuine RECOVERIES trigger a resync.
+ * - Repeated errors while already disconnected do not re-emit 'disconnected'.
  */
 
 export type RealtimeBidRow = {
@@ -35,8 +44,15 @@ export type BidChangePayload = {
   old: RealtimeBidRow | null;
 };
 
-export function subscribeToBidChanges(onChange: (payload: BidChangePayload) => void): () => void {
+export type RealtimeConnectionStatus = 'connected' | 'disconnected';
+
+export function subscribeToBidChanges(
+  onChange: (payload: BidChangePayload) => void,
+  onStatusChange?: (status: RealtimeConnectionStatus) => void
+): () => void {
   const supabase = createClient();
+
+  let hasDisconnected = false;
 
   const channel = supabase
     .channel('bids-changes')
@@ -56,8 +72,26 @@ export function subscribeToBidChanges(onChange: (payload: BidChangePayload) => v
       }
     )
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.error(`[realtime] bids channel problem: ${status}`);
+      switch (status) {
+        case 'CHANNEL_ERROR':
+        case 'TIMED_OUT':
+        case 'CLOSED':
+          // Emit once per outage, not for every repeated failure while down.
+          if (!hasDisconnected) {
+            hasDisconnected = true;
+
+            console.error(`[realtime] bids channel problem: ${status}`);
+            onStatusChange?.('disconnected');
+          }
+          break;
+        case 'SUBSCRIBED':
+          // Recovery: the channel re-joined after a known outage.
+          if (hasDisconnected) {
+            hasDisconnected = false;
+
+            onStatusChange?.('connected');
+          }
+          break;
       }
     });
 

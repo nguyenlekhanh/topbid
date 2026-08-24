@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**5.6 completed** — Next recommended: 5.7
+**5.7 completed** — Phase 5 complete — Next recommended: 6.1
 
 ## Completed Tasks
 
@@ -71,6 +71,7 @@
 - 5.4: Recent bid updates ✓
 - 5.5: Rank change animation ✓
 - 5.6: New #1 state celebration ✓
+- 5.7: Connection/reconnection handling ✓
 
 ## Tasks in Progress
 
@@ -153,6 +154,7 @@ _None_
 - Recent bid updates made live (getRecentBidEntries browser query, src/lib/recent-bids-tracker.ts with the same initial-load/coalesced-refetch/snapshot-change pattern, RecentBids.tsx converted to a live client component with loading/empty/error/retry states replacing the static mock feed)
 - Rank change animation added (src/lib/rank-changes.ts pure up/down/new/same detection by bid id; Leaderboard rows apply motion-safe slideDown/fadeInUp classes per direction with reduced-motion respected - purely visual, ordering untouched)
 - New #1 celebration added (hasNewTopBid pure detection of champion change between committed rankings; Leaderboard shows motion-safe scaleIn ring + New #1 pill on the #1 row for a fixed window with cleanup-safe timer - reduced-motion respected, first loads/unchanged snapshots never trigger)
+- Connection/reconnection handling added (realtime.ts translates CHANNEL_ERROR/TIMED_OUT/CLOSED into once-per-outage disconnected signals and SUBSCRIBED-after-outage into connected recovery; trackers trigger coalesced authoritative refetches on recovery so missed changes are recovered; optional onConnectionChange forwarded through subscribe contract)
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
 ## Current Environment/Setup Status
@@ -171,7 +173,7 @@ _None_
 
 ## Next Recommended Task
 
-**5.7 — Connection/reconnection handling**
+**6.1 — Detect previous highest bidder**
 
 ## Notes
 
@@ -236,5 +238,7 @@ Task 5.4 completed successfully. Recent Bids feed made live: getRecentBidEntries
 Task 5.5 completed successfully. Rank change animation added: src/lib/rank-changes.ts provides pure per-bid up/down/new/same detection against the previously committed ranking, and Leaderboard rows apply motion-safe slideDown/fadeInUp classes by direction - purely visual, ordering and #1 styling untouched; 135/135 tests passing.
 
 Task 5.6 completed successfully. New-#1 celebration added: hasNewTopBid pure detection (different bid takes rank 1 vs previously committed ranking) drives a motion-safe scaleIn ring and New #1! pill on the #1 row for a fixed window with cleanup-safe timer; first loads and unchanged snapshots never celebrate; 140/140 tests passing.
+
+Task 5.7 completed successfully. Connection/reconnection handling added: realtime.ts maps channel lifecycle states to once-per-outage disconnected signals and recovery connected signals, trackers resync authoritative data via coalesced refetches on 'connected', all with deterministic test coverage; Phase 5 complete; 147/147 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

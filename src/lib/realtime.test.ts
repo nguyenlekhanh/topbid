@@ -158,3 +158,72 @@ describe('subscribeToBidChanges', () => {
     errorSpy.mockRestore();
   });
 });
+
+describe('connection/reconnection handling (Task 5.7)', () => {
+  it('does not treat the initial SUBSCRIBED as a recovery signal', () => {
+    const onStatusChange = vi.fn();
+    subscribeToBidChanges(() => {}, onStatusChange);
+
+    supabaseMock.state.statusHandlers[0]('SUBSCRIBED');
+
+    expect(onStatusChange).not.toHaveBeenCalled();
+  });
+
+  it('maps CHANNEL_ERROR to disconnected and re-SUBSCRIBED to connected recovery', () => {
+    const onStatusChange = vi.fn();
+    subscribeToBidChanges(() => {}, onStatusChange);
+
+    supabaseMock.state.statusHandlers[0]('CHANNEL_ERROR');
+    supabaseMock.state.statusHandlers[0]('SUBSCRIBED');
+
+    expect(onStatusChange.mock.calls.map(([status]) => status)).toEqual([
+      'disconnected',
+      'connected',
+    ]);
+  });
+
+  it('collapses repeated failures during a single outage into one disconnected signal', () => {
+    const onStatusChange = vi.fn();
+    subscribeToBidChanges(() => {}, onStatusChange);
+
+    const rawHandler = supabaseMock.state.statusHandlers[0];
+    rawHandler('CHANNEL_ERROR');
+    rawHandler('TIMED_OUT');
+    rawHandler('CLOSED');
+
+    const disconnects = onStatusChange.mock.calls.filter(([status]) => status === 'disconnected');
+
+    expect(disconnects).toHaveLength(1);
+  });
+
+  it('stays correct across repeated outage/recovery cycles', () => {
+    const onStatusChange = vi.fn();
+    subscribeToBidChanges(() => {}, onStatusChange);
+
+    const rawHandler = supabaseMock.state.statusHandlers[0];
+
+    rawHandler('CHANNEL_ERROR');
+    rawHandler('SUBSCRIBED');
+    rawHandler('TIMED_OUT');
+    rawHandler('SUBSCRIBED');
+    rawHandler('CLOSED');
+    rawHandler('SUBSCRIBED');
+
+    expect(onStatusChange.mock.calls.map(([status]) => status)).toEqual([
+      'disconnected',
+      'connected',
+      'disconnected',
+      'connected',
+      'disconnected',
+      'connected',
+    ]);
+  });
+
+  it('supports consumers that do not pass an onStatusChange callback', () => {
+    expect(() => {
+      subscribeToBidChanges(() => {});
+      supabaseMock.state.statusHandlers[0]('SUBSCRIBED');
+      supabaseMock.state.statusHandlers[0]('CHANNEL_ERROR');
+    }).not.toThrow();
+  });
+});
