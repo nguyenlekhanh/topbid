@@ -50,7 +50,8 @@ describe('processStripeWebhook', () => {
     expect(stripeMock.constructEvent).toHaveBeenCalledWith(
       'raw-payload',
       VALID_SIGNATURE,
-      'whsec_test'
+      'whsec_test',
+      300
     );
   });
 
@@ -60,7 +61,8 @@ describe('processStripeWebhook', () => {
     expect(stripeMock.constructEvent).toHaveBeenCalledWith(
       '{"weird":"but raw"}',
       VALID_SIGNATURE,
-      'whsec_test'
+      'whsec_test',
+      300
     );
   });
 

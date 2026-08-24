@@ -25,6 +25,13 @@ export type WebhookProcessingResult = {
   body: Record<string, string>;
 };
 
+/**
+ * Replay-protection window for signature timestamps, in seconds.
+ * This is Stripe's default tolerance, made explicit so review and tests can pin it;
+ * events with older timestamps fail verification.
+ */
+export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
+
 const SUPPORTED_EVENT_TYPES = new Set(['checkout.session.completed']);
 
 type StripeLikeEvent = {
@@ -75,14 +82,14 @@ export function processStripeWebhook(
 ): WebhookProcessingResult {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!webhookSecret) {
+  if (!webhookSecret || !webhookSecret.trim()) {
     return {
       status: 500,
       body: { error: 'Webhook secret is not configured' },
     };
   }
 
-  if (typeof payload !== 'string' || !payload || !signature) {
+  if (typeof payload !== 'string' || !payload || !signature || !signature.trim()) {
     return {
       status: 400,
       body: { error: 'Missing payload or signature' },
@@ -93,7 +100,13 @@ export function processStripeWebhook(
 
   try {
     // Raw payload goes straight into signature verification - no prior parsing.
-    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret) as StripeLikeEvent;
+    // Tolerance (seconds) pins Stripe's replay window (see constant docs).
+    event = stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      webhookSecret,
+      STRIPE_WEBHOOK_TOLERANCE_SECONDS
+    ) as StripeLikeEvent;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

@@ -1,32 +1,74 @@
 ﻿TASK ID: 4.6
 PHASE: 4
 TITLE: Verify webhook signature
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Strengthen and prove the webhook signature-verification boundary so that only genuine Stripe events pass: verification operates on the exact raw payload before any parsing, uses STRIPE_WEBHOOK_SECRET server-side, and enforces Stripe's replay window.
 
 SCOPE:
+- src/lib/stripe-webhook.ts hardening:
+  * Explicit exported STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300 (Stripe's default replay window, now pinned for review and tests) passed as constructEvent's tolerance argument
+  * Whitespace-only signature header -> 400; whitespace-only secret -> 500 (blank values previously slipped past truthiness guards)
+  * HTTP semantics unchanged (200 verified handled/ignored; 400 missing/invalid; 500 config/processing)
+- New src/lib/stripe-webhook-signature.test.ts - REAL-crypto verification tests using the genuine Stripe SDK constructEvent (NOT mocked): signatures computed locally per Stripe's documented HMAC-SHA256 scheme (t=timestamp,v1=HMAC(secret,"timestamp.payload"))
+- Existing mocked-boundary tests updated for the tolerance argument and preserved in full
 
 OUT OF SCOPE:
+- Payment-status checks (Task 4.7), pending->paid conversion (4.8), event-id idempotency ledger (4.9), failure/refund handling (4.10/4.11), RLS/schema/service-role changes, new dependencies
 
-INPUTS / DEPENDENCIES:
+WHY THE REAL-CRYPTO SUITE MATTERS (and what it caught):
+The first implementation passed an options object ({tolerance:300}) as constructEvent's fourth argument; the installed SDK types define that parameter as a plain NUMBER (tolerance?: number). The object silently broke timestamp-staleness comparison - stale events were accepted with HTTP 200. The real-crypto test suite caught this immediately ("Timestamp outside the tolerance zone" now correctly rejects). Fixed by passing the numeric constant directly. This is exactly the class of bug a mocked-only suite cannot see.
 
-IMPLEMENTATION REQUIREMENTS:
+TEST COVERAGE (8 new real-crypto tests; no network, no live Stripe):
+- Correctly signed fresh payload -> 200 received:true (genuine HMAC path)
+- Tampered payload (signature computed over different bytes) -> 400 - proves exact-raw-payload verification
+- Wrong signing secret -> 400
+- Missing signature header -> 400
+- Stale timestamp beyond tolerance -> 400 (replay protection active)
+- Timestamp inside tolerance (now-270s vs 300s window) -> 200
+- Signed non-JSON payload -> 400 (raw-body integrity through constructEvent's parse step)
+- Unsupported-but-validly-signed type -> 200 ignored:true
+
+PRESERVED:
+- All 62 prior tests unchanged except two assertions extended for the explicit tolerance argument (raw-payload passthrough assertions intact - still proves no pre-parsing)
+- Raw-body requirement, Node runtime, secret confinement, HTTP contract, Tasks 4.1-4.5 logic untouched otherwise
 
 FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
+- src/lib/stripe-webhook.ts
+- src/lib/stripe-webhook-signature.test.ts (new)
+- src/lib/stripe-webhook.test.ts (two assertion updates)
+- docs/4.6.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 DEFINITION OF DONE:
+- Signature verification hardened (explicit tolerance, blank-value guards) and PROVEN against the real Stripe crypto implementation incl. tamper/replay cases; all repo checks green; no scope creep into 4.7+
 
 IMPLEMENTATION NOTES:
+Real-crypto file avoids mocking '@/lib/stripe' entirely: env vars are stubbed BEFORE a dynamic import (the Stripe client constructor requires some key at import time even when only constructEvent is used), then signatures are generated locally with node:crypto createHmac. Lint flagged an unused constant and a variable named `module` during development - both fixed. Live Stripe delivery remains unavailable and was NOT faked; the local-HMAC approach exercises the identical verification code path constructEvent uses in production without needing external infrastructure.
 
 RESULT:
+Implementation complete. Suite: 70/70 PASSED across 4 files (43 bids + 8 checkout + 11 webhook boundary + 8 real-crypto signature). typecheck/lint/format:check/build all PASSED. The tolerance-argument bug found by the new suite was fixed and regression-guarded.
 
 FILES ACTUALLY CHANGED:
+- src/lib/stripe-webhook.ts (tolerance constant + argument fix + blank-value guards)
+- src/lib/stripe-webhook-signature.test.ts (new - real-crypto suite)
+- src/lib/stripe-webhook.test.ts (two assertion updates only)
+- docs/4.6.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 70/70 PASSED (4 files)
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Stripe delivery verification: SKIPPED - Stripe CLI/test keys unavailable; NOT faked. Local HMAC computation exercises the same constructEvent path production uses; true end-to-end delivery check remains documented for Task 4.12.
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 4.7 - Verify payment status

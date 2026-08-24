@@ -1512,6 +1512,36 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery verification deferred; conversion pending Task 4.8 by design)
 - **Follow-up work**: Task 4.6 — Verify webhook signature
 
+### Task 4.6
+
+- **Date**: 2026-08-23
+- **Objective**: Harden and prove webhook signature verification — exact raw payload, STRIPE_WEBHOOK_SECRET server-side, Stripe replay-window enforcement — without touching payment logic
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/stripe-webhook.ts: exported STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300 (Stripe's default replay window, now explicit) passed to constructEvent as its tolerance argument; whitespace-only signature header -> 400 and whitespace-only secret -> 500 (blank values previously slipped past truthiness guards); HTTP semantics unchanged
+  - New src/lib/stripe-webhook-signature.test.ts: REAL-crypto verification suite using the genuine Stripe SDK constructEvent (not mocked) — signatures computed locally per Stripe's documented HMAC-SHA256 scheme via node:crypto, env stubbed before a dynamic module import (constructor requires a key at import time)
+  - Existing mocked-boundary suite preserved; two assertions extended for the explicit tolerance argument
+- **Real bug found and fixed**: the first implementation passed an options object ({tolerance:300}) where the SDK's fourth parameter is a plain number (tolerance?: number per installed typings) — the object silently disabled timestamp-staleness comparison, accepting stale events with 200. The new real-crypto suite caught it immediately ("Timestamp outside the tolerance zone" now correctly rejects with 400); regression-guarded at both boundary levels
+- **Files changed**:
+  - src/lib/stripe-webhook.ts (tolerance constant + numeric argument + blank-value guards)
+  - src/lib/stripe-webhook-signature.test.ts (new)
+  - src/lib/stripe-webhook.test.ts (two assertion updates only)
+  - docs/4.6.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 70/70 PASSED across 4 files (43 bids + 8 checkout + 11 webhook boundary + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (unused constant removed; variable named `module` renamed during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Stripe delivery: SKIPPED — CLI/test keys unavailable; NOT faked. The local-HMAC tests exercise the identical constructEvent path production uses; true end-to-end delivery check remains documented for Task 4.12
+- **Important technical decisions**:
+  - Real-crypto coverage added because a mocked constructEvent can never prove tamper/staleness behavior — this directly caught a silent security-relevant bug in this task's own first draft
+  - Explicit numeric tolerance chosen over SDK default so review/tests pin the window; no other verification mechanism changed
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.7 — Verify payment status
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
