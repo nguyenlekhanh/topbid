@@ -31,6 +31,17 @@ beforeAll(async () => {
   const webhookLib = await import('./stripe-webhook');
   processStripeWebhook = webhookLib.processStripeWebhook;
   STRIPE_WEBHOOK_TOLERANCE_SECONDS = webhookLib.STRIPE_WEBHOOK_TOLERANCE_SECONDS;
+
+  // constructEvent above runs GENUINELY (real signature crypto), while the outbound
+  // Checkout Session retrieval introduced by Task 4.7 is a network boundary - mocked
+  // here so signature properties stay isolated from API availability.
+  const { stripe } = await import('@/lib/stripe');
+  vi.spyOn(stripe.checkout.sessions, 'retrieve').mockResolvedValue({
+    id: 'cs_real_1',
+    payment_status: 'paid',
+    client_reference_id: 'bid-1000',
+    metadata: { bid_id: 'bid-1000' },
+  } as never);
 });
 
 function signPayload(payload: string, timestampSeconds: number, secret: string = SECRET): string {
@@ -73,70 +84,70 @@ const TAMPERED_PAYLOAD = JSON.stringify({
 });
 
 describe('processStripeWebhook signature verification (real Stripe crypto)', () => {
-  it('accepts a correctly signed payload delivered within the replay window', () => {
+  it('accepts a correctly signed payload delivered within the replay window', async () => {
     const header = signPayload(VALID_PAYLOAD, currentTimestamp());
 
-    const result = processStripeWebhook(VALID_PAYLOAD, header);
+    const result = await processStripeWebhook(VALID_PAYLOAD, header);
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({ received: 'true' });
   });
 
-  it('rejects a tampered payload whose signature was computed over different bytes', () => {
+  it('rejects a tampered payload whose signature was computed over different bytes', async () => {
     const header = signPayload(VALID_PAYLOAD, currentTimestamp());
 
-    const result = processStripeWebhook(TAMPERED_PAYLOAD, header);
+    const result = await processStripeWebhook(TAMPERED_PAYLOAD, header);
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ error: 'Invalid signature' });
   });
 
-  it('rejects payloads signed with the wrong secret', () => {
+  it('rejects payloads signed with the wrong secret', async () => {
     const header = signPayload(VALID_PAYLOAD, currentTimestamp(), 'whsec_attacker_knows');
 
-    const result = processStripeWebhook(VALID_PAYLOAD, header);
+    const result = await processStripeWebhook(VALID_PAYLOAD, header);
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ error: 'Invalid signature' });
   });
 
-  it('returns 400 when the signature header is missing entirely', () => {
-    const result = processStripeWebhook(VALID_PAYLOAD, null);
+  it('returns 400 when the signature header is missing entirely', async () => {
+    const result = await processStripeWebhook(VALID_PAYLOAD, null);
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ error: 'Missing payload or signature' });
   });
 
-  it('enforces the explicit replay-window tolerance on stale timestamps', () => {
+  it('enforces the explicit replay-window tolerance on stale timestamps', async () => {
     const staleTimestamp = currentTimestamp() - (STRIPE_WEBHOOK_TOLERANCE_SECONDS + 60);
     const header = signPayload(VALID_PAYLOAD, staleTimestamp);
 
-    const result = processStripeWebhook(VALID_PAYLOAD, header);
+    const result = await processStripeWebhook(VALID_PAYLOAD, header);
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ error: 'Invalid signature' });
   });
 
-  it('still accepts timestamps inside the tolerance window', () => {
+  it('still accepts timestamps inside the tolerance window', async () => {
     const recentTimestamp = currentTimestamp() - (STRIPE_WEBHOOK_TOLERANCE_SECONDS - 30);
     const header = signPayload(VALID_PAYLOAD, recentTimestamp);
 
-    const result = processStripeWebhook(VALID_PAYLOAD, header);
+    const result = await processStripeWebhook(VALID_PAYLOAD, header);
 
     expect(result.status).toBe(200);
   });
 
-  it('rejects signed non-JSON payloads (raw body integrity handling)', () => {
+  it('rejects signed non-JSON payloads (raw body integrity handling)', async () => {
     const notJson = 'this is not json but was signed';
     const header = signPayload(notJson, currentTimestamp());
 
-    const result = processStripeWebhook(notJson, header);
+    const result = await processStripeWebhook(notJson, header);
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ error: 'Invalid signature' });
   });
 
-  it('acknowledges unsupported-but-validly-signed event types as ignored', () => {
+  it('acknowledges unsupported-but-validly-signed event types as ignored', async () => {
     const otherEventPayload = JSON.stringify({
       id: 'evt_real_2',
       object: 'event',
@@ -145,7 +156,7 @@ describe('processStripeWebhook signature verification (real Stripe crypto)', () 
     });
     const header = signPayload(otherEventPayload, currentTimestamp());
 
-    const result = processStripeWebhook(otherEventPayload, header);
+    const result = await processStripeWebhook(otherEventPayload, header);
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({ received: 'true', ignored: 'true' });

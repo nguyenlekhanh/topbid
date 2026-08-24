@@ -1,32 +1,86 @@
 ﻿TASK ID: 4.7
 PHASE: 4
 TITLE: Verify payment status
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Before any conversion (Task 4.8), authoritatively verify that a Checkout Session is actually paid using Stripe's server-side API - never trusting the webhook event body's embedded session data, and never mutating bid state in this task.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies only "4.7 | Verify payment status | 4.6"; combined with the non-negotiable business rule "Payment: Bid becomes valid ONLY after verified Stripe webhook confirmation", the authoritative check is defined as:
+- retrieve the Checkout Session AGAIN from Stripe's server-side API by its identifier (the event body only says WHICH session to inspect)
+- require retrieved session.payment_status === 'paid' ('unpaid' covers still-processing async methods; 'no_payment_required' does not apply to paid bids)
+- enforce linkage consistency: client_reference_id and metadata.bid_id are both written by our own Task 4.2 code to the same bid id - absent references or a mismatch means the session cannot be safely attributed
 
 SCOPE:
+- src/lib/stripe-webhook.ts: exported verifyCheckoutSessionPaid(sessionId): Promise<PaymentVerificationResult> (typed union with stable failure reasons: session_not_paid / missing_bid_reference / reference_mismatch); retrieval failures throw descriptive errors so the endpoint answers 500 and Stripe retries
+- handleCheckoutSessionCompleted now async: extracts the session reference from the event, runs verification, logs VERIFIED or NOT-verified(reason); processStripeWebhook became async and the route awaits it
+- NO database access, no status mutation, no event-id ledger (4.9), no conversion (4.8), no refund/failure handling (4.10/4.11)
 
-OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+PRESERVED:
+- Task 4.6 raw-body signature verification exactly (constructEvent before anything else; real-crypto suite intact)
+- Task 3.5-3.7 contracts untouched; RLS/service-role boundaries untouched; secrets server-only
+- HTTP semantics unchanged: 200 verified-or-unverified-but-valid (unverified simply means "no conversion will occur"), 400 invalid signature, 500 config/retrieval failures so Stripe retries
 
 FILES EXPECTED TO CHANGE:
+- src/lib/stripe-webhook.ts
+- src/app/api/webhooks/stripe/route.ts (await async result)
+- src/lib/stripe-webhook.test.ts (+11 tests; all prior tests preserved with awaited calls)
+- src/lib/stripe-webhook-signature.test.ts (network boundary mocked via spyOn while constructEvent stays genuine)
+- docs/4.7.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new suites + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: event body never trusted, authoritative retrieval, boundary vs 4.8
 
 DEFINITION OF DONE:
+- Payment status verified against Stripe's API before any downstream consumption point; unverified sessions acknowledged without mutation; all repo checks green
+
+TEST COVERAGE (11 new tests):
+verifyCheckoutSessionPaid direct:
+- paid + consistent linkage -> verified true with bidReference
+- metadata-only linkage -> verified true
+- payment_status 'unpaid' AND 'no_payment_required' -> rejected session_not_paid
+- no bid reference at all -> rejected missing_bid_reference
+- client_reference_id != metadata.bid_id -> rejected reference_mismatch
+- retrieval failure -> descriptive rethrow
+Endpoint flow:
+- completed event -> retrieve called with session id from event -> 200, no warn
+- unpaid session -> 200 acknowledged with warn NOT verified(session_not_paid) and zero mutation
+- retrieval rejection -> 500 Webhook processing failed (Stripe retries)
+- unsupported types never consult Stripe retrieve
 
 IMPLEMENTATION NOTES:
+processStripeWebhook had to become async (handler awaits verification) - route and every test call site updated accordingly. The real-crypto signature suite initially failed because validly-signed events now trigger an outbound API call with the placeholder key ("Invalid API Key"); fixed by spying on the REAL client's checkout.sessions.retrieve inside that suite - constructEvent remains genuinely cryptographic while the network boundary is isolated. Three Prettier auto-fixes applied during development.
 
 RESULT:
+Implementation complete. Suite: 81/81 PASSED across 4 files (43 bids + 8 checkout + 22 webhook + 8 real-crypto signature). typecheck/lint/format:check/build all PASSED. Static inspection confirmed: event payload never trusted for state, authoritative retrieval enforced, conversion cleanly deferred to Task 4.8.
 
 FILES ACTUALLY CHANGED:
+- src/lib/stripe-webhook.ts (verifyCheckoutSessionPaid + async handler/dispatch)
+- src/app/api/webhooks/stripe/route.ts (await)
+- src/lib/stripe-webhook.test.ts (+11 tests, awaited call sites)
+- src/lib/stripe-webhook-signature.test.ts (retrieve spied on real client)
+- docs/4.7.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 81/81 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Stripe retrieval: SKIPPED - no test keys available; NOT faked. Mocked at the SDK instance boundary; live end-to-end remains documented for Task 4.12.
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 4.8 - Convert pending bid to paid

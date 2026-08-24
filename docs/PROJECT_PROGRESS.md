@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.6 completed** — Next recommended: 4.7
+**4.7 completed** — Next recommended: 4.8
 
 ## Completed Tasks
 
@@ -59,6 +59,7 @@
 - 4.4: Cancel page ✓
 - 4.5: Stripe webhook endpoint ✓
 - 4.6: Verify webhook signature ✓
+- 4.7: Verify payment status ✓
 
 ## Tasks in Progress
 
@@ -129,6 +130,7 @@ _None_
 - Cancel page created (src/app/cancel/page.tsx: static /cancel route with neutral informational card, honest no-payment-taken copy, zero data access; matches the checkout cancel_url from Task 4.1)
 - Stripe webhook endpoint created (src/lib/stripe-webhook.ts + src/app/api/webhooks/stripe/route.ts: raw-body signature verification against STRIPE_WEBHOOK_SECRET, checkout.session.completed acknowledged with linkage extraction, other events ignored, 400/500/200 semantics; conversion deferred to 4.8)
 - Webhook signature verification hardened (explicit 300s replay-window tolerance passed to constructEvent, blank signature/secret guards; new real-crypto test suite computing genuine HMAC signatures proves tamper rejection, wrong-secret rejection, staleness enforcement, and exact-raw-payload verification without live Stripe)
+- Payment status verification created (verifyCheckoutSessionPaid retrieves the Checkout Session from Stripe's server-side API by id and requires payment_status='paid' plus consistent client_reference_id/metadata.bid_id linkage; unverified sessions acknowledged without mutation; conversion deferred to 4.8)
 
 ## Current Environment/Setup Status
 
@@ -187,3 +189,5 @@ Task 4.4 completed successfully. /cancel page added as a static prerendered rout
 Task 4.5 completed successfully. Stripe webhook endpoint added (src/app/api/webhooks/stripe + src/lib/stripe-webhook.ts): raw-body signature verification against STRIPE_WEBHOOK_SECRET, checkout.session.completed acknowledged with linkage extraction, other events ignored, correct 200/400/500 semantics; conversion deferred to Task 4.8; 62/62 tests passing.
 
 Task 4.6 completed successfully. Signature verification hardened: explicit 300s replay-window tolerance passed to constructEvent (a real bug where an options-object argument silently disabled staleness checks was caught by the new suite and fixed), blank signature/secret guards added; new real-crypto test suite proves tamper rejection, wrong-secret rejection, and replay-window enforcement against the genuine Stripe SDK; 70/70 tests passing.
+
+Task 4.7 completed successfully. verifyCheckoutSessionPaid added: after signature verification the Checkout Session is retrieved again from Stripe's server-side API and payment_status must be 'paid' with consistent client_reference_id/metadata.bid_id linkage; unverified sessions are acknowledged without any mutation; conversion deferred to Task 4.8; 81/81 tests passing.

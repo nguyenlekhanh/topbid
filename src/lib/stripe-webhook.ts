@@ -25,6 +25,74 @@ export type WebhookProcessingResult = {
   body: Record<string, string>;
 };
 
+export type PaymentVerificationFailureReason =
+  'missing_bid_reference' | 'session_not_paid' | 'reference_mismatch';
+
+export type PaymentVerificationResult =
+  | { verified: true; sessionId: string; bidReference: string }
+  | { verified: false; reason: PaymentVerificationFailureReason; sessionId: string };
+
+/**
+ * Verify authoritatively that a Checkout Session is actually paid (Task 4.7).
+ *
+ * - The webhook EVENT body is never trusted for payment state: the session is retrieved
+ *   again from Stripe's server-side API by its identifier, and that response is the
+ *   source of truth
+ * - Authoritative check: session.payment_status === 'paid' ('unpaid' covers async
+ *   payment methods still processing; 'no_payment_required' does not apply to paid bids)
+ * - Linkage consistency: client_reference_id and metadata.bid_id are both set by our own
+ *   Task 4.2 creation code to the same bid id - a mismatch or full absence means the
+ *   session cannot be safely attributed, so it is rejected
+ * - Retrieval failures throw so the endpoint responds 500 and Stripe retries
+ * - No database access and no status mutation here: conversion is Task 4.8
+ */
+export async function verifyCheckoutSessionPaid(
+  sessionId: string
+): Promise<PaymentVerificationResult> {
+  let session;
+
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    throw new Error(`Failed to retrieve Checkout Session "${sessionId}": ${message}`);
+  }
+
+  if (session.payment_status !== 'paid') {
+    return {
+      verified: false,
+      reason: 'session_not_paid',
+      sessionId: session.id,
+    };
+  }
+
+  const clientReferenceId = session.client_reference_id ?? null;
+  const metadataBidId = session.metadata?.bid_id ?? null;
+
+  if (!clientReferenceId && !metadataBidId) {
+    return {
+      verified: false,
+      reason: 'missing_bid_reference',
+      sessionId: session.id,
+    };
+  }
+
+  if (clientReferenceId && metadataBidId && clientReferenceId !== metadataBidId) {
+    return {
+      verified: false,
+      reason: 'reference_mismatch',
+      sessionId: session.id,
+    };
+  }
+
+  return {
+    verified: true,
+    sessionId: session.id,
+    bidReference: clientReferenceId ?? metadataBidId!,
+  };
+}
+
 /**
  * Replay-protection window for signature timestamps, in seconds.
  * This is Stripe's default tolerance, made explicit so review and tests can pin it;
@@ -60,26 +128,42 @@ function extractSessionReferences(event: StripeLikeEvent): {
   };
 }
 
-function handleCheckoutSessionCompleted(event: StripeLikeEvent): void {
-  // Task 4.5 boundary: acknowledge and record the linkage only. Converting the bid to
-  // 'paid' belongs to Task 4.8; no bid rows are read or written here.
+async function handleCheckoutSessionCompleted(event: StripeLikeEvent): Promise<void> {
+  // Task 4.7: the event body only identifies WHICH session to inspect - authoritative
+  // payment state comes from Stripe's server-side API via verifyCheckoutSessionPaid.
+  // Task 4.5 boundary still holds: no bid rows are read or written here; conversion to
+  // 'paid' belongs to Task 4.8.
   const references = extractSessionReferences(event);
+  const verification = await verifyCheckoutSessionPaid(references.sessionId);
+
+  if (!verification.verified) {
+    console.warn(
+      `[stripe-webhook] checkout.session.completed NOT verified (${verification.reason})`,
+      JSON.stringify({
+        eventId: event.id ?? 'unknown',
+        sessionId: verification.sessionId,
+        clientReferenceId: references.clientReferenceId,
+      })
+    );
+
+    return;
+  }
 
   console.info(
-    `[stripe-webhook] checkout.session.completed received`,
+    '[stripe-webhook] checkout.session.completed payment VERIFIED',
     JSON.stringify({
       eventId: event.id ?? 'unknown',
-      sessionId: references.sessionId,
+      sessionId: verification.sessionId,
+      bidReference: verification.bidReference,
       clientReferenceId: references.clientReferenceId,
-      bidId: references.bidId,
     })
   );
 }
 
-export function processStripeWebhook(
+export async function processStripeWebhook(
   payload: string,
   signature: string | null
-): WebhookProcessingResult {
+): Promise<WebhookProcessingResult> {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret || !webhookSecret.trim()) {
@@ -124,7 +208,7 @@ export function processStripeWebhook(
   }
 
   try {
-    handleCheckoutSessionCompleted(event);
+    await handleCheckoutSessionCompleted(event);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

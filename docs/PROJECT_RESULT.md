@@ -1542,6 +1542,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.7 — Verify payment status
 
+### Task 4.7
+
+- **Date**: 2026-08-23
+- **Objective**: Authoritatively verify a Checkout Session's payment status via Stripe's server-side API before any conversion — the webhook event body is never trusted for state
+- **Status**: Completed
+- **What was implemented**:
+  - verifyCheckoutSessionPaid(sessionId): Promise<PaymentVerificationResult> in src/lib/stripe-webhook.ts — retrieves the session AGAIN from Stripe's API by identifier (event body only names WHICH session), requires retrieved session.payment_status === 'paid' ('unpaid' = async methods still processing; 'no_payment_required' inapplicable), and enforces linkage consistency: client_reference_id and metadata.bid_id (both authored by Task 4.2) must not be absent or contradictory
+  - Typed union result with stable reasons: verified {sessionId, bidReference} | unverified {reason: 'session_not_paid' | 'missing_bid_reference' | 'reference_mismatch'}; retrieval failures throw descriptively -> endpoint 500 -> Stripe retries
+  - handleCheckoutSessionCompleted now async and verification-aware: VERIFIED logged for downstream consumption, NOT-verified(reason) warned with zero mutation; processStripeWebhook became async; route awaits it
+- **Files changed**:
+  - src/lib/stripe-webhook.ts (verification function + async handler/dispatch)
+  - src/app/api/webhooks/stripe/route.ts (await)
+  - src/lib/stripe-webhook.test.ts (+11 tests; prior tests preserved with awaited call sites)
+  - src/lib/stripe-webhook-signature.test.ts (checkout.sessions.retrieve spied on the REAL client so constructEvent stays genuinely cryptographic while the network boundary is isolated)
+  - docs/4.7.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 81/81 PASSED across 4 files (43 bids + 8 checkout + 22 webhook + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (three Prettier auto-fixes during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Stripe retrieval: SKIPPED — no test keys available; NOT faked; mocked at the SDK instance boundary only
+- **Important technical decisions**:
+  - Verification-by-re-retrieval chosen over trusting event.data.object — the standard authoritative pattern matching the plan's "verified Stripe webhook confirmation" rule
+  - Unverified-but-valid events answered 200 (acknowledged, no conversion path taken) rather than 500: they are legitimate states, not endpoint failures; genuine failures (retrieval errors) do return 500 for retry
+  - The signature suite's network boundary mock (spyOn on the real client) keeps Task 4.6 crypto testing genuine while isolating API availability — its initial failure ("Invalid API Key" surfacing as a correct 500) validated the new flow end-to-end before the mock was added
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.8 — Convert pending bid to paid
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
