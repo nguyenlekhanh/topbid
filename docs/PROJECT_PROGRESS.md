@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.11 completed** — Next recommended: 4.12
+**4.12 completed** — Phase 4 complete — Next recommended: 5.1
 
 ## Completed Tasks
 
@@ -64,6 +64,7 @@
 - 4.9: Idempotent webhook handling ✓
 - 4.10: Payment failure handling ✓
 - 4.11: Refund handling ✓
+- 4.12: Stripe integration tests ✓
 
 ## Tasks in Progress
 
@@ -139,6 +140,7 @@ _None_
 - Idempotent webhook handling created (migration 20260823000011 adds processed_webhook_events ledger keyed by Stripe event.id PRIMARY KEY plus process_checkout_completed_event wrapper RPC claiming the event and applying conversion in one transaction - duplicates acknowledged via duplicate:'true', anomalies roll back claim+effect so events stay retryable)
 - Payment failure handling created (migration 20260823000012 adds fail_pending_bid RPC handling checkout.session.async_payment_failed: claim+effect in one transaction, never downgrades paid bids, marks only linked pending bids 'failed' with session-linkage guards; EXECUTE restricted to service_role)
 - Refund handling created (migration 20260823000013 adds refund_paid_bid RPC: ledger claim + paid->refunded transition in one transaction keyed on stripe_payment_intent_id from the authoritatively retrieved charge (refunded=true required); already_refunded/duplicate no-ops; anomalies answered 500; EXECUTE restricted to service_role)
+- Stripe integration test infrastructure created (npm run test:integration via vitest.integration.config.mts; src/integration/stripe.integration.test.ts provides opt-in guarded suites for real test-mode Checkout API, signature round-trip, and the full paid/duplicate/refund lifecycle against real Supabase - skipped honestly when credentials/opt-in are absent)
 
 ## Current Environment/Setup Status
 
@@ -156,7 +158,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.12 — Stripe integration tests**
+**5.1 — Supabase realtime subscription**
 
 ## Notes
 
@@ -207,5 +209,7 @@ Task 4.9 completed successfully. Migration 20260823000011 adds the processed_web
 Task 4.10 completed successfully. Payment failure handling added: migration 20260823000012 adds fail_pending_bid (ledger claim + pending-to-failed transition in one transaction, never downgrades paid bids, session-linkage guards) and the webhook now handles checkout.session.async_payment_failed authoritatively; 96/96 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
+
+Task 4.12 completed successfully. Stripe integration test infrastructure added: npm run test:integration runs opt-in guarded suites (src/integration/stripe.integration.test.ts) covering real test-mode Checkout API lifecycle, signature round-trip through constructEvent, and the full paid/duplicate/refund lifecycle against real Supabase; suites SKIP honestly without credentials/opt-in. Unit suite remains hermetic at 103/103. Phase 4 complete.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

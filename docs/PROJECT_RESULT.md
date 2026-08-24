@@ -1704,6 +1704,41 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.12 — Stripe integration tests
 
+### Task 4.12
+
+- **Date**: 2026-08-23
+- **Objective**: Stripe integration tests for the flows built in Tasks 4.1–4.11, executing against real test-mode boundaries where credentials permit and skipping honestly where they do not
+- **Status**: Completed
+- **What was implemented**:
+  - vitest.integration.config.mts + `npm run test:integration` script; unit config now excludes *.integration.test.ts so `npm run test` stays hermetic
+  - src/integration/stripe.integration.test.ts: opt-in guarded suites (RUN_STRIPE_INTEGRATION=true + disposable test-mode credentials) with lazy dynamic imports so missing credentials can never break collection; .env.local defaults loaded without overriding exported vars
+  - Guarded coverage: real test-mode Checkout Session create/retrieve lifecycle; webhook signature round-trip through the SDK's constructEvent (signed unsupported -> 200 ignored; signed completed for unknown session -> 500 retry semantics; tampered -> 400); full lifecycle against real Supabase — seed category -> createCheckoutSession (pending bid + linked cs_test session) -> signed completed event converts bid to 'paid' -> identical delivery answered duplicate:'true' -> charge.refunded event transitions bid to 'refunded'; fixtures cleaned up via service-role deletes
+- **Environment audit (honest)**:
+  - Stripe CLI: NOT AVAILABLE; Docker/local Supabase: NOT AVAILABLE
+  - STRIPE_WEBHOOK_SECRET empty in this environment; non-empty credentials unverifiable as disposable TEST keys; firing live calls/refunds against an unverified remote database judged unsafe without operator opt-in
+  - Therefore genuine live Stripe/Supabase integration DID NOT RUN here — reported as skipped, NOT passed, nothing faked
+- **Files changed**:
+  - vitest.config.mts (integration exclusion)
+  - vitest.integration.config.mts (new)
+  - package.json (+test:integration script)
+  - src/integration/stripe.integration.test.ts (new)
+  - docs/4.12.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 103/103 PASSED — local/unit suites only (bids engine, checkout boundary-mocked, webhook boundary-mocked, real-crypto signature); all preserved green
+  - `npm run test:integration`: executed; 5 SKIPPED (opt-in/credentials unavailable) — explicitly NOT claimed as passing
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (six Prettier auto-fixes during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Opt-in guard pattern (RUN_STRIPE_INTEGRATION=true + credential presence) chosen so committed infrastructure executes automatically in a properly configured environment while this one stays honest and green
+  - Lazy per-suite dynamic imports prevent module-level Stripe construction from breaking collection without credentials
+  - Full-lifecycle suite cleans up seeded rows via service-role deletes against the configured disposable project only
+- **Known limitations**: The five guarded scenarios await a disposable test-mode environment (Stripe sk_test_/whsec_ + Supabase project); they execute unchanged once available
+- **Follow-up work**: Phase 4 complete — Task 5.1 — Supabase realtime subscription
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
