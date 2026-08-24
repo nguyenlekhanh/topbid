@@ -2531,4 +2531,34 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+### Task 8.5
+
+- **Date**: 2026-08-24
+- **Objective**: Provide administrators a payment-centric oversight view - authoritative statuses, amounts, timestamps, and Stripe identifiers for dashboard cross-referencing - as a READ-ONLY capability (refund action is explicitly Task 8.6)
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/admin-payment-management.ts (server-only): listPaymentsForAdmin() gated by getAdminAuthorization (fail-closed); isolated service-role read selecting created_at/amount/status/paid_at/stripe_session_id/stripe_payment_intent_id/categories(name) ordered newest-first LIMIT 100; per-status counts aggregated from mapped rows
+  - Privacy enforced twice: query-level exclusion of bidder_email/bidder_name/internal ids AND explicit allow-list row mapping
+  - src/app/admin/payments/page.tsx: per-status stat chips, responsive table with status badges + mono/truncated session & payment-intent cells, paid-at timestamps; dashboard link activated
+  - ZERO mutations and ZERO Stripe API calls: refund initiation is Task 8.6's explicit scope and will flow through the existing stripe client + charge.refunded webhook/RPC pipeline
+- **Files changed**:
+  - src/lib/admin-payment-management.ts + test (created, 8 tests)
+  - src/app/admin/payments/page.tsx (created)
+  - src/app/admin/page.tsx (link activated)
+  - docs/8.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 491/491 across 29 files (+8 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/admin/payments registered dynamic)
+- **Important technical decisions**:
+  - Plan decomposition honored: "Refund action" is Task 8.6 - implementing it here would have violated task ordering and duplicated the Stripe-initiation boundary before its designated task
+  - Payment identifiers exposed to authenticated admins only (required for cross-referencing); personal fields excluded wholesale as irrelevant to payment oversight
+  - Pure read = naturally repeatable/idempotent; no queues/retries/schedulers introduced
+- **Known limitations**: fixed 100-record window; full identifier strings visible in truncated cells to admins only (never on public surfaces)
+- **Follow-up work**: Task 8.6 - Refund action
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

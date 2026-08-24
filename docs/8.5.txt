@@ -1,32 +1,46 @@
 ﻿TASK ID: 8.5
 PHASE: 8
 TITLE: Payment management
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Provide administrators a payment-centric oversight view - authoritative statuses, amounts, timestamps, and the Stripe identifiers needed to cross-reference the Stripe dashboard - as a READ-ONLY capability. The refund ACTION is explicitly Task 8.6 (PROJECT_PLAN.md: "8.6 | Refund action | 8.5"), so no mutation exists in this task.
 
-SCOPE:
+PAYMENT-SAFETY ANALYSIS (performed before any code):
+- Status transitions are owned exclusively by verified-webhook RPCs inside ledger transactions (Tasks 4.8-4.11): convert_pending_bid_to_paid / fail_pending_bid / refund_paid_bid behind process_checkout_completed_event + processed_webhook_events (event.id PK)
+- Direct admin writes to bid.status/paid_at/stripe fields would create an alternate payment pipeline and were rejected outright
+- Stripe-side initiation (refunds.create) belongs to Task 8.6; adding it here would violate the plan decomposition
+- Therefore 8.5 ships as pure read-only oversight; zero Stripe API calls, zero mutations
 
-OUT OF SCOPE:
+WHAT THIS VIEW ADDS OVER TASK 8.4's BID LIST:
+The AUTHORITATIVE PAYMENT IDENTIFIERS (Stripe Checkout Session id + PaymentIntent id) admins need for Stripe-dashboard cross-referencing, plus per-status counts across the read window.
 
-INPUTS / DEPENDENCIES:
+DATA EXPOSURE (exact):
+Shown: placed timestamp, category name, whole-dollar amount, colored status badge, stripe_session_id, stripe_payment_intent_id (mono/truncated cells), paid_at.
+Excluded by design: bidder email, bidder display name, internal bid id, unsubscribe tokens, webhook payloads/signatures, any credentials. Column selection excludes personal fields at the query level AND rows pass through an explicit allow-list mapping.
 
-IMPLEMENTATION REQUIREMENTS:
+QUERY MECHANISM:
+listPaymentsForAdmin() in server-only src/lib/admin-payment-management.ts: getAdminAuthorization() gate -> service-role select of created_at/amount/status/paid_at/stripe_session_id/stripe_payment_intent_id/categories(name), ordered created_at DESC LIMIT 100 (bounded window). Per-status counts aggregated from the mapped rows. No caching (fresh every request).
 
-FILES EXPECTED TO CHANGE:
+IDEMPOTENCY / DUPLICATES:
+Pure read - naturally repeatable, nothing to dedupe. No queues/retries/schedulers introduced.
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/admin-payment-management.ts + test (new, 8 tests)
+- src/app/admin/payments/page.tsx (new)
+- src/app/admin/page.tsx (Payment management link activated)
+- docs/8.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 491/491 PASSED across 29 files (+8 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/admin/payments registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO refund action (8.6), NO fraud/banned-email tooling (8.7), NO audit logging, NO analytics/charts, NO bulk operations, NO Stripe API calls, NO changes to Phase 4 webhook/idempotency behavior, Phase 6 email flows, Phase 7 sharing, Task 8.1 auth, or Tasks 8.2-8.4 pages beyond the dashboard link.
 
 KNOWN ISSUES:
+- Fixed 100-record window (intentional minimalism).
+- Full session/intent ids shown in truncated mono cells to authenticated admins only - required for Stripe cross-referencing; not present in any public surface.
 
 FOLLOW-UP:
+Task 8.6 - Refund action

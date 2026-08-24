@@ -160,7 +160,14 @@ export default async function AdminDashboardPage() {
                 Bid management
               </Link>
             </li>
-            <li>Payment management — coming soon</li>
+            <li>
+              <Link
+                href="/admin/payments"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              >
+                Payment management
+              </Link>
+            </li>
           </ul>
         </div>
 
