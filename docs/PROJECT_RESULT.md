@@ -1739,6 +1739,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: The five guarded scenarios await a disposable test-mode environment (Stripe sk_test_/whsec_ + Supabase project); they execute unchanged once available
 - **Follow-up work**: Phase 4 complete — Task 5.1 — Supabase realtime subscription
 
+### Task 5.1
+
+- **Date**: 2026-08-23
+- **Objective**: Client-side subscription infrastructure streaming authoritative public.bids changes to the browser, enabling Tasks 5.2–5.4 display updates without polling or a second state machine
+- **Status**: Completed
+- **What was implemented**:
+  - Migration 20260823000014_enable_bids_realtime.sql: adds public.bids to the supabase_realtime publication (idempotent guard) — without it postgres_changes delivers nothing; RLS preserved since browsers subscribe with the anon key, so deliveries are filtered by bids_public_select_paid (paid bids only)
+  - src/lib/realtime.ts: subscribeToBidChanges(onChange) -> unsubscribe closure over the existing browser client; channel 'bids-changes' with postgres_changes {event:'*', schema:'public', table:'bids'}; typed BidChangePayload {eventType,new,old}; channel errors logged not thrown
+  - RealtimeBidRow declared structurally in realtime.ts — importing ./bids would pull server-only service-role modules into the browser bundle
+- **Files changed**:
+  - supabase/migrations/20260823000014_enable_bids_realtime.sql (new)
+  - src/lib/realtime.ts (new)
+  - src/lib/realtime.test.ts (new — 5 tests)
+  - docs/5.1.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 108/108 PASSED across 5 files (43 bids + 8 checkout + 44 webhook + 8 real-crypto signature + 5 realtime)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: anon-client only, no server-module imports in the client graph, publication membership idempotent
+  - Live Supabase Realtime delivery: SKIPPED — no Docker/remote test project available; NOT faked. Intended live check documented in docs/5.1.txt
+- **Important technical decisions**:
+  - Infrastructure-only scope: UI consumers arrive in Tasks 5.2–5.4 per the phase decomposition
+  - Structural row type instead of importing Bid keeps the client bundle free of server-only modules while staying type-compatible
+  - Test fake captures the .on() postgres_changes filter (not channel config) matching how supabase-js actually receives it
+- **Known limitations**: Live delivery verification deferred until a real database environment exists; no UI consumes the subscription yet (by design until 5.2+)
+- **Follow-up work**: Task 5.2 — Update highest bid display
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
