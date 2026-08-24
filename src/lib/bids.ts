@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server';
 import { createServiceClient } from '@/lib/supabase-service';
 import { getCategoryBySlug, validateCategory } from '@/lib/categories';
+import { isEmailBanned } from '@/lib/email-bans';
 
 export type Bid = {
   id: string;
@@ -365,6 +366,7 @@ export type CreatePendingBidFailureReason =
   | 'invalid_amount'
   | 'amount_below_minimum'
   | 'invalid_bidder_email'
+  | 'banned_email'
   | 'invalid_bidder_name'
   | 'invalid_stripe_session_id'
   | 'duplicate_transaction';
@@ -409,6 +411,14 @@ export async function createPendingBid(input: PendingBidInput): Promise<CreatePe
 
   if (!email) {
     return { valid: false, reason: 'invalid_bidder_email', minimumBid: null };
+  }
+
+  // Task 8.7: fraud enforcement at the single authoritative choke point - a banned
+  // email can never create a pending bid, hence never reach Checkout or payment.
+  // Checked before any other validation so banned actors learn nothing about the
+  // category's current state.
+  if (await isEmailBanned(email)) {
+    return { valid: false, reason: 'banned_email', minimumBid: null };
   }
 
   const nameResult = normalizeBidderName(input.bidderName);

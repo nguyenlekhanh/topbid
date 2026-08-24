@@ -73,6 +73,14 @@ vi.mock('@/lib/notification-deliveries', () => ({
   markDeliveryFailed: deliveriesMock.markDeliveryFailed,
 }));
 
+const emailBansMock = vi.hoisted(() => ({
+  isEmailBanned: vi.fn(),
+}));
+
+vi.mock('@/lib/email-bans', () => ({
+  isEmailBanned: emailBansMock.isEmailBanned,
+}));
+
 const CATEGORY = { id: 'cat-1', slug: 'retro-gaming', name: 'Retro Gaming' };
 
 const NEW_BID_ROW = {
@@ -121,6 +129,8 @@ beforeEach(() => {
   unsubscribeMock.listUnsubscribeHeaders.mockReturnValue(LIST_UNSUBSCRIBE_HEADERS);
   deliveriesMock.beginDeliveryAttempt.mockReset();
   deliveriesMock.beginDeliveryAttempt.mockResolvedValue({ status: 'fresh', attempts: 1 });
+  emailBansMock.isEmailBanned.mockReset();
+  emailBansMock.isEmailBanned.mockResolvedValue(false);
   deliveriesMock.markDeliverySent.mockReset();
   deliveriesMock.markDeliverySent.mockResolvedValue(undefined);
   deliveriesMock.markDeliveryFailed.mockReset();
@@ -217,6 +227,17 @@ describe('sendOutbidNotification (Task 6.4)', () => {
 
     expect(result).toEqual({ notified: false, reason: 'self_outbid' });
     expect(unsubscribeMock.isUnsubscribed).not.toHaveBeenCalled();
+    expect(emailBansMock.isEmailBanned).not.toHaveBeenCalled();
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('never emails a fraud-banned recipient (Task 8.7)', async () => {
+    emailBansMock.isEmailBanned.mockResolvedValue(true);
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(emailBansMock.isEmailBanned).toHaveBeenCalledWith('champ@example.com');
+    expect(result).toEqual({ notified: false, reason: 'recipient_banned' });
     expect(resendMock.sendEmail).not.toHaveBeenCalled();
   });
 

@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 8 in progress — 8.6 completed** — Next recommended: 8.7
+**Phase 8 in progress — 8.7 completed** — Next recommended: 8.8
 
 ## Completed Tasks
 
@@ -92,6 +92,7 @@
 - 8.4: Bid management ✓
 - 8.5: Payment management ✓
 - 8.6: Refund action ✓
+- 8.7: Fraud/banned email management ✓
 
 ## Tasks in Progress
 
@@ -214,7 +215,7 @@ _None_
 
 ## Next Recommended Task
 
-**8.7 - Fraud/banned email management**
+**8.8 — Audit logs**
 
 ## Notes
 
@@ -321,5 +322,7 @@ Task 8.4 completed successfully. Bid management added as a deliberately read-onl
 Task 8.5 completed successfully. Payment management added as a read-only oversight view (refund ACTION explicitly deferred to 8.6 per plan decomposition): server-only admin-payment-management.ts listPaymentsForAdmin guard-gated service-role read returns the latest 100 payment records with the Stripe session/payment-intent identifiers admins need for Stripe-dashboard cross-referencing plus status badges/amounts/timestamps/category names and per-status counts aggregated across the window; personal fields excluded at query level and via allow-list mapping; /admin/payments page renders stat chips + responsive table; zero mutations and zero Stripe API calls - payment state remains owned by the verified-webhook RPCs; dashboard link activated; 491/491 tests passing.
 
 Task 8.6 completed successfully. Refund action added through the EXISTING authoritative boundaries: admin-refunds.ts initiateAdminRefund authorizes via getAdminAuthorization, pre-validates (paid status + persisted PI + amount>0 by strict-UUID bid id), issues stripe.refunds.create with per-bid idempotency key admin-refund-<bidId> through the server-only Stripe client, then applies the Task 4.11 refund_paid_bid ledger+transition RPC (event_id=Stripe refund id, event_type=admin.refund); audit uncovered a latent Phase-4 defect - refund_paid_bid referenced an undeclared parameter so every invocation errored at runtime - fixed via migration 20260823000019 preserving signature/locking/idempotency; non-terminal Stripe statuses defer to the webhook ('refund_submitted'), provider failures never record local state, db_pending honestly surfaces retry-safe reconciliation; POST /api/admin/payments/refund routes JSON/form input into stable ?result=/ ?error= redirects; /admin/payments renders per-row Refund buttons for paid payments only; no direct bid-row writes anywhere; 521/521 tests passing.
+
+Task 8.7 completed successfully. Fraud/banned email management added: migration 20260823000020 creates banned_emails (email_canonical UNIQUE lowercase identity + created_at; RLS zero policies); server-only email-bans.ts provides canonicalization, idempotent ban/unban (ON CONFLICT/upsert + exact-count delete), guarded list, and enforcement lookups; createPendingBid rejects banned emails at the single authoritative choke point BEFORE category/amount validation (new 'banned_email' failure reason) so banned actors cannot reach Checkout or learn category state; sendOutbidNotification independently skips banned recipients ('recipient_banned') after the unsubscribe check; POST /api/admin/banned (ban/unban intents) + /admin/banned page with ban form and blocklist; dashboard links it; distinct from notification_unsubscribes consent state; no fraud scoring/providers/queues; 543/543 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

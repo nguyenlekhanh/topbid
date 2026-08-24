@@ -6,6 +6,7 @@ import {
 } from '@/lib/notification-deliveries';
 import { buildOutbidEmail } from '@/lib/outbid-email-template';
 import { sendEmail, SendEmailError } from '@/lib/resend';
+import { isEmailBanned } from '@/lib/email-bans';
 import { buildUnsubscribeUrl, isUnsubscribed, listUnsubscribeHeaders } from '@/lib/unsubscribe';
 
 /**
@@ -41,6 +42,7 @@ export type OutbidNotificationSkippedReason =
   | 'no_previous_bidder'
   | 'self_outbid'
   | 'recipient_unsubscribed'
+  | 'recipient_banned'
   | 'already_sent'
   | 'already_handled';
 
@@ -139,6 +141,12 @@ export async function sendOutbidNotification(
   // as such regardless of suppression state.
   if (await isUnsubscribed(previous.bidderEmail)) {
     return { notified: false, reason: 'recipient_unsubscribed' };
+  }
+
+  // Task 8.7: fraud-banned recipients never receive outbid notifications either -
+  // checked independently of unsubscribe consent (separate state, separate reason).
+  if (await isEmailBanned(previous.bidderEmail)) {
+    return { notified: false, reason: 'recipient_banned' };
   }
 
   // Task 6.7: gate and record the attempt BEFORE composing - a recorded 'sent' or

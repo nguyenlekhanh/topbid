@@ -1,32 +1,48 @@
 ﻿TASK ID: 8.7
 PHASE: 8
 TITLE: Fraud/banned email management
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Give administrators first-party fraud-blocklist management - ban an email, unban, list - with server-side enforcement at the two boundaries that matter: bid creation (the single choke point before Checkout) and outbid notification sending. No third-party fraud providers, scoring engines, or queues.
 
-SCOPE:
+ARCHITECTURE:
+- migration 20260823000020 creates banned_emails (email_canonical UNIQUE + created_at; RLS enabled with ZERO policies - service-role only)
+- Canonical identity = lower(trimmed(raw email)); bids store the trimmed original casing, so enforcement compares case-insensitively against the canonical column
+- src/lib/email-bans.ts (server-only): canonicalizeEmail / isEmailBanned / banEmail (ON CONFLICT DO NOTHING upsert -> banned|already_banned by row count) / unbanEmail (exact-count delete -> unbanned|not_banned) / listBannedEmails; admin ops gated through getAdminAuthorization and fail closed
 
-OUT OF SCOPE:
+ENFORCEMENT POINTS (both authoritative):
+1. createPendingBid (src/lib/bids.ts): after email shape validation, BEFORE category/amount checks - a banned email learns nothing about any category and can never create a pending bid, reach Checkout, or pay. New typed failure reason 'banned_email'.
+2. sendOutbidNotification (src/lib/outbid-notification.ts): after the unsubscribe check, BEFORE composition/delivery-attempt gating - banned recipients never receive mail ('recipient_banned'). Unsubscribe consent and fraud bans are separate states checked independently.
 
-INPUTS / DEPENDENCIES:
+ADMIN UI/ENDPOINT:
+- POST /api/admin/banned: intents ban | unban | list over form {email}; unauthorized redirects to login; stable ?result=/?error= flags
+- GET removed deliberately (no extra JSON dump surface); the page reads server-side via listBannedEmails
+- /admin/banned page: ban form + blocklist (canonical emails newest-first) with per-row Unban buttons; result/error banner mapping
+- Dashboard management list now links it
 
-IMPLEMENTATION REQUIREMENTS:
+PRIVACY:
+Only canonical addresses stored/exposed (no IPs/names/device data). The blocklist is distinct from notification_unsubscribes (consent state, HMAC-hashed) - separation preserved per task constraints.
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- supabase/migrations/20260823000020_create_banned_emails.sql (new)
+- src/lib/email-bans.ts + test (new, 20 tests)
+- src/lib/bids.ts (+banned_email gate in createPendingBid) + bids.test.ts (+bypass/regression tests)
+- src/lib/outbid-notification.ts (+recipient_banned skip) + test (+banned/no-regression cases)
+- src/app/api/admin/banned/route.ts, src/app/admin/banned/page.tsx (new)
+- src/app/admin/page.tsx (Fraud/banned emails link activated)
+- docs/8.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 543/543 PASSED across 33 files (+22 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/api/admin/banned registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO 8.8 audit logs, NO generic fraud scoring/risk engines/third-party providers, NO queues/cron, NO changes to payment/webhook correctness, Phase 6 email delivery mechanics, Phase 7 sharing, Task 8.1 auth internals, or Tasks 8.2-8.6 pages beyond the dashboard link. Unsubscribe semantics untouched and fully separate.
 
 KNOWN ISSUES:
+- Ban is address-level only (no domain wildcards) - minimal scope per plan.
+- Bidding enforcement adds one indexed service-role lookup per bid creation attempt.
 
 FOLLOW-UP:
+Task 8.8 - Audit logs

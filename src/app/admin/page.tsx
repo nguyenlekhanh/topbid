@@ -168,6 +168,14 @@ export default async function AdminDashboardPage() {
                 Payment management
               </Link>
             </li>
+            <li>
+              <Link
+                href="/admin/banned"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              >
+                Fraud / banned emails
+              </Link>
+            </li>
           </ul>
         </div>
 

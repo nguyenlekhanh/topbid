@@ -2557,7 +2557,29 @@ This file records what has actually been built, not what was planned.
   - Payment identifiers exposed to authenticated admins only (required for cross-referencing); personal fields excluded wholesale as irrelevant to payment oversight
   - Pure read = naturally repeatable/idempotent; no queues/retries/schedulers introduced
 - **Known limitations**: fixed 100-record window; full identifier strings visible in truncated cells to admins only (never on public surfaces)
-- **Follow-up work**: Task 8.7 - Fraud/banned email management
+- **Follow-up work**: Task 8.8 - Audit logs
+
+---
+
+### Task 8.7
+
+- **Date**: 2026-08-24
+- **Objective**: Give administrators first-party fraud-blocklist management (ban/unban/list) with server-side enforcement at bid creation and outbid-notification boundaries - no fraud scoring, third-party providers, or queues
+- **Status**: Completed
+- **What was implemented**:
+  - supabase/migrations/20260823000020_create_banned_emails.sql: banned_emails (email_canonical UNIQUE lowercase identity + created_at; RLS enabled with ZERO policies - service-role only)
+  - src/lib/email-bans.ts (server-only): canonicalizeEmail (trim+lowercase identity matched case-insensitively), isEmailBanned, banEmail (ON CONFLICT DO NOTHING upsert -> banned|already_banned by exact row count), unbanEmail (exact-count delete -> unbanned|not_banned), listBannedEmails; admin ops gated by getAdminAuthorization and fail closed
+  - src/lib/bids.ts: createPendingBid rejects banned emails AFTER email shape validation and BEFORE category/amount checks - new typed reason banned_email; a banned actor learns nothing about any category and can never reach Checkout or payment
+  - src/lib/outbid-notification.ts: recipient_banned skip checked independently after the unsubscribe guard - banned recipients never receive outbid mail; separate state from notification_unsubscribes consent
+  - POST /api/admin/banned (ban|unban|list intents over form data) + /admin/banned page rendering the blocklist newest-first with ban form and per-row Unban buttons; dashboard link activated
+- **Files changed**: migration 20260823000020; src/lib/email-bans.ts + test (20 tests); src/lib/bids.ts + bids.test.ts (+banned-email gate/regression); src/lib/outbid-notification.ts + test (+recipient_banned cases); src/app/api/admin/banned/route.ts; src/app/admin/banned/page.tsx; docs/8.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 543/543 across 33 files (+22 net); typecheck/lint/format:check/build all PASSED (/api/admin/banned registered dynamic)
+- **Important technical decisions**:
+  - Canonical identity = lower(trimmed(email)) stored UNIQUE so duplicate bans are deterministic no-ops and enforcement matches case-insensitively against addresses bids store as-entered
+  - Enforcement placed at the single choke point (createPendingBid) before Checkout - banned actors learn nothing about category state and cannot pay; notification suppression enforced separately and independently of unsubscribe consent
+  - Distinct states: notification_unsubscribes stays consent-only (HMAC-hashed); banned_emails is plaintext-canonical fraud state - neither substitutes for the other
+- **Known limitations**: address-level bans only (no domain wildcards); one indexed service-role lookup added to each bid creation attempt
+- **Follow-up work**: Task 8.8 - Audit logs
 
 ---
 

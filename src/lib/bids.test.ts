@@ -88,6 +88,14 @@ vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: () => mocks.makeFakeClient(mocks.serviceState),
 }));
 
+const emailBansMock = vi.hoisted(() => ({
+  isEmailBanned: vi.fn(),
+}));
+
+vi.mock('@/lib/email-bans', () => ({
+  isEmailBanned: emailBansMock.isEmailBanned,
+}));
+
 const CATEGORY = {
   id: 'cat-1',
   slug: 'gaming',
@@ -138,6 +146,8 @@ beforeEach(() => {
   mocks.serverState.calls.length = 0;
   mocks.serviceState.queue.length = 0;
   mocks.serviceState.calls.length = 0;
+  emailBansMock.isEmailBanned.mockReset();
+  emailBansMock.isEmailBanned.mockResolvedValue(false);
 });
 
 describe('getHighestBidForCategory', () => {
@@ -354,6 +364,20 @@ describe('createPendingBid local input handling', () => {
 });
 
 describe('createPendingBid', () => {
+  it('rejects banned emails before any validation or database access (Task 8.7)', async () => {
+    emailBansMock.isEmailBanned.mockResolvedValue(true);
+
+    const result = await createPendingBid({
+      categorySlug: 'gaming',
+      amount: 1000,
+      bidderEmail: 'fraud@example.com',
+    });
+
+    expect(result).toEqual({ valid: false, reason: 'banned_email', minimumBid: null });
+    expect(mocks.serverState.calls).toHaveLength(0);
+    expect(mocks.serviceState.calls).toHaveLength(0);
+  });
+
   it('creates a pending bid through the RPC with authoritative values', async () => {
     const inserted = pendingBidRow(1000);
     enqueueServer(
