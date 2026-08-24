@@ -108,6 +108,8 @@ export type ConversionOutcome =
   | 'duplicate'
   | 'failed'
   | 'already_failed'
+  | 'refunded'
+  | 'already_refunded'
   | 'bid_not_found'
   | 'invalid_state'
   | 'session_mismatch';
@@ -118,6 +120,8 @@ const KNOWN_CONVERSION_OUTCOMES: readonly ConversionOutcome[] = [
   'duplicate',
   'failed',
   'already_failed',
+  'refunded',
+  'already_refunded',
   'bid_not_found',
   'invalid_state',
   'session_mismatch',
@@ -199,6 +203,40 @@ async function failVerifiedBid(
 }
 
 /**
+ * Apply the verified refund at the database boundary (Task 4.11).
+ * - Delegates to the refund_paid_bid RPC: ledger claim + transition in one transaction;
+ *   duplicate claims and already-refunded bids return success/no-op outcomes; anomalies
+ *   raise inside the RPC, rolling back the claim so the event stays retryable
+ * - Links authoritatively via stripe_payment_intent_id persisted by Task 4.8
+ * - RPC errors throw so the endpoint responds 500 and Stripe retries
+ */
+async function refundVerifiedBid(
+  eventId: string,
+  eventType: string,
+  paymentIntentId: string
+): Promise<ConversionOutcome> {
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase.rpc('refund_paid_bid', {
+    p_event_id: eventId,
+    p_event_type: eventType,
+    p_stripe_payment_intent_id: paymentIntentId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to process refund event: ${error.message}`);
+  }
+
+  const outcome = data as ConversionOutcome;
+
+  if (!KNOWN_CONVERSION_OUTCOMES.includes(outcome)) {
+    throw new Error(`Failed to process refund event: unknown outcome "${String(data)}"`);
+  }
+
+  return outcome;
+}
+
+/**
  * Replay-protection window for signature timestamps, in seconds.
  * This is Stripe's default tolerance, made explicit so review and tests can pin it;
  * events with older timestamps fail verification.
@@ -208,6 +246,7 @@ export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
 const SUPPORTED_EVENT_TYPES = new Set([
   'checkout.session.completed',
   'checkout.session.async_payment_failed',
+  'charge.refunded',
 ]);
 
 type StripeLikeEvent = {
@@ -218,6 +257,8 @@ type StripeLikeEvent = {
       id?: string;
       client_reference_id?: string | null;
       metadata?: Record<string, string> | null;
+      payment_intent?: string | { id?: string } | null;
+      refunded?: boolean;
     };
   };
 };
@@ -275,6 +316,49 @@ async function handleAsyncPaymentFailed(
   }
 
   return failVerifiedBid(event.id ?? 'unknown', event.type!, references.bidId, sessionId);
+}
+
+async function handleChargeRefunded(
+  event: StripeLikeEvent
+): Promise<ConversionOutcome | 'unverified'> {
+  // Task 4.11: authoritative verification - retrieve the charge and require
+  // refunded = true (full refund). Partial refunds are acknowledged without mutation:
+  // the plan specifies no partial-refund policy, so none is invented.
+  const charge = event.data?.object ?? {};
+  const chargeId = typeof charge.id === 'string' ? charge.id : 'unknown';
+  const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : null;
+
+  if (!paymentIntentId) {
+    console.warn(
+      '[stripe-webhook] charge.refunded without payment_intent - cannot link bid',
+      JSON.stringify({ eventId: event.id ?? 'unknown', chargeId })
+    );
+
+    return 'unverified';
+  }
+
+  let refunded: boolean | null = null;
+
+  try {
+    const retrieved = await stripe.charges.retrieve(chargeId);
+
+    refunded = retrieved.refunded;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    throw new Error(`Failed to retrieve Charge "${chargeId}": ${message}`);
+  }
+
+  if (refunded !== true) {
+    console.warn(
+      '[stripe-webhook] charge.refunded not fully refunded - no state change',
+      JSON.stringify({ eventId: event.id ?? 'unknown', chargeId })
+    );
+
+    return 'unverified';
+  }
+
+  return refundVerifiedBid(event.id ?? 'unknown', event.type!, paymentIntentId);
 }
 
 async function handleCheckoutSessionCompleted(
@@ -362,7 +446,9 @@ export async function processStripeWebhook(
     const outcome =
       event.type === 'checkout.session.completed'
         ? await handleCheckoutSessionCompleted(event)
-        : await handleAsyncPaymentFailed(event);
+        : event.type === 'charge.refunded'
+          ? await handleChargeRefunded(event)
+          : await handleAsyncPaymentFailed(event);
 
     // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
     // Stripe retries and monitoring surfaces them.

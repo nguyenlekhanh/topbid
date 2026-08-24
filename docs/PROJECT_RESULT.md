@@ -1673,6 +1673,37 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.11 — Refund handling
 
+### Task 4.11
+
+- **Date**: 2026-08-23
+- **Objective**: When Stripe authoritatively reports a full refund, transition the linked PAID bid to 'refunded' — linked via stripe_payment_intent_id, idempotent at the ledger, no invented partial-refund policy
+- **Status**: Completed
+- **What was implemented**:
+  - Migration 20260823000013_refund_paid_bid_function.sql: refund_paid_bid(p_event_id, p_event_type, p_stripe_payment_intent_id) returns text — ledger claim + transition in ONE transaction (Task 4.9 pattern: unique_violation -> 'duplicate'; already_refunded no-op; bid_not_found/invalid_state returned as outcomes the dispatcher answers 500); row-locked SELECT ... FOR UPDATE keyed on stripe_payment_intent_id persisted by Task 4.8; SECURITY DEFINER + pinned search_path; EXECUTE service_role only
+  - src/lib/stripe-webhook.ts: charge.refunded added to supported types; handleChargeRefunded extracts a STRING payment_intent from the verified event (expanded objects treated as absent), retrieves the charge via the server-only client requiring refunded===true (4.7 re-retrieval discipline), then applies the refund through the RPC; ConversionOutcome gains 'refunded'/'already_refunded'
+  - Partial refunds (retrieved refunded=false) acknowledged without mutation — no partial-refund policy exists in the plan, so none was invented
+- **Files changed**:
+  - supabase/migrations/20260823000013_refund_paid_bid_function.sql (new)
+  - src/lib/stripe-webhook.ts (refund routing/handler/wrapper + outcome extensions)
+  - src/lib/stripe-webhook.test.ts (+7 tests; charges.retrieve added to Stripe mock and reset block)
+  - docs/4.11.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 103/103 PASSED across 4 files (43 bids + 8 checkout + 44 webhook + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL inspection: PASSED (PK claim arbitration, paid->refunded-only guard, outcome set validation, grant signature match)
+  - Live Stripe refund delivery: SKIPPED — requires live keys/refunds; NOT faked; live end-to-end remains documented for Task 4.12
+- **Important technical decisions**:
+  - Refunds keyed on stripe_payment_intent_id (authoritative linkage persisted by Task 4.8) rather than session or client data
+  - Full refunds only (refunded=true); partial-refund behavior deliberately unspecified pending plan guidance
+  - Test development caught retrieveCharge mock-call accumulation across tests — fixed by adding it to the shared beforeEach reset block
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.12 — Stripe integration tests
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

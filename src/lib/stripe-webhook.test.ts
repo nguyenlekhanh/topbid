@@ -5,6 +5,7 @@ import { processStripeWebhook, verifyCheckoutSessionPaid } from './stripe-webhoo
 const stripeMock = vi.hoisted(() => ({
   constructEvent: vi.fn(),
   retrieveSession: vi.fn(),
+  retrieveCharge: vi.fn(),
 }));
 
 const supabaseMock = vi.hoisted(() => {
@@ -78,6 +79,9 @@ vi.mock('@/lib/stripe', () => ({
         retrieve: stripeMock.retrieveSession,
       },
     },
+    charges: {
+      retrieve: stripeMock.retrieveCharge,
+    },
   },
 }));
 
@@ -107,6 +111,7 @@ beforeEach(() => {
     metadata: { bid_id: 'bid-1000' },
     payment_intent: 'pi_test_123',
   });
+  stripeMock.retrieveCharge.mockReset();
   supabaseMock.state.queue.length = 0;
   supabaseMock.state.calls.length = 0;
   vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -569,5 +574,116 @@ describe('payment failure handling (Task 4.10)', () => {
       expect.any(String)
     );
     expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+});
+
+describe('refund handling (Task 4.11)', () => {
+  const REFUNDED_EVENT = {
+    id: 'evt_ref_1',
+    type: 'charge.refunded',
+    data: {
+      object: {
+        id: 'ch_test_1',
+        payment_intent: 'pi_test_123',
+        refunded: true,
+      },
+    },
+  };
+
+  function enqueueRefundedEvent() {
+    stripeMock.constructEvent.mockReturnValue(REFUNDED_EVENT);
+    stripeMock.retrieveCharge.mockResolvedValue({
+      id: 'ch_test_1',
+      refunded: true,
+      payment_intent: 'pi_test_123',
+    });
+  }
+
+  it('refunds the linked paid bid via the RPC with authoritative values', async () => {
+    enqueueRefundedEvent();
+    supabaseMock.state.queue.push({ data: 'refunded', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(stripeMock.retrieveCharge).toHaveBeenCalledWith('ch_test_1');
+    expect(lastRpcCall()?.args[0]).toBe('refund_paid_bid');
+    expect(lastRpcCall()?.args[1]).toEqual({
+      p_event_id: 'evt_ref_1',
+      p_event_type: 'charge.refunded',
+      p_stripe_payment_intent_id: 'pi_test_123',
+    });
+  });
+
+  it('acknowledges ledger-reported duplicates for refund events', async () => {
+    enqueueRefundedEvent();
+    supabaseMock.state.queue.push({ data: 'duplicate', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true', duplicate: 'true' });
+  });
+
+  it('treats repeats of an already-applied refund as success without re-refunding', async () => {
+    enqueueRefundedEvent();
+    supabaseMock.state.queue.push({ data: 'already_refunded', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+  });
+
+  it('does not refund on partial refunds (refunded flag false)', async () => {
+    enqueueRefundedEvent();
+    stripeMock.retrieveCharge.mockResolvedValue({
+      id: 'ch_test_1',
+      refunded: false,
+      payment_intent: 'pi_test_123',
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('not fully refunded'),
+      expect.any(String)
+    );
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+
+  it('cannot link a refund without a string payment_intent', async () => {
+    enqueueRefundedEvent();
+    stripeMock.constructEvent.mockReturnValue({
+      ...REFUNDED_EVENT,
+      data: { object: { id: 'ch_test_1', payment_intent: { id: 'pi_obj' } } },
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(stripeMock.retrieveCharge).not.toHaveBeenCalled();
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+
+  it('returns 500 when the authoritative charge cannot be retrieved', async () => {
+    enqueueRefundedEvent();
+    stripeMock.retrieveCharge.mockRejectedValue(new Error('stripe unavailable'));
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+
+  it('returns 500 when the refund reports bid_not_found so Stripe retries', async () => {
+    enqueueRefundedEvent();
+    supabaseMock.state.queue.push({ data: 'bid_not_found', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: 'Webhook processing failed' });
   });
 });

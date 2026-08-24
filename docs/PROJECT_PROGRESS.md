@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.10 completed** — Next recommended: 4.11
+**4.11 completed** — Next recommended: 4.12
 
 ## Completed Tasks
 
@@ -63,6 +63,7 @@
 - 4.8: Convert pending bid to paid ✓
 - 4.9: Idempotent webhook handling ✓
 - 4.10: Payment failure handling ✓
+- 4.11: Refund handling ✓
 
 ## Tasks in Progress
 
@@ -137,6 +138,7 @@ _None_
 - Pending-to-paid conversion created (migration 20260823000010 adds convert_pending_bid_to_paid RPC: row-locked atomic transition setting status='paid', paid_at, stripe_payment_intent_id, completing NULL session linkage only; typed outcomes converted/already_paid/bid_not_found/invalid_state/session_mismatch with retry-safe idempotency via bid+session identity; EXECUTE restricted to service_role)
 - Idempotent webhook handling created (migration 20260823000011 adds processed_webhook_events ledger keyed by Stripe event.id PRIMARY KEY plus process_checkout_completed_event wrapper RPC claiming the event and applying conversion in one transaction - duplicates acknowledged via duplicate:'true', anomalies roll back claim+effect so events stay retryable)
 - Payment failure handling created (migration 20260823000012 adds fail_pending_bid RPC handling checkout.session.async_payment_failed: claim+effect in one transaction, never downgrades paid bids, marks only linked pending bids 'failed' with session-linkage guards; EXECUTE restricted to service_role)
+- Refund handling created (migration 20260823000013 adds refund_paid_bid RPC: ledger claim + paid->refunded transition in one transaction keyed on stripe_payment_intent_id from the authoritatively retrieved charge (refunded=true required); already_refunded/duplicate no-ops; anomalies answered 500; EXECUTE restricted to service_role)
 
 ## Current Environment/Setup Status
 
@@ -154,7 +156,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.11 — Refund handling**
+**4.12 — Stripe integration tests**
 
 ## Notes
 
@@ -203,3 +205,7 @@ Task 4.8 completed successfully. Migration 20260823000010 adds convert_pending_b
 Task 4.9 completed successfully. Migration 20260823000011 adds the processed_webhook_events ledger (event.id PRIMARY KEY) and process_checkout_completed_event wrapper claiming events and converting in one atomic transaction - duplicates acknowledged with duplicate:'true', anomalies roll back claim+effect keeping events retryable; signature/payment/conversion semantics from Tasks 4.6-4.8 preserved; 89/89 tests passing.
 
 Task 4.10 completed successfully. Payment failure handling added: migration 20260823000012 adds fail_pending_bid (ledger claim + pending-to-failed transition in one transaction, never downgrades paid bids, session-linkage guards) and the webhook now handles checkout.session.async_payment_failed authoritatively; 96/96 tests passing.
+
+Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
+
+Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
