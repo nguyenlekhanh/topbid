@@ -1,32 +1,58 @@
 ﻿TASK ID: 9.1
 PHASE: 9
-TITLE: Input validation (all endpoints)
-STATUS: pending
+TITLE: Input validation review
+STATUS: completed
 
 OBJECTIVE:
+Review every externally-influenced input entering server-side code, classify findings, and fix only concrete input-validation gaps required by Task 9.1 - without touching payment state machines, webhook idempotency, email delivery semantics, admin authorization internals, or public behavior.
 
-SCOPE:
+AUDIT SCOPE (inputs inventoried):
+Stripe webhook raw payload/signature; checkout success_url; /success session_id; unsubscribe token (page + endpoint); share-event JSON body; admin login credentials + next param; admin category mutation fields (slug/name/description/starting_bid/increment/image_url/intents); refund bid_id (JSON + form); banned-email form values; audit-log inputs; all admin banner query flags (result/error); public category slug route param; dashboard/bids/payments/banned/audit-logs page params.
 
-OUT OF SCOPE:
+FINDINGS CLASSIFICATION:
+A. ALREADY CORRECTLY VALIDATED (no change):
+- Stripe webhook pipeline: SDK signature verification is the authoritative parser; the event body only identifies which session to inspect; authoritative Stripe API re-retrieval precedes any mutation
+- createPendingBid amount matrix (Number.isFinite/isInteger/>0) with full RPC re-validation under row lock
+- validateCategory/getCategoryBySlug slug normalization + active-only app filter + RLS policies
+- getBidByStripeSessionId trim + 255-length guard; getHighestBidForCategory limit flooring to safe defaults
+- extractSessionId (string-only single-value, trimmed, <=255)
+- isValidUnsubscribeTokenShape (64-hex pre-query gate); canonicalizeEmail pattern + length <=254
+- sanitizeNextPath open-redirect guard incl. '/\\' protocol-relative rejection + resolved-origin equality in login route
+- normalizeBidId strict UUID pre-query; writeAuditLog action allow-list rejection before insert
+- trackShareEvent allow-list + swallow-all dispatch; server /api/share-events JSON parse try/catch -> 400
+- All Phase 8 banner pages use typed Record lookups with fallbacks for known keys
 
-INPUTS / DEPENDENCIES:
+B. MISSING VALIDATION REQUIRED BY 9.1 - FIXED:
+1. Prototype-chain record indexing on the three admin banner pages: RESULT_MESSAGES[result]/ERROR_MESSAGES[error] indexed directly with search-param strings let inherited keys ('__proto__', 'constructor', 'toString') resolve truthy through the prototype chain, defeating ?? fallbacks and crashing React rendering ("Objects are not valid as a React child") - an availability bug reachable by authenticated admins via crafted query strings. Fixed via new prototype-safe lookupRecordValue helper (hasOwnProperty-based) applied uniformly.
+2. Duplicated weaker inline sanitizer on /admin/login replaced by delegation to the canonical sanitizeNextPath guard (single source of truth for open-redirect policy).
 
-IMPLEMENTATION REQUIREMENTS:
+C. DEFENSE-IN-DEPTH IMPROVEMENTS DOCUMENTED ONLY (not implemented per minimal-scope rules):
+- int4 upper bound on bid amounts surfaces as generic infra error instead of a friendly message (fails closed; Postgres remains final authority)
+- abandoned pending reservations elevate the minimum-bid floor indefinitely (Phase 3 reservation-model tradeoff, no plan-mandated expiry)
+- beginDeliveryAttempt/markDeliveryFailed accept internal UUIDs without re-validation (sources are trusted server-side rows)
 
-FILES EXPECTED TO CHANGE:
+D. INTENTIONALLY PERMISSIVE, CONSISTENT WITH PLAN (no change):
+- bids-client Number(row.amount): column is NOT NULL integer - NaN unreachable
+- login email format not pre-validated: Supabase Auth performs authoritative validation; responses identical for unknown emails vs wrong passwords (no existence leak)
+- share-events accepts repeated events as separate rows; no dedup rule invented (documented in 7.7)
+- getLeaderboard/getRecentBids limit handling floors invalid values to safe defaults
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/safe-lookup.ts + test (new, 10 tests)
+- src/app/admin/categories/page.tsx, payments/page.tsx, banned/page.tsx (lookupRecordValue integration replacing direct record indexing)
+- src/app/admin/login/page.tsx (sanitizer deduplicated to shared guard)
+- docs/9.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 562/562 PASSED across 34 files (+10 net)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+SCOPE BOUNDARY (explicit):
+NO validation library introduced; NO schema/migration changes; NO changes to payment/webhook correctness, ledger/RPC architecture, email delivery mechanics, admin authorization internals, or public behavior beyond identical-output hardening; NO 9.2+ work (rate limiting/captcha remain later-phase scope).
+
+KNOWN ISSUES / NON-BLOCKING OBSERVATIONS:
+- TypeScript types continue to serve as documentation; runtime guards remain the enforcement layer everywhere untrusted data enters.
+- Admin-only crash-class inputs were low severity but fixed anyway since they fell squarely within the review mandate.
 
 FOLLOW-UP:
+Task 9.2 - Rate limiting

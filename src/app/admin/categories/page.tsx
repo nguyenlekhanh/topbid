@@ -6,6 +6,7 @@ import {
   listAllCategoriesForAdmin,
   type CategoryManagementErrorReason,
 } from '@/lib/admin-category-management';
+import { lookupRecordValue } from '@/lib/safe-lookup';
 import { createClient } from '@/lib/supabase-server';
 
 export const metadata: Metadata = {
@@ -96,9 +97,8 @@ export default async function AdminCategoriesPage({
             }`}
           >
             {error
-              ? (ERROR_MESSAGES[error as CategoryManagementErrorReason] ??
-                'Something went wrong. Please try again.')
-              : (RESULT_MESSAGES[result!] ?? 'Done.')}
+              ? lookupRecordValue(ERROR_MESSAGES, error, 'Something went wrong. Please try again.')
+              : lookupRecordValue(RESULT_MESSAGES, result ?? '', 'Done.')}
           </p>
         )}
 

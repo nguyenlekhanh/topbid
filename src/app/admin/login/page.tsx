@@ -1,17 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { sanitizeNextPath } from '@/lib/admin-auth';
+
 export const metadata: Metadata = {
   title: 'Admin login — Topbid.lol',
 };
 
 function sanitizeNext(value: string | string[] | undefined): string {
-  if (typeof value !== 'string') {
-    return '';
-  }
-
-  // Mirrors the server-side guard: same-origin relative paths only.
-  return value.startsWith('/') && !value.startsWith('//') ? value : '';
+  // Delegates to the shared open-redirect guard (same-origin relative paths only).
+  return sanitizeNextPath(value) ?? '';
 }
 
 /**

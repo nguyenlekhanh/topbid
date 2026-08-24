@@ -2581,6 +2581,34 @@ This file records what has actually been built, not what was planned.
   - processed_webhook_events remains the payment ledger and is NOT duplicated as an audit log; share_events remains product telemetry
 - **Known limitations**: best-effort writes can be lost on DB failure (loud-logged); detail payloads intentionally minimal
 - **Follow-up work**: Phase 9 - Security and Reliability (Task 9.1 Input validation review)
+- **Follow-up work**: Task 9.2 - Rate limiting
+
+---
+
+## Phase 9 - Security and Reliability
+
+### Task 9.1
+
+- **Date**: 2026-08-24
+- **Objective**: Review every externally-influenced input entering server-side code, classify findings, and fix only concrete input-validation gaps - no payment/webhook/email/share behavior changes, no new dependencies
+- **Status**: Completed
+- **Audit scope**: Stripe webhook payload/signature; success/unsubscribe/admin banner search params; admin login credentials + next redirects; category mutation fields; refund bid_id (JSON+form); share-event JSON; banned-email values; audit-log inputs; all public bid/category queries; RLS/RPC second lines of defense
+- **Findings classification**:
+  - A (already validated, no change): webhook SDK signature parsing + authoritative Stripe re-retrieval; createPendingBid amount matrix (finite/integer/positive) with RPC re-validation under lock; slug normalization + active-only filters; extractSessionId; unsubscribe token shape gate; canonicalizeEmail; sanitizeNextPath incl. /\\ protocol-relative trick; normalizeBidId strict UUID; writeAuditLog action allow-list; trackShareEvent allow-list + server JSON try/catch -> 400
+  - B (fixed): prototype-chain record indexing on the three admin banner pages - RESULT_MESSAGES/ERROR_MESSAGES indexed with search-param strings let inherited keys (**proto**/constructor/toString) resolve truthy through the prototype chain, defeating ?? fallbacks and crashing React rendering; plus a duplicated weaker inline sanitizer on the login page missing the backslash protocol-relative case
+  - C/D (documented only): int4 upper bound surfaces as generic infra error (fails closed); abandoned pending reservations elevate floors indefinitely; Number(row.amount) in bids-client is a safe no-op cast on NOT NULL columns; login email format delegated to Supabase Auth authoritatively; repeated share events intentionally counted separately
+- **What was implemented**:
+  - src/lib/safe-lookup.ts: lookupRecordValue(record, key, fallback) - hasOwnProperty-based prototype-safe map lookup used by every search-param-driven message map
+  - src/app/admin/login/page.tsx: sanitizer deduplicated onto the shared guard (adds the missing backslash case at this surface)
+  - src/app/admin/categories|payments|banned pages: banner lookups switched to the helper (identical output for valid input)
+  - src/lib/safe-lookup.test.ts (created, 10 tests)
+- **Files changed**: src/lib/safe-lookup.ts + test (created); src/app/admin/{categories,payments,banned}/page.tsx + src/app/admin/login/page.tsx (hardening/dedupe); docs/9.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 562/562 across 34 files (+10 net); typecheck/lint/format:check/build all PASSED
+- **Important technical decisions**:
+  - No validation library introduced; small pure helpers match the established testable-lib convention
+  - TypeScript types alone are not validation - runtime guards remain the enforcement layer at every untrusted boundary, verified by the inventory above
+- **Known limitations**: none blocking; remaining observations are documented as non-blocking defense-in-depth notes
+- **Follow-up work**: Task 9.2 - Rate limiting
 
 ---
 
