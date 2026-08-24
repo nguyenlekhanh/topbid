@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import BidButton from '@/components/BidButton';
 import BidModal from '@/components/BidModal';
+import HighestBidDisplay from '@/components/HighestBidDisplay';
 import { EmptyCategories } from '@/components/EmptyState';
 
 interface Category {
@@ -143,9 +144,10 @@ export default function CategoryCards() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-muted-foreground">Current Bid</div>
-                          <div className="font-semibold text-foreground">
-                            {formatCurrency(category.currentHighestBid ?? category.startingBid)}
-                          </div>
+                          <HighestBidDisplay
+                            categoryId={category.id}
+                            initialAmount={category.currentHighestBid ?? category.startingBid}
+                          />
                         </div>
                         <div>
                           <div className="text-muted-foreground">Total Bids</div>

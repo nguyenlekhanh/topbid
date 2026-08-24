@@ -1,32 +1,74 @@
 ﻿TASK ID: 5.2
 PHASE: 5
 TITLE: Update highest bid display
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Make the category-card "Current Bid" display update live from authoritative database state when bids change, driven by the Task 5.1 realtime subscription - without trusting realtime payload values or creating a client-side bidding state machine.
 
-SCOPE:
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "5.2 | Update highest bid display | 5.1". The existing highest-bid display is the "Current Bid" value in each CategoryCards card (static mock data). 5.2 turns that value live.
+
+SCOPE (three pieces):
+- src/lib/bids-client.ts (new) - getHighestPaidBidAmountForCategory(categoryId): Promise<number|null> over the browser anon client (RLS paid-only); lives separately from ./bids to keep server-only service-role modules out of the browser bundle
+- src/lib/highest-bid-tracker.ts (new) - createHighestBidTracker(options): () => void; realtime events are SIGNALS only: relevant events (same category_id AND resulting row paid OR DELETE) trigger an authoritative re-fetch via the injected fetcher; bursts coalesce to at most one trailing refetch; callback fires only on actual change; refetch errors logged not thrown; returns unsubscribe
+- src/components/HighestBidDisplay.tsx (new, 'use client') - thin wrapper holding the amount state, wiring tracker with real subscribe/fetch, rendering formatted amount (aria-live polite), fallback to initialAmount when authoritative value unknown
+- src/components/CategoryCards.tsx - the card's static Current Bid text replaced by <HighestBidDisplay categoryId initialAmount>; mock values remain as initial fallbacks so Phase 1 visuals are preserved until real category ids flow through
+
+PRESERVED / BOUNDARIES:
+- Payload rows never trusted for display: every change triggers a fresh authoritative query (RLS-filtered)
+- No client-side state machine duplicating pending/paid/refunded logic; no service-role access; no new dependencies
+- Tasks 1.1-5.1 logic untouched except the one-line integration point in CategoryCards
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Leaderboard ranking updates (Task 5.3), recent-bid updates (5.4), rank animations (5.5/5.6), reconnection UX (5.7), replacing remaining mock data sources wholesale
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids-client.ts (new)
+- src/lib/highest-bid-tracker.ts (new)
+- src/components/HighestBidDisplay.tsx (new)
+- src/components/CategoryCards.tsx (integration point)
+- src/lib/highest-bid-tracker.test.ts (new)
+- docs/5.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (7 new tracker tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
 
 DEFINITION OF DONE:
+- Highest-bid display updates live from authoritative RLS-filtered queries, signal-driven by Task 5.1 subscription, with cleanup and burst coalescing; all repo checks green
 
 IMPLEMENTATION NOTES:
+Tracker semantics proven by 7 deterministic tests: paid INSERT refetch/emits; other-category events ignored; unpaid resulting-row events ignored; DELETE refetches (bid disappeared); unchanged amount does not notify; bursts coalesce into at most one trailing refetch (three rapid events -> exactly two fetches, final value wins); unsubscribe detaches handler so later emits do nothing. Live Supabase Realtime delivery itself remains unavailable (no Docker/remote project) as documented since Task 5.1 - the suite proves the wiring deterministically instead of faking live delivery. Note: mock categories use non-UUID ids ('1'..'6'), so in the current mock-driven UI the tracker receives no matching events; it activates fully once real category ids flow through - consistent with the documented mock-driven state of Phase 1 components.
 
 RESULT:
+Implementation complete. Suite: 115/115 PASSED across 6 files (+7 tracker tests). typecheck/lint/format:check/build all PASSED. Static inspection confirmed payload-untrusted design, RLS-respecting queries, correct cleanup, and unchanged payment flows.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids-client.ts (new)
+- src/lib/highest-bid-tracker.ts (new)
+- src/components/HighestBidDisplay.tsx (new)
+- src/components/CategoryCards.tsx (integration point only)
+- src/lib/highest-bid-tracker.test.ts (new)
+- docs/5.2.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 115/115 PASSED (103 prior + 12 total across tracker/realtime additions this phase-so-far)
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Supabase Realtime delivery: SKIPPED - environment limitation carried from Task 5.1; NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 5.3 - Update leaderboard rankings

@@ -1770,6 +1770,39 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: Live delivery verification deferred until a real database environment exists; no UI consumes the subscription yet (by design until 5.2+)
 - **Follow-up work**: Task 5.2 — Update highest bid display
 
+### Task 5.2
+
+- **Date**: 2026-08-23
+- **Objective**: Make the category-card "Current Bid" display update live from authoritative database state, signal-driven by the Task 5.1 realtime subscription — payload values never trusted for display
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/bids-client.ts: getHighestPaidBidAmountForCategory over the browser anon client (RLS paid-only) — kept separate from ./bids so server-only modules stay out of the browser bundle
+  - src/lib/highest-bid-tracker.ts: createHighestBidTracker(options) -> unsubscribe; relevant events (same category_id AND resulting row paid, or DELETE) trigger an authoritative re-fetch; bursts coalesce into at most one trailing refetch; callback fires only when the authoritative amount actually changes; refetch errors logged not thrown
+  - src/components/HighestBidDisplay.tsx ('use client'): amount state + tracker wiring via useEffect with cleanup; renders formatted amount with aria-live="polite"; falls back to initialAmount when authoritative value unknown
+  - src/components/CategoryCards.tsx: static Current Bid text replaced by <HighestBidDisplay> per card; mock values remain as initial fallbacks preserving Phase 1 visuals
+- **Files changed**:
+  - src/lib/bids-client.ts (new)
+  - src/lib/highest-bid-tracker.ts (new)
+  - src/components/HighestBidDisplay.tsx (new)
+  - src/components/CategoryCards.tsx (integration point only)
+  - src/lib/highest-bid-tracker.test.ts (new — 7 tests)
+  - docs/5.2.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 115/115 PASSED across 6 files (43 bids + 8 checkout + 44 webhook + 8 real-crypto signature + 5 realtime + 7 tracker)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Supabase Realtime delivery: SKIPPED — environment limitation carried from Task 5.1; NOT faked
+- **Important technical decisions**:
+  - Realtime payloads used purely as change signals; displayed value always re-fetched from RLS-filtered DB state (no blind payload trust, no client state machine)
+  - Burst coalescing proven by test: three rapid events produce exactly two fetches with the final value winning
+  - Tracker injected with subscribe/fetch dependencies for deterministic testing without React rendering tools
+- **Known limitations**: Mock categories use non-UUID ids ('1'..'6'), so the tracker receives no matching events in the current mock-driven UI; it activates fully once real category ids flow through — consistent with the documented Phase 1 mock state
+- **Follow-up work**: Task 5.3 — Update leaderboard rankings
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

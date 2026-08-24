@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**5.1 completed** — Next recommended: 5.2
+**5.2 completed** — Next recommended: 5.3
 
 ## Completed Tasks
 
@@ -66,6 +66,7 @@
 - 4.11: Refund handling ✓
 - 4.12: Stripe integration tests ✓
 - 5.1: Supabase realtime subscription ✓
+- 5.2: Update highest bid display ✓
 
 ## Tasks in Progress
 
@@ -143,6 +144,7 @@ _None_
 - Refund handling created (migration 20260823000013 adds refund_paid_bid RPC: ledger claim + paid->refunded transition in one transaction keyed on stripe_payment_intent_id from the authoritatively retrieved charge (refunded=true required); already_refunded/duplicate no-ops; anomalies answered 500; EXECUTE restricted to service_role)
 - Stripe integration test infrastructure created (npm run test:integration via vitest.integration.config.mts; src/integration/stripe.integration.test.ts provides opt-in guarded suites for real test-mode Checkout API, signature round-trip, and the full paid/duplicate/refund lifecycle against real Supabase - skipped honestly when credentials/opt-in are absent)
 - Supabase realtime subscription created (migration 20260823000014 adds public.bids to the supabase_realtime publication; src/lib/realtime.ts exposes subscribeToBidChanges over the browser anon client with RLS-filtered paid-bid deliveries and typed payloads; structural row type avoids server modules in the client bundle)
+- Highest-bid display updated live (src/lib/bids-client.ts browser anon queries, src/lib/highest-bid-tracker.ts signal-driven authoritative refetch with burst coalescing and change-only notifications, src/components/HighestBidDisplay.tsx wired into CategoryCards cards replacing static Current Bid values)
 
 ## Current Environment/Setup Status
 
@@ -160,7 +162,7 @@ _None_
 
 ## Next Recommended Task
 
-**5.2 — Update highest bid display**
+**5.3 — Update leaderboard rankings**
 
 ## Notes
 
@@ -215,5 +217,7 @@ Task 4.11 completed successfully. Refund handling added: migration 2026082300001
 Task 4.12 completed successfully. Stripe integration test infrastructure added: npm run test:integration runs opt-in guarded suites (src/integration/stripe.integration.test.ts) covering real test-mode Checkout API lifecycle, signature round-trip through constructEvent, and the full paid/duplicate/refund lifecycle against real Supabase; suites SKIP honestly without credentials/opt-in. Unit suite remains hermetic at 103/103. Phase 4 complete.
 
 Task 5.1 completed successfully. Supabase realtime subscription added: migration 20260823000014 enables realtime for public.bids via the supabase_realtime publication, and src/lib/realtime.ts exposes subscribeToBidChanges over the browser anon client - deliveries RLS-filtered to paid bids only; 108/108 tests passing.
+
+Task 5.2 completed successfully. Highest-bid display made live: bids-client.ts provides RLS-respecting browser queries, highest-bid-tracker.ts turns realtime signals into authoritative refetches (burst coalescing, change-only notifications), and HighestBidDisplay is wired into CategoryCards cards; payload values never trusted for display; 115/115 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
