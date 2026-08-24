@@ -1835,6 +1835,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
 - **Follow-up work**: Task 5.4 — Recent bid updates
 
+### Task 5.4
+
+- **Date**: 2026-08-23
+- **Objective**: Make the Recent Bids feed update live from authoritative database state, signal-driven by realtime events — payload values never drive the UI
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/bids-client.ts: getRecentBidEntries(limit=8) + RecentBidEntryData — browser anon query mirroring the server-side getRecentBids (paid bids newest-first via created_at DESC + amount DESC tie-breaker, category embed), null-safe typed mapping
+  - src/lib/recent-bids-tracker.ts: createRecentBidsTracker<T> — identical proven pattern to the Task 5.3 leaderboard tracker: initial authoritative fetch on creation, coalesced trailing refetch for any bids event (the feed is global), JSON-snapshot change-only notifications, optional onError
+  - src/components/RecentBids.tsx converted to a live 'use client' consumer: loading state during first fetch, EmptyRecentBids on authoritative empty result, RecentBidsError with working Retry on load failure; rows preserve Phase 1 structure (initials avatar, name/'Anonymous bidder' fallback, category pill 'General' fallback, computed timeAgo, formatted amount) and the mock's New pulse label became an honest Paid badge
+  - Footer updated honestly: "Updated in real-time." replacing "Updates are mock, no realtime yet."
+- **Files changed**:
+  - src/lib/bids-client.ts (browser recent-bids query + type)
+  - src/lib/recent-bids-tracker.ts (new)
+  - src/components/RecentBids.tsx (live data conversion)
+  - src/lib/recent-bids-tracker.test.ts (new — 7 tests)
+  - docs/5.4.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 129/129 PASSED across 8 files (43 bids + 8 checkout + 44 webhook + 8 real-crypto signature + 5 realtime + 7 highest-bid tracker + 7 leaderboard tracker + 7 recent-bids tracker)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live Supabase Realtime delivery: SKIPPED — environment limitation carried from Task 5.1; NOT faked
+- **Important technical decisions**:
+  - Same claim-free signal/refetch architecture as Tasks 5.2/5.3: payload rows are never display state
+  - Feed is global (any paid-bid change refetches); per-category filtering remains specific to the Task 5.2 tracker
+  - Mock's "New" pulse replaced by honest "Paid" badge since every visible row is authoritatively paid under RLS
+- **Known limitations**: None within scope (live delivery verification carried from Task 5.1)
+- **Follow-up work**: Task 5.5 — Rank change animation
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

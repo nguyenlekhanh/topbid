@@ -73,3 +73,49 @@ export async function getLeaderboardEntries(limit = 10): Promise<LeaderboardEntr
         : null,
   }));
 }
+
+export type RecentBidEntryData = {
+  id: string;
+  amount: number;
+  bidderName: string | null;
+  bidderEmail: string;
+  createdAt: string;
+  category: { id: string; slug: string; name: string } | null;
+};
+
+/**
+ * Authoritative recent-bids feed for browsers (Task 5.4).
+ * Mirrors the server-side getRecentBids(): paid bids newest-first (created_at DESC)
+ * with amount DESC tie-breaker, RLS-filtered to paid rows for anon clients.
+ */
+export async function getRecentBidEntries(limit = 8): Promise<RecentBidEntryData[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from('bids')
+    .select('id, amount, bidder_name, bidder_email, created_at, categories (id, slug, name)')
+    .eq('status', 'paid')
+    .order('created_at', { ascending: false })
+    .order('amount', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to fetch recent bids: ${error.message}`);
+  }
+
+  return ((data as unknown as Array<Record<string, unknown>>) ?? []).map((row) => ({
+    id: String(row.id),
+    amount: Number(row.amount),
+    bidderName: (row.bidder_name as string | null) ?? null,
+    bidderEmail: String(row.bidder_email),
+    createdAt: String(row.created_at),
+    category:
+      row.categories && !Array.isArray(row.categories)
+        ? {
+            id: String((row.categories as Record<string, unknown>).id),
+            slug: String((row.categories as Record<string, unknown>).slug),
+            name: String((row.categories as Record<string, unknown>).name),
+          }
+        : null,
+  }));
+}

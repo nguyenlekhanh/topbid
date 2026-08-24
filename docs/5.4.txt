@@ -1,32 +1,76 @@
 ﻿TASK ID: 5.4
 PHASE: 5
 TITLE: Recent bid updates
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Make the Recent Bids feed update live from authoritative database state, signal-driven by the Task 5.1 realtime subscription - payload values never drive the UI.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "5.4 | Recent bid updates | 5.1". The existing RecentBids component rendered a static 8-item mock feed footnoted "Updates are mock, no realtime yet"; 5.4 replaces that with live data while preserving the visual structure.
 
 SCOPE:
+- src/lib/bids-client.ts - getRecentBidEntries(limit=8): Promise<RecentBidEntryData[]>; browser anon client mirroring the server-side getRecentBids (paid bids newest-first via created_at DESC + amount DESC tie-breaker, category embed); typed null-safe mapping
+- src/lib/recent-bids-tracker.ts (new) - createRecentBidsTracker<T>(options): () => void; identical proven pattern to the Task 5.3 leaderboard tracker: initial authoritative fetch on creation, coalesced trailing refetch for any bids event (the feed is global), JSON-snapshot change-only notifications, optional onError
+- src/components/RecentBids.tsx - converted to 'use client' live consumer:
+  * Initial load via tracker (entries===null -> inline loading state), EmptyRecentBids on authoritative empty result, RecentBidsError with working Retry on load failure
+  * Rows preserve Phase 1 structure: initials avatar, bidder name ('Anonymous bidder' fallback), category pill ('General' fallback), computed timeAgo, formatted amount, Paid badge replacing the mock's New pulse label
+  * Footer updated honestly: "Updated in real-time." replacing "Updates are mock, no realtime yet."
+- Home page composition unchanged (<RecentBids />)
+
+PRESERVED / BOUNDARIES:
+- Payload rows never trusted for display: every event triggers an authoritative RLS-filtered re-query
+- No client-side state machine duplicating payment logic; no service-role access; no new dependencies
+- Tasks 1.1-5.3 untouched except this component conversion and the additive client query
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Rank animations/new-#1 celebration (Tasks 5.5/5.6), reconnection UX (5.7), full /bids page
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids-client.ts
+- src/lib/recent-bids-tracker.ts (new)
+- src/components/RecentBids.tsx (live conversion)
+- src/lib/recent-bids-tracker.test.ts (new)
+- docs/5.4.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (7 new tracker tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: signals-not-payloads design, RLS-respecting queries, cleanup correctness
 
 DEFINITION OF DONE:
+- Recent Bids feed refreshes live from authoritative RLS-filtered queries with burst coalescing and change-only notifications; all repo checks green
 
 IMPLEMENTATION NOTES:
+Tracker mirrors the leaderboard-tracker pattern exactly (initial fetch on creation, burst coalescing to at most one trailing refetch, JSON snapshot change detection, optional onError). One lint warning fixed by actually rendering the derived displayEntries list (name/category fallbacks + timeAgo) instead of raw entries. Static inspection confirmed payload-untrusted design and cleanup correctness. Live Supabase Realtime delivery remains unavailable (no Docker/remote project) as documented since Task 5.1 - deterministic unit tests prove the wiring instead of faking live delivery.
 
 RESULT:
+Implementation complete. Suite: 129/129 PASSED across 8 files (+7 recent-bids tracker tests). typecheck/lint/format:check/build all PASSED.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids-client.ts (getRecentBidEntries + RecentBidEntryData)
+- src/lib/recent-bids-tracker.ts (new)
+- src/components/RecentBids.tsx (live data conversion)
+- src/lib/recent-bids-tracker.test.ts (new)
+- docs/5.4.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 129/129 PASSED across 8 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Supabase Realtime delivery: SKIPPED - environment limitation carried from Task 5.1; NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 5.5 - Rank change animation
