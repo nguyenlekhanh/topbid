@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase-service';
-import { getAdminAuthorization } from '@/lib/admin-auth';
+import { getAdminContext } from '@/lib/admin-auth';
+import { writeAuditLog } from '@/lib/audit-log';
 import { stripe } from '@/lib/stripe';
 
 /**
@@ -60,6 +61,8 @@ type RefundableBid = {
 };
 
 async function applyRefundTransition(
+  context: { userId: string; email: string },
+  bidId: string,
   paymentIntentId: string,
   refundId: string
 ): Promise<AdminRefundResult> {
@@ -84,12 +87,30 @@ async function applyRefundTransition(
   const outcome = data as string;
 
   if (outcome === 'refunded') {
+    await writeAuditLog({
+      actorUserId: context.userId,
+      actorEmail: context.email,
+      action: 'payment.refund',
+      targetType: 'bid',
+      targetId: bidId,
+      detail: { outcome: 'refunded', stripe_refund_id: refundId },
+    });
+
     return { ok: true, outcome: 'refunded', refundId };
   }
 
   if (outcome === 'already_refunded' || outcome === 'duplicate') {
     // Idempotent no-op: the refund was already applied (webhook raced ahead, or this
-    // exact action was retried).
+    // exact action was retried). Audited as the same no-op it is.
+    await writeAuditLog({
+      actorUserId: context.userId,
+      actorEmail: context.email,
+      action: 'payment.refund',
+      targetType: 'bid',
+      targetId: bidId,
+      detail: { outcome, stripe_refund_id: refundId },
+    });
+
     return { ok: true, outcome: 'already_refunded', refundId };
   }
 
@@ -99,7 +120,9 @@ async function applyRefundTransition(
 }
 
 export async function initiateAdminRefund(input: { bidId: unknown }): Promise<AdminRefundResult> {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -172,18 +195,19 @@ export async function initiateAdminRefund(input: { bidId: unknown }): Promise<Ad
       JSON.stringify({ bidId, refundId, status: refund.status })
     );
 
+    await writeAuditLog({
+      actorUserId: context.userId,
+      actorEmail: context.email,
+      action: 'payment.refund',
+      targetType: 'bid',
+      targetId: bidId,
+      detail: { outcome: 'refund_submitted', stripe_refund_id: refundId },
+    });
+
     return { ok: true, outcome: 'refund_submitted', refundId };
   }
 
-  const result = await applyRefundTransition(paymentIntentId, refundId);
+  const transition = await applyRefundTransition(context, bidId, paymentIntentId, refundId);
 
-  if (result.ok && result.outcome === 'refunded') {
-    return { ok: true, outcome: 'refunded', refundId };
-  }
-
-  if (result.ok) {
-    return { ok: true, outcome: result.outcome, refundId };
-  }
-
-  return result;
+  return transition;
 }

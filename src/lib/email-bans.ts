@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase-service';
-import { getAdminAuthorization } from '@/lib/admin-auth';
+import { getAdminContext } from '@/lib/admin-auth';
+import { writeAuditLog } from '@/lib/audit-log';
 
 /**
  * Banned/fraudulent email management (Task 8.7).
@@ -68,7 +69,9 @@ export async function banEmail(
   | { ok: true; outcome: 'banned' | 'already_banned' }
   | { ok: false; reason: 'unauthorized' | 'invalid_email' | 'db_error' }
 > {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -91,6 +94,15 @@ export async function banEmail(
     return { ok: false, reason: 'db_error' };
   }
 
+  await writeAuditLog({
+    actorUserId: context.userId,
+    actorEmail: context.email,
+    action: 'banned_email.ban',
+    targetType: 'banned_email',
+    targetId: canonical,
+    detail: { outcome: (count ?? 0) > 0 ? 'banned' : 'already_banned' },
+  });
+
   return { ok: true, outcome: (count ?? 0) > 0 ? 'banned' : 'already_banned' };
 }
 
@@ -101,7 +113,9 @@ export async function unbanEmail(
   | { ok: true; outcome: 'unbanned' | 'not_banned' }
   | { ok: false; reason: 'unauthorized' | 'invalid_email' | 'db_error' }
 > {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -122,6 +136,15 @@ export async function unbanEmail(
     return { ok: false, reason: 'db_error' };
   }
 
+  await writeAuditLog({
+    actorUserId: context.userId,
+    actorEmail: context.email,
+    action: 'banned_email.unban',
+    targetType: 'banned_email',
+    targetId: canonical,
+    detail: { outcome: (count ?? 0) > 0 ? 'unbanned' : 'not_banned' },
+  });
+
   return { ok: true, outcome: (count ?? 0) > 0 ? 'unbanned' : 'not_banned' };
 }
 
@@ -129,7 +152,9 @@ export async function listBannedEmails(): Promise<
   | { ok: true; bans: Array<{ emailCanonical: string; createdAt: string }> }
   | { ok: false; reason: 'unauthorized' | 'db_error' }
 > {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 

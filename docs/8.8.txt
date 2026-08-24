@@ -1,32 +1,49 @@
 ﻿TASK ID: 8.8
 PHASE: 8
 TITLE: Audit logs
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add an immutable first-party audit trail for administrative mutations - who, what, on what target, when, with structured context - plus a bounded newest-first admin read surface. No analytics/event-bus/third-party providers; no Phase 9+ scope.
 
-SCOPE:
+ARCHITECTURE:
+- migration 20260823000021 creates audit_logs: identity PK; actor_user_id uuid NOT NULL (verified Supabase Auth id from getAdminContext - never a client claim); actor_email snapshot (trail stays self-describing even if the auth user is later removed); action CHECK allow-list covering exactly the seven Phase-8 mutation types (category.create|update|activate|deactivate, payment.refund, banned_email.ban|unban); target_type/target_id from server-side mutation results; detail jsonb for small structured context; created_at server-generated. Index idx_audit_logs_created_at DESC.
+- Immutability: RLS enabled with ZERO policies (anon/authenticated fully blocked); only service-role inserts via writeAuditLog exist and no update/delete paths are present anywhere.
 
-OUT OF SCOPE:
+ATOMICITY / FAILURE MODEL:
+Existing Phase-8 mutations are single-statement writes outside shared transactions, so audit inserts are BEST-EFFORT immediately after a successful mutation: writeAuditLog never throws, failures are logged loudly and reported as false, and business results are unaffected. This is documented rather than rewriting each write into a new RPC. Failed validations/refusals record nothing (no false-success audit entries); idempotent no-op outcomes ARE recorded with their outcome (e.g. already_refunded/duplicate), matching 4.x webhook conventions without inventing new dedup rules.
 
-INPUTS / DEPENDENCIES:
+ACTOR/ACTION/TARGET SEMANTICS:
+- Actor identity comes exclusively from getAdminContext() (Task 8.1 boundary extended to also expose the admin email in the same pass) - client claims are never trusted
+- Allow-listed action names only; unknown actions rejected before any query
+- Read path readAuditLogs() is itself guard-gated fail-closed; unauthorized callers get zero DB access
 
-IMPLEMENTATION REQUIREMENTS:
+INTEGRATION POINTS:
+- admin-category-management.ts: category.create / category.update / category.activate / category.deactivate audited after success (target = category/<server-generated id or updated id>, detail = slug or changed-field list)
+- admin-refunds.ts: payment.refund audited for refunded / already_refunded(+duplicate) / refund_submitted outcomes (target = bid/<bidId>, detail = outcome + stripe refund id)
+- email-bans.ts: banned_email.ban / banned_email.unban audited (target = banned_email/<canonical>)
+- /admin/audit-logs page renders the newest-first trail (actor email, action, target, truncated detail) behind the same authorization gate
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- supabase/migrations/20260823000021_create_audit_logs.sql (new)
+- src/lib/audit-log.ts + test (new, 9 tests)
+- src/lib/admin-category-management.ts + test (audit wiring/assertions)
+- src/lib/admin-refunds.ts + test (audit wiring/assertions)
+- src/lib/email-bans.ts + test (audit wiring/assertions)
+- src/app/admin/audit-logs/page.tsx (new)
+- src/app/admin/page.tsx (Audit logs link)
+- docs/8.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 552/552 PASSED across 33 files (+9 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/admin/audit-logs registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO Phase 9+ work, NO third-party logging providers, NO event bus, NO filtering/search/pagination consoles, NO changes to payment/webhook/refund correctness, email flows, share flows, or the Task 8.1 auth boundary beyond additive context reuse.
 
 KNOWN ISSUES:
+- Best-effort audit writes can be lost on DB failure (loud-logged); atomic mutation+audit would require converting every Phase-8 write into an RPC - rejected as disproportionate for MVP.
+- Audit detail payloads intentionally minimal; extend deliberately as new admin actions appear.
 
 FOLLOW-UP:
+Phase 8 complete. Next: Phase 9 - Security and Reliability (Task 9.1 Input validation review)

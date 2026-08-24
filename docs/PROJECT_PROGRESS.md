@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 8 in progress — 8.7 completed** — Next recommended: 8.8
+**Phase 8 complete — 8.8 completed** — Next recommended: Phase 9 (9.1 Input validation review)
 
 ## Completed Tasks
 
@@ -93,6 +93,7 @@
 - 8.5: Payment management ✓
 - 8.6: Refund action ✓
 - 8.7: Fraud/banned email management ✓
+- 8.8: Audit logs ✓ (Phase 8 complete)
 
 ## Tasks in Progress
 
@@ -215,7 +216,7 @@ _None_
 
 ## Next Recommended Task
 
-**8.8 — Audit logs**
+**Phase 9 - Security and Reliability (9.1 Input validation review)**
 
 ## Notes
 

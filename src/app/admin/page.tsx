@@ -176,6 +176,14 @@ export default async function AdminDashboardPage() {
                 Fraud / banned emails
               </Link>
             </li>
+            <li>
+              <Link
+                href="/admin/audit-logs"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              >
+                Audit logs
+              </Link>
+            </li>
           </ul>
         </div>
 

@@ -10,9 +10,9 @@ import {
 import type { Category } from './categories';
 
 /**
- * Task 8.3 - deterministic tests for server-side category management.
- * Authorization and service-role boundaries are mocked; the real validation,
- * normalization, persistence mapping, and constraint-error handling run.
+ * Task 8.3 (+8.8 audit integration) - deterministic tests for server-side category
+ * management. Authorization, audit, and service-role boundaries are mocked; the real
+ * validation/normalization/persistence logic runs. No database or network.
  */
 
 type FakeResult = { data: unknown; error: { message: string; code?: string } | null };
@@ -67,9 +67,10 @@ const mocks = vi.hoisted(() => {
   }
 
   const state = { queue: [] as FakeResult[], calls: [] as CallLog };
-  const getAdminAuthorization = vi.fn();
+  const getAdminContext = vi.fn();
+  const writeAuditLog = vi.fn();
 
-  return { makeFakeClient, state, getAdminAuthorization };
+  return { makeFakeClient, state, getAdminContext, writeAuditLog };
 });
 
 vi.mock('@/lib/supabase-service', () => ({
@@ -77,18 +78,24 @@ vi.mock('@/lib/supabase-service', () => ({
 }));
 
 vi.mock('@/lib/admin-auth', () => ({
-  getAdminAuthorization: mocks.getAdminAuthorization,
+  getAdminContext: mocks.getAdminContext,
 }));
 
-const ADMIN_ID = '0b7f9c58-6f2e-4a55-9d0e-2f5f1a52f111';
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: mocks.writeAuditLog,
+}));
+
+const ADMIN = { userId: '0b7f9c58-6f2e-4a55-9d0e-2f5f1a52f111', email: 'admin@topbid.lol' };
 
 function enqueue(...results: FakeResult[]) {
   mocks.state.queue.push(...results);
 }
 
 beforeEach(() => {
-  mocks.getAdminAuthorization.mockReset();
-  mocks.getAdminAuthorization.mockResolvedValue({ authorized: true, userId: ADMIN_ID });
+  mocks.getAdminContext.mockReset();
+  mocks.getAdminContext.mockResolvedValue({ authorized: true, ...ADMIN });
+  mocks.writeAuditLog.mockReset();
+  mocks.writeAuditLog.mockResolvedValue(true);
   mocks.state.queue.length = 0;
   mocks.state.calls.length = 0;
 });
@@ -110,10 +117,11 @@ describe('authorization gate', () => {
     ['set-active', () => setCategoryActive({ id: validUuid, active: true })],
     ['list', () => listAllCategoriesForAdmin()],
   ])('%s fails closed for non-admins without touching the database', async (_label, call) => {
-    mocks.getAdminAuthorization.mockResolvedValue({ authorized: false });
+    mocks.getAdminContext.mockResolvedValue({ authorized: false });
 
     await expect(call()).resolves.toEqual({ ok: false, reason: 'unauthorized' });
     expect(mocks.state.calls).toHaveLength(0);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });
 
@@ -136,7 +144,10 @@ describe('parseDollarsToCents', () => {
 
 describe('createAdminCategory', () => {
   it('inserts normalized values with is_active defaulting to true', async () => {
-    enqueue({ data: null, error: null });
+    enqueue({
+      data: [{ id: validUuid }],
+      error: null,
+    });
 
     await expect(createAdminCategory(validCreate)).resolves.toEqual({ ok: true });
 
@@ -150,10 +161,21 @@ describe('createAdminCategory', () => {
       image_url: null,
       is_active: true,
     });
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: ADMIN.userId,
+        actorEmail: ADMIN.email,
+        action: 'category.create',
+        targetType: 'category',
+        targetId: validUuid,
+        detail: { slug: 'art' },
+      })
+    );
   });
 
   it('normalizes uppercase/padded slugs before persisting', async () => {
-    enqueue({ data: null, error: null });
+    enqueue({ data: [{ id: validUuid }], error: null });
 
     await createAdminCategory({ ...validCreate, slug: '  Retro-Gaming  ' });
 
@@ -174,9 +196,10 @@ describe('createAdminCategory', () => {
       ok: false,
       reason: 'slug_taken',
     });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
-  it('maps duplicate-slug violations to slug_taken even without a code field', async () => {
+  it('maps duplicate-slug violations without a code field identically', async () => {
     enqueue({
       data: null,
       error: { message: 'duplicate key value violates unique constraint' },
@@ -202,6 +225,7 @@ describe('createAdminCategory', () => {
       reason: 'invalid_input',
     });
     expect(mocks.state.calls).toHaveLength(0);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it('maps unexpected database failures to db_error without leaking details', async () => {
@@ -211,11 +235,12 @@ describe('createAdminCategory', () => {
       ok: false,
       reason: 'db_error',
     });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });
 
 describe('updateAdminCategory', () => {
-  it('updates provided fields and maintains updated_at while leaving slug untouched', async () => {
+  it('updates provided fields, maintains updated_at, and audits the change', async () => {
     enqueue({ data: [{ id: validUuid }], error: null });
 
     await expect(
@@ -232,9 +257,19 @@ describe('updateAdminCategory', () => {
 
     const eqCall = mocks.state.calls.filter((call) => call.method === 'eq').pop();
     expect(eqCall?.args).toEqual(['id', validUuid]);
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: ADMIN.userId,
+        actorEmail: ADMIN.email,
+        action: 'category.update',
+        targetType: 'category',
+        targetId: validUuid,
+      })
+    );
   });
 
-  it('clears the description when an empty value is submitted', async () => {
+  it('clears the description when an empty string is submitted', async () => {
     enqueue({ data: [{ id: validUuid }], error: null });
 
     await updateAdminCategory({ id: validUuid, description: '   ' });
@@ -250,6 +285,7 @@ describe('updateAdminCategory', () => {
       ok: false,
       reason: 'not_found',
     });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -269,13 +305,27 @@ describe('setCategoryActive', () => {
   it.each([
     [true, true],
     ['false', false],
-  ])('persists desired active state %p', async (active, expected) => {
+  ])('persists desired active state %p and audits the action', async (active, expected) => {
     enqueue({ data: [{ id: validUuid }], error: null });
 
     await expect(setCategoryActive({ id: validUuid, active })).resolves.toEqual({ ok: true });
 
     const updateCall = mocks.state.calls.find((call) => call.method === 'update');
     expect((updateCall?.args[0] as { is_active: boolean }).is_active).toBe(expected);
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: ADMIN.userId,
+        actorEmail: ADMIN.email,
+        targetType: 'category',
+        targetId: validUuid,
+      })
+    );
+
+    const auditAction = mocks.writeAuditLog.mock.calls[0][0] as { action: string };
+    const expectedAction =
+      active === true || active === 'true' ? 'category.activate' : 'category.deactivate';
+    expect(auditAction.action).toBe(expectedAction);
   });
 
   it.each([undefined, null, 'yes', 1])('rejects ambiguous active value %p', async (active) => {
@@ -310,7 +360,12 @@ describe('listAllCategoriesForAdmin', () => {
     updated_at: '2026-01-01T00:00:00Z',
   };
 
-  const INACTIVE_ROW: Category = { ...ACTIVE_ROW, id: 'b2...', slug: 'legacy', is_active: false };
+  const INACTIVE_ROW: Category = {
+    ...ACTIVE_ROW,
+    id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+    slug: 'legacy',
+    is_active: false,
+  };
 
   it('returns the full category set including inactive rows', async () => {
     enqueue({ data: [ACTIVE_ROW, INACTIVE_ROW], error: null });

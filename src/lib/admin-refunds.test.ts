@@ -68,6 +68,7 @@ const mocks = vi.hoisted(() => {
     queue: [] as FakeResult[],
     calls: [] as CallLog,
     getAdminAuthorization: vi.fn(),
+    getAdminContext: vi.fn(),
     refundsCreate: vi.fn(),
   };
 
@@ -87,7 +88,11 @@ vi.mock('@/lib/stripe', () => ({
 }));
 
 vi.mock('@/lib/admin-auth', () => ({
+  getAdminContext: mocks.state.getAdminContext,
   getAdminAuthorization: mocks.state.getAdminAuthorization,
+}));
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: vi.fn().mockResolvedValue(true),
 }));
 
 const BID_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -97,8 +102,12 @@ function enqueue(...results: FakeResult[]) {
 }
 
 beforeEach(() => {
-  mocks.state.getAdminAuthorization.mockReset();
-  mocks.state.getAdminAuthorization.mockResolvedValue({ authorized: true, userId: 'admin-1' });
+  mocks.state.getAdminContext.mockReset();
+  mocks.state.getAdminContext.mockResolvedValue({
+    authorized: true,
+    userId: 'admin-1',
+    email: 'admin@topbid.lol',
+  });
   mocks.state.refundsCreate.mockReset();
   mocks.state.refundsCreate.mockResolvedValue({ id: 're_test_1', status: 'succeeded' });
   mocks.state.queue.length = 0;
@@ -107,7 +116,7 @@ beforeEach(() => {
 
 describe('authorization gate', () => {
   it('fails closed for non-admins without any Stripe or database call', async () => {
-    mocks.state.getAdminAuthorization.mockResolvedValue({ authorized: false });
+    mocks.state.getAdminContext.mockResolvedValue({ authorized: false });
 
     await expect(initiateAdminRefund({ bidId: BID_ID })).resolves.toEqual({
       ok: false,

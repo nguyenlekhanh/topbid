@@ -2558,6 +2558,29 @@ This file records what has actually been built, not what was planned.
   - Pure read = naturally repeatable/idempotent; no queues/retries/schedulers introduced
 - **Known limitations**: fixed 100-record window; full identifier strings visible in truncated cells to admins only (never on public surfaces)
 - **Follow-up work**: Task 8.8 - Audit logs
+- **Follow-up work**: Phase 9 - Security and Reliability
+
+---
+
+### Task 8.8
+
+- **Date**: 2026-08-24
+- **Objective**: Add an immutable first-party audit trail for administrative mutations - who/what/target/when plus structured context - with a bounded newest-first admin read surface
+- **Status**: Completed
+- **What was implemented**:
+  - supabase/migrations/20260823000021_create_audit_logs.sql: audit_logs (identity PK; actor_user_id NOT NULL from the verified Supabase Auth session - never a client claim; actor_email snapshot; action CHECK allow-list covering exactly the seven Phase-8 mutation types; target_type/target_id from server-side results; detail jsonb; created_at) + idx_audit_logs_created_at DESC; RLS enabled with ZERO policies (service-role only)
+  - src/lib/audit-log.ts (server-only): writeAuditLog (allow-list validated insert that NEVER throws - failures logged loudly and reported false), readAuditLogs newest-first bounded guard-gated reader
+  - src/lib/admin-auth.ts: additive getAdminContext() exposing userId + email in one pass; getAdminAuthorization reimplemented on top (public contract unchanged)
+  - Audit wiring after successful mutations: category.create/update/activate/deactivate (admin-category-management), payment.refund incl. already_refunded/duplicate no-ops and refund_submitted deferrals (admin-refunds), banned_email.ban/unban (email-bans); failed validations/refusals record nothing
+  - /admin/audit-logs page: newest-first bounded list (actor email, action, target, truncated detail context) behind the same authorization gate
+- **Files changed**: migration 20260823000021; src/lib/audit-log.ts + test (9 tests); admin-category-management.ts/.test.ts, admin-refunds.ts/.test.ts, email-bans.ts/.test.ts (audit wiring/assertions); src/app/admin/audit-logs/page.tsx (created); src/app/admin/page.tsx (link); docs/8.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 552/552 across 33 files (+9 net); typecheck/lint/format:check/build all PASSED (/admin/audit-logs registered dynamic)
+- **Important technical decisions**:
+  - Actor identity exclusively from getAdminContext (verified session); client claims never trusted; unknown actions rejected pre-query
+  - Best-effort audit inserts immediately after successful mutations; failures loud-logged and never masquerade as success or failure of the business operation
+  - processed_webhook_events remains the payment ledger and is NOT duplicated as an audit log; share_events remains product telemetry
+- **Known limitations**: best-effort writes can be lost on DB failure (loud-logged); detail payloads intentionally minimal
+- **Follow-up work**: Phase 9 - Security and Reliability (Task 9.1 Input validation review)
 
 ---
 

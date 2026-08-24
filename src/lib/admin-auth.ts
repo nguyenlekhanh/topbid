@@ -31,7 +31,14 @@ import { createClient } from '@/lib/supabase-server';
 
 export type AdminAuthorization = { authorized: true; userId: string } | { authorized: false };
 
-export async function getAdminAuthorization(): Promise<AdminAuthorization> {
+/**
+ * Full admin context (Task 8.8): authorization PLUS the authenticated
+ * administrator's email, resolved in one pass for audit records.
+ */
+export type AdminContext =
+  { authorized: true; userId: string; email: string } | { authorized: false };
+
+export async function getAdminContext(): Promise<AdminContext> {
   const supabase = await createClient();
 
   const { data: authData, error: userError } = await supabase.auth.getUser();
@@ -54,7 +61,17 @@ export async function getAdminAuthorization(): Promise<AdminAuthorization> {
     return { authorized: false };
   }
 
-  return { authorized: true, userId: user.id };
+  return { authorized: true, userId: user.id, email: user.email ?? '' };
+}
+
+export async function getAdminAuthorization(): Promise<AdminAuthorization> {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
+    return { authorized: false };
+  }
+
+  return { authorized: true, userId: context.userId };
 }
 
 /**

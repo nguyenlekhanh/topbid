@@ -67,8 +67,9 @@ const mocks = vi.hoisted(() => {
 
   const state = { queue: [] as FakeResult[], calls: [] as CallLog };
   const getAdminAuthorization = vi.fn();
+  const getAdminContext = vi.fn();
 
-  return { makeFakeClient, state, getAdminAuthorization };
+  return { makeFakeClient, state, getAdminAuthorization, getAdminContext };
 });
 
 vi.mock('@/lib/supabase-service', () => ({
@@ -77,6 +78,10 @@ vi.mock('@/lib/supabase-service', () => ({
 
 vi.mock('@/lib/admin-auth', () => ({
   getAdminAuthorization: mocks.getAdminAuthorization,
+  getAdminContext: mocks.getAdminContext,
+}));
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: vi.fn().mockResolvedValue(true),
 }));
 
 function enqueue(...results: FakeResult[]) {
@@ -86,6 +91,8 @@ function enqueue(...results: FakeResult[]) {
 beforeEach(() => {
   mocks.getAdminAuthorization.mockReset();
   mocks.getAdminAuthorization.mockResolvedValue({ authorized: true, userId: 'admin-1' });
+  mocks.getAdminContext.mockReset();
+  mocks.getAdminContext.mockResolvedValue({ authorized: true, userId: 'admin-1' });
   mocks.state.queue.length = 0;
   mocks.state.calls.length = 0;
 });
@@ -176,7 +183,7 @@ describe('banEmail / unbanEmail (admin operations)', () => {
   });
 
   it('fails closed on unauthorized admin operations before any query', async () => {
-    mocks.getAdminAuthorization.mockResolvedValue({ authorized: false });
+    mocks.getAdminContext.mockResolvedValue({ authorized: false });
 
     await expect(banEmail('a@b.com')).resolves.toEqual({ ok: false, reason: 'unauthorized' });
     await expect(unbanEmail('a@b.com')).resolves.toEqual({ ok: false, reason: 'unauthorized' });

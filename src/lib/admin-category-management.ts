@@ -1,6 +1,7 @@
 import type { Category } from '@/lib/categories';
 import { createServiceClient } from '@/lib/supabase-service';
-import { getAdminAuthorization } from '@/lib/admin-auth';
+import { getAdminContext } from '@/lib/admin-auth';
+import { writeAuditLog } from '@/lib/audit-log';
 
 /**
  * Server-only category management (Task 8.3).
@@ -122,7 +123,9 @@ export type CreateCategoryInput = {
 export async function createAdminCategory(
   input: CreateCategoryInput
 ): Promise<CategoryManagementResult> {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -139,15 +142,18 @@ export async function createAdminCategory(
 
   const supabase = createServiceClient();
 
-  const { error } = await supabase.from('categories').insert({
-    slug,
-    name,
-    description,
-    starting_bid: startingBid,
-    increment,
-    image_url: imageUrl.kind === 'set' ? imageUrl.url : null,
-    is_active: true,
-  });
+  const { data: inserted, error } = await supabase
+    .from('categories')
+    .insert({
+      slug,
+      name,
+      description,
+      starting_bid: startingBid,
+      increment,
+      image_url: imageUrl.kind === 'set' ? imageUrl.url : null,
+      is_active: true,
+    })
+    .select('id');
 
   if (error) {
     if (isUniqueViolation(error)) {
@@ -158,6 +164,17 @@ export async function createAdminCategory(
 
     return { ok: false, reason: 'db_error' };
   }
+
+  const createdId = Array.isArray(inserted) && inserted[0] ? String(inserted[0].id) : '';
+
+  await writeAuditLog({
+    actorUserId: context.userId,
+    actorEmail: context.email,
+    action: 'category.create',
+    targetType: 'category',
+    targetId: createdId,
+    detail: { slug },
+  });
 
   return { ok: true };
 }
@@ -176,7 +193,9 @@ export type UpdateCategoryInput = {
 export async function updateAdminCategory(
   input: UpdateCategoryInput
 ): Promise<CategoryManagementResult> {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -252,6 +271,15 @@ export async function updateAdminCategory(
     return { ok: false, reason: 'not_found' };
   }
 
+  await writeAuditLog({
+    actorUserId: context.userId,
+    actorEmail: context.email,
+    action: 'category.update',
+    targetType: 'category',
+    targetId: id,
+    detail: { fields: Object.keys(patch).filter((key) => key !== 'updated_at') },
+  });
+
   return { ok: true };
 }
 
@@ -263,7 +291,9 @@ export async function setCategoryActive(input: {
   id: unknown;
   active: unknown;
 }): Promise<CategoryManagementResult> {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
@@ -297,6 +327,15 @@ export async function setCategoryActive(input: {
     return { ok: false, reason: 'not_found' };
   }
 
+  await writeAuditLog({
+    actorUserId: context.userId,
+    actorEmail: context.email,
+    action: active ? 'category.activate' : 'category.deactivate',
+    targetType: 'category',
+    targetId: id,
+    detail: {},
+  });
+
   return { ok: true };
 }
 
@@ -309,7 +348,9 @@ export async function setCategoryActive(input: {
 export async function listAllCategoriesForAdmin(): Promise<
   { ok: true; categories: Category[] } | { ok: false; reason: CategoryManagementErrorReason }
 > {
-  if (!(await getAdminAuthorization()).authorized) {
+  const context = await getAdminContext();
+
+  if (!context.authorized) {
     return { ok: false, reason: 'unauthorized' };
   }
 
