@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Hero() {
   return (
     <section className="relative py-16 sm:py-24 lg:py-32 overflow-hidden">
@@ -11,12 +13,12 @@ export default function Hero() {
             notifications, and viral share moments.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 motion-safe:animate-[fadeInUp_400ms_ease-out_200ms_both] motion-reduce:animate-none">
-            <a
-              href="/categories"
+            <Link
+              href="/"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-primary-foreground font-medium text-base transition-all will-change-transform hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11 motion-reduce:transform-none motion-reduce:shadow-none"
             >
               Start Bidding
-            </a>
+            </Link>
             <a
               href="/leaderboard"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-all hover:bg-muted hover:border-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full sm:w-auto min-h-11"

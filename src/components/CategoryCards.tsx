@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import BidButton from '@/components/BidButton';
 import BidModal from '@/components/BidModal';
 import HighestBidDisplay from '@/components/HighestBidDisplay';
@@ -190,8 +191,8 @@ export default function CategoryCards() {
           )}
 
           <div className="mt-12 text-center">
-            <a
-              href="/categories"
+            <Link
+              href="/"
               className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3.5 text-foreground font-medium text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-11"
             >
               View All Categories
@@ -209,7 +210,7 @@ export default function CategoryCards() {
                   d="M17 8l4 4m0 0l-4 4m4-4H3"
                 />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
       </section>

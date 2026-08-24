@@ -1,32 +1,50 @@
 ﻿TASK ID: 7.4
 PHASE: 7
 TITLE: Public category URL
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Introduce the project's first public category-specific URL - /categories/[slug] - resolving identity exclusively through the authoritative slug query, with uniform not-found behavior for nonexistent/inactive/malformed slugs.
 
-SCOPE:
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "7.4 | Public category URL | 2.7" - dependency on Task 2.7's category queries only. No OG/metadata/tracking/bidding functionality is included (that is 7.5+/other phases).
 
-OUT OF SCOPE:
+ROUTE SHAPE DECISION:
+/categories/[slug] chosen because the plural prefix was already established in-repo by Hero and CategoryCards hrefs ("/categories"); singular /category/[slug] appears nowhere. Exactly one shape, no aliases.
 
-INPUTS / DEPENDENCIES:
+CATEGORY LOOKUP AUTHORITY:
+- getCategoryBySlug (Task 2.7): trim/lowercase normalization of the untrusted URL slug, app-level is_active = true filter + RLS categories_public_select_active; returns null for missing/inactive/malformed alike (no existence leak)
+- getHighestBidForCategory (Task 2.8): current top PAID bid, amount DESC, RLS paid-only - no pending bids, no bidder emails, no Stripe identifiers ever rendered
+Both existing queries reused verbatim via a small pure loader; zero new SQL, zero schema changes, service role never used for public reads.
 
-IMPLEMENTATION REQUIREMENTS:
+NOT-FOUND BEHAVIOR:
+loadCategoryPageData returns null -> page calls Next.js notFound() (default 404), matching prompt guidance. Covers: nonexistent slug, inactive/deleted category, malformed/blank input (guarded before any query).
 
-FILES EXPECTED TO CHANGE:
+PAGE SCOPE (minimum useful public surface):
+Category name, description (nullable), current highest paid bid ("No bids yet" state when none), starting bid, bid increment - all DB-sourced facts already public under RLS. Static metadata title only; NO generateMetadata/OG/Twitter cards (7.5), NO OG image (7.6), NO tracking (7.7). Server component; React escapes all rendered strings (XSS-safe).
 
-TEST PLAN:
+SHARING INTEGRATION DECISION (Option A):
+Tasks 7.2/7.3 remain UNTOUCHED and continue sharing/copying {APP_URL}/#leaderboard-heading. Updating them to per-category URLs would be an improvement made possible by 7.4, not a correctness requirement of it; per the scope rule that change is deferred to an explicit future task.
 
-DEFINITION OF DONE:
+JUSTIFIED COLLATERAL FIX:
+Creating /categories/[slug] activated Next's no-html-link-for-pages lint rule against two pre-existing placeholder <a href="/categories"> links (Hero "Start Bidding", CategoryCards "View All Categories") whose target route had never existed (404). Converted both to next/link pointing at "/" (the actual homepage categories grid) - honest destinations, idiomatic navigation, lint clean.
 
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/category-page.ts + src/lib/category-page.test.ts (new loader, 8 tests)
+- src/app/categories/[slug]/page.tsx (new public route)
+- src/components/Hero.tsx + src/components/CategoryCards.tsx (placeholder <a> -> Link "/" ; lint-activated fix)
+- docs/7.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 338/338 PASSED across 19 files (+11 net)
+- npm run typecheck / lint / format:check / build: all PASSED; build registers /categories/[slug] as dynamic route
+
+SCOPE BOUNDARY (explicit):
+NO 7.5 Open Graph metadata, NO 7.6 dynamic OG image, NO 7.7 share tracking, NO bidding/payment changes on the category page, NO admin features, NO 7.2/7.3 share-URL updates.
 
 KNOWN ISSUES:
+- The bare /categories index still has no dedicated page (out of scope); the two converted links now point at the homepage grid instead of a dead 404.
+- Shared/copied URLs from 7.2/7.3 still target the leaderboard anchor until a future task explicitly re-points them.
 
 FOLLOW-UP:
+Task 7.5 - Open Graph metadata
