@@ -2124,6 +2124,45 @@ This file records what has actually been built, not what was planned.
   - Link targets the categories grid rather than a per-category page until Task 7.4 introduces public category URLs
 - **Follow-up work**: Task 6.6 — Unsubscribe handling
 
+### Task 6.6
+
+- **Date**: 2026-08-24
+- **Objective**: Let outbid-notification recipients opt out without accounts, enforce the opt-out server-side in the existing notification flow, and advertise unsubscription at the transport level
+- **Status**: Completed
+- **What was implemented**:
+  - Architecture decision: provider-managed opt-out is unavailable (raw `resend.emails.send()`, no Audiences/Contacts infrastructure), so suppression state is application-managed per the plan's own flow requirement
+  - supabase/migrations/20260823000015: `notification_unsubscribes` (recipient_hash PK = HMAC-SHA256(UNSUBSCRIBE_SECRET, lowercased email); unsubscribed_at; RLS enabled with ZERO policies - service-role bypass only; raw emails never stored)
+  - src/lib/unsubscribe.ts (server-only): token derivation (node:crypto HMAC), buildUnsubscribeUrl (NEXT_PUBLIC_APP_URL + /unsubscribe?token=...), listUnsubscribeHeaders (RFC 2369/8058 one-click), shape validation (64 hex chars), unsubscribeByToken (idempotent ignoreDuplicates upsert with exact-count outcome), hasUnsubscribeRecord/isUnsubscribed authoritative checks; UNSUBSCRIBE_SECRET validated lazily (min 32 chars) like the Resend pattern
+  - src/lib/resend.ts: additive optional `headers` passthrough (omitted keeps payload unchanged)
+  - src/lib/outbid-email-template.ts: optional unsubscribeUrl footer (attribute-escaped anchor + plain-text line; absent/blank = byte-identical output)
+  - src/lib/outbid-notification.ts: suppression check AFTER self-notification guard, BEFORE composition ('recipient_unsubscribed' typed skip); footer URL passed to template; List-Unsubscribe headers attached at transport boundary
+  - src/app/unsubscribe/page.tsx: dynamic GET confirmation page rendering AUTHORITATIVE state (invalid-shape neutral copy / confirm form / unsubscribed)
+  - src/app/api/unsubscribe/route.ts: POST only; token from query string first (mailbox one-click) then form body; 303 redirects back to the page
+  - .env.example: UNSUBSCRIBE_SECRET documented (server-only, openssl rand -hex 32 guidance)
+- **Files changed**:
+  - supabase/migrations/20260823000015_create_notification_unsubscribes.sql (created)
+  - src/lib/unsubscribe.ts + src/lib/unsubscribe.test.ts (created, 21 tests)
+  - src/lib/resend.ts + src/lib/resend.test.ts (+1 headers test)
+  - src/lib/outbid-email-template.ts + test (+6 footer tests)
+  - src/lib/outbid-notification.ts + test (+4 tests incl. unsubscribed-skip and header assertions)
+  - src/app/api/unsubscribe/route.ts + src/app/unsubscribe/page.tsx (created)
+  - .env.example, docs/6.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 252/252 across 13 files (+51 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/api/unsubscribe and /unsubscribe registered as dynamic routes)
+- **Important technical decisions**:
+  - Token = stored PK: lookup-by-token resolves suppression directly; unforgeable without the server-only secret; no raw email ever in URLs or the table
+  - GET renders / POST mutates: scanner prefetch cannot unsubscribe anyone; one-click mailbox POSTs carry the token via query string
+  - Suppression enforced before composition so suppressed recipients cost nothing further and never receive mail through this flow
+  - Idempotency via ON CONFLICT DO NOTHING; repeated submissions report already-unsubscribed
+- **Known limitations**:
+  - Rotating UNSUBSCRIBE_SECRET invalidates previously issued links and decouples stored hashes (documented; rotation policy is future scope)
+  - Well-shaped unknown tokens can insert harmless rows (grants nothing)
+- **Follow-up work**: Task 6.7 — Email failure handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

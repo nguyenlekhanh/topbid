@@ -1,6 +1,7 @@
 import { getBidByStripeSessionId, getPreviousHighestBidder } from '@/lib/bids';
 import { buildOutbidEmail } from '@/lib/outbid-email-template';
 import { sendEmail } from '@/lib/resend';
+import { buildUnsubscribeUrl, isUnsubscribed, listUnsubscribeHeaders } from '@/lib/unsubscribe';
 
 /**
  * Outbid notification orchestration (Task 6.4).
@@ -21,14 +22,15 @@ import { sendEmail } from '@/lib/resend';
  * Server-only module: transitively imports Resend credentials and must never be
  * imported by client code.
  *
- * Deliberately out of scope (later tasks own them): unsubscribe handling (Task 6.6)
- * and retry/failure-policy flows beyond propagating provider errors (Task 6.7). The
- * bid-again CTA (Task 6.5) is built from trusted server configuration only. No queues,
- * retries, scheduling, or notification state are introduced.
+ * Deliberately out of scope (later tasks own them): retry/failure-policy flows beyond
+ * propagating provider errors (Task 6.7). The bid-again CTA (Task 6.5) is built from
+ * trusted server configuration only. Unsubscribe handling (Task 6.6) enforces
+ * application-managed suppression server-side BEFORE composition. No queues, retries,
+ * scheduling, or notification-delivery state are introduced.
  */
 
 export type OutbidNotificationSkippedReason =
-  'new_bid_not_found' | 'no_previous_bidder' | 'self_outbid';
+  'new_bid_not_found' | 'no_previous_bidder' | 'self_outbid' | 'recipient_unsubscribed';
 
 export type OutbidNotificationResult =
   | { notified: true; recipient: string; messageId: string }
@@ -69,6 +71,8 @@ function buildBidAgainUrl(): string {
  *   - the previous top bidder is the same person who just became highest again
  *     ('self_outbid', case-insensitive email comparison - bidders outbidding themselves
  *     must never be told they were outbid)
+ *   - the previous top bidder has unsubscribed from outbid notifications
+ *     ('recipient_unsubscribed', Task 6.6 - checked authoritatively before composition)
  * - Throws when the email provider fails (propagated verbatim from sendEmail)
  */
 export async function sendOutbidNotification(
@@ -102,6 +106,20 @@ export async function sendOutbidNotification(
     return { notified: false, reason: 'self_outbid' };
   }
 
+  // Task 6.6: server-side suppression BEFORE composing/sending - an unsubscribed
+  // recipient must never receive future outbid notifications through this flow.
+  // Checked after the self-notification guard so a self-outbid skip is reported
+  // as such regardless of suppression state.
+  if (await isUnsubscribed(previous.bidderEmail)) {
+    return { notified: false, reason: 'recipient_unsubscribed' };
+  }
+
+  const unsubscribeUrl = buildUnsubscribeUrl(previous.bidderEmail);
+
+  if (!unsubscribeUrl) {
+    throw new Error('Failed to build unsubscribe link: unidentifiable recipient email');
+  }
+
   const email = buildOutbidEmail({
     to: previous.bidderEmail,
     bidderName: previous.bidderName,
@@ -110,9 +128,15 @@ export async function sendOutbidNotification(
     newAmount: newBid.amount,
     newBidderName: newBid.bidder_name,
     bidAgainUrl: buildBidAgainUrl(),
+    unsubscribeUrl,
   });
 
-  const sent = await sendEmail(email);
+  // Task 6.6: advertise one-click unsubscription at the transport level. Headers are
+  // transport metadata, so they are attached here - never inside the pure template.
+  const sent = await sendEmail({
+    ...email,
+    headers: listUnsubscribeHeaders(unsubscribeUrl),
+  });
 
   return { notified: true, recipient: previous.bidderEmail, messageId: sent.id };
 }

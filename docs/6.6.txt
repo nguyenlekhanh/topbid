@@ -1,32 +1,82 @@
 ﻿TASK ID: 6.6
 PHASE: 6
 TITLE: Unsubscribe handling
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Allow outbid-notification recipients to opt out of future notifications without accounts (MVP constraint), enforce that opt-out server-side in the existing notification flow, and advertise unsubscription at the transport level.
+
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "6.6 | Unsubscribe handling | 6.5" - a single line. Architecture was derived from what exists: the project sends raw transactional emails via resend.emails.send() with NO Audiences/Contacts/suppression infrastructure, so provider-managed opt-out is unavailable; durable suppression state must therefore live in the application. This matches the prompt's success criterion ("a recipient who has unsubscribed must not receive future outbid notifications through this flow").
+
+ARCHITECTURE CHOSEN:
+Application-managed unsubscribe state keyed by recipient-specific capability tokens.
+- token = HEX(HMAC-SHA256(UNSUBSCRIBE_SECRET, lowercased_email)) - deterministic per recipient; it is BOTH the URL token and the notification_unsubscribes PRIMARY KEY, so lookup-by-token resolves suppression directly
+- Raw email addresses are NEVER stored in the unsubscribe table and NEVER appear in URLs (@-free)
+- Tokens cannot be forged, guessed, or reused across recipients without UNSUBSCRIBE_SECRET (server-only, min 32 chars, lazy memoized validation like resend.ts)
+
+SECURITY MODEL:
+- No auth/accounts introduced; possession of a valid token = proof the link was issued to that recipient
+- node:crypto HMAC (already used by the Stripe signature suite); shape validation requires exactly 64 lowercase hex chars before any DB access
+- notification_unsubscribes has RLS enabled with ZERO policies - only the service role touches it
+- The unsubscribe page renders AUTHORITATIVE state for a well-shaped token; malformed tokens get neutral copy leaking nothing about existence
+- Only POST mutates (GET page renders) - email-scanner prefetch cannot unsubscribe anyone
 
 SCOPE:
+- supabase/migrations/20260823000015_create_notification_unsubscribes.sql (recipient_hash PK + unsubscribed_at, RLS, no policies)
+- src/lib/unsubscribe.ts (server-only): getUnsubscribeToken, buildUnsubscribeUrl (NEXT_PUBLIC_APP_URL + /unsubscribe?token=...), listUnsubscribeHeaders (RFC 2369/8058), isValidUnsubscribeTokenShape, unsubscribeByToken (idempotent upsert, count-based outcome), hasUnsubscribeRecord (token-direct), isUnsubscribed (email-based suppression check)
+- src/lib/resend.ts: additive optional headers passthrough on SendEmailParams (omitted = payload unchanged)
+- src/lib/outbid-email-template.ts: optional unsubscribeUrl footer (absent/blank = byte-identical output); HTML anchor attribute-escaped + plain-text line
+- src/lib/outbid-notification.ts: suppression check AFTER self-notification guard and BEFORE composition ('recipient_unsubscribed' skip reason); passes footer URL into template; attaches List-Unsubscribe/List-Unsubscribe-Post headers at the transport boundary (headers are transport metadata - never inside the pure template)
+- src/app/unsubscribe/page.tsx: GET confirmation page rendering authoritative state (invalid-shape neutral / confirm form / already-unsubscribed)
+- src/app/api/unsubscribe/route.ts: POST only; token from query string first (mailbox one-click posts hit the header URL) then form body; 303 redirects back to the page; invalid shape redirects neutrally
+- .env.example: UNSUBSCRIBE_SECRET documented (note: .env.example is intentionally UNTRACKED - the repo's .gitignore `.env*` rule has excluded it since Phase 0 - so this documentation lives in the local template only)
+- .env.example: UNSUBSCRIBE_SECRET documented
+
+PRESERVED / BOUNDARIES:
+- Flow unchanged: webhook -> paid transition -> detection -> build -> sendEmail; suppression inserted as one server-side check before composition
+- Same sendEmail boundary (extended additively); no second provider/client; template purity intact
+- Detection, self-notification guard, webhook idempotency untouched
+- Tasks 6.7+ NOT implemented: no retries, queues, scheduling, delivery state, analytics, or preferences beyond opt-out
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Email failure handling/retries (6.7), provider audience management, resubscribe flows, admin UI, per-category URLs (7.4)
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000015_create_notification_unsubscribes.sql (new)
+- src/lib/unsubscribe.ts (new) + src/lib/unsubscribe.test.ts (new)
+- src/lib/resend.ts + resend.test.ts (additive headers)
+- src/lib/outbid-email-template.ts + test (footer)
+- src/lib/outbid-notification.ts + test (suppression + headers wiring)
+- src/app/api/unsubscribe/route.ts (new), src/app/unsubscribe/page.tsx (new)
+- .env.example, docs/6.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TEST PLAN:
-
-DEFINITION OF DONE:
+1. npm run test (new lib/template/orchestration suites + full regression)
+2. npm run typecheck / lint / format:check / build
+3. Static inspection: secret confinement, no raw emails in URLs/state, POST-only mutation, idempotency
 
 IMPLEMENTATION NOTES:
+Suppression check placement: after 'self_outbid' so a self-outbid skip keeps its precise reason regardless of suppression state; before URL building/composition so suppressed recipients cost nothing further. unsubscribeByToken distinguishes first-time vs repeat via PostgREST exact-count on the ignoreDuplicates upsert (cosmetic distinction only; both outcomes are safe no-ops). Page/route are fully dynamic (force-dynamic / request-time DB access), matching /success precedent. Missing UNSUBSCRIBE_SECRET or NEXT_PUBLIC_APP_URL throws descriptively at use time (build-safe lazy pattern established in 6.4).
 
 RESULT:
+Implementation complete. Suite: 252/252 PASSED across 13 files (+51 net). typecheck/lint/format:check/build all PASSED; build registers /api/unsubscribe and /unsubscribe as dynamic routes.
 
 FILES ACTUALLY CHANGED:
+(as SCOPE list above; all implemented)
 
 TESTS ACTUALLY RUN:
+- npm run test: 252/252 PASSED across 13 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live end-to-end unsubscribe through Resend/mail providers: SKIPPED honestly (requires real credentials/domain); all boundaries mocked/hermetic
 
 KNOWN ISSUES:
+- Token rotation would orphan previously issued links (rotating UNSUBSCRIBE_SECRET invalidates old URLs AND decouples stored hashes from new ones); document before ever rotating
+- Unknown-but-well-shaped tokens can insert harmless rows (grants nothing; looked up only by exact match)
+- List-Unsubscribe-Post one-click relies on mailbox providers POSTing to the header URL; behavior verified at unit level only
 
 FOLLOW-UP:
+Task 6.7 - Email failure handling

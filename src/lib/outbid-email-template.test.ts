@@ -156,3 +156,54 @@ describe('buildOutbidEmail bid-again CTA (Task 6.5)', () => {
     expect(buildOutbidEmail(BASE_WITH_CTA)).toEqual(buildOutbidEmail(BASE_WITH_CTA));
   });
 });
+
+describe('buildOutbidEmail unsubscribe footer (Task 6.6)', () => {
+  const UNSUBSCRIBE_URL = `https://topbid.lol/unsubscribe?token=${'f'.repeat(64)}`;
+  const BASE_WITH_FOOTER = { ...BASE_INPUT, unsubscribeUrl: UNSUBSCRIBE_URL };
+
+  it('appends the unsubscribe link to the HTML body', () => {
+    const email = buildOutbidEmail(BASE_WITH_FOOTER);
+
+    expect(email.html).toContain(`<a href="${UNSUBSCRIBE_URL}">Unsubscribe</a>`);
+    expect(email.html).toContain('from outbid notifications');
+  });
+
+  it('appends the raw URL to the plain-text body', () => {
+    const email = buildOutbidEmail(BASE_WITH_FOOTER);
+
+    expect(email.text).toContain(`Don't want these emails? Unsubscribe: ${UNSUBSCRIBE_URL}`);
+  });
+
+  it('leaves subject and existing body content unchanged when the footer is added', () => {
+    const without = buildOutbidEmail(BASE_INPUT);
+    const withFooter = buildOutbidEmail(BASE_WITH_FOOTER);
+
+    expect(withFooter.subject).toBe(without.subject);
+    expect(withFooter.to).toBe(without.to);
+    expect(withFooter.html.startsWith(without.html)).toBe(true);
+    expect(withFooter.text.startsWith(without.text)).toBe(true);
+  });
+
+  it('omits the footer entirely when no URL or a blank URL is provided', () => {
+    const without = buildOutbidEmail(BASE_INPUT);
+    const blank = buildOutbidEmail({ ...BASE_INPUT, unsubscribeUrl: '   ' });
+
+    expect(without.text.toLowerCase()).not.toContain('unsubscribe');
+    expect(blank.text.toLowerCase()).not.toContain('unsubscribe');
+    expect(blank.html).not.toContain(UNSUBSCRIBE_URL);
+  });
+
+  it('escapes the URL for attribute context while keeping it raw in text', () => {
+    const email = buildOutbidEmail({
+      ...BASE_INPUT,
+      unsubscribeUrl: 'https://topbid.lol/unsubscribe?token=a&x=1"y',
+    });
+
+    expect(email.html).toContain('href="https://topbid.lol/unsubscribe?token=a&amp;x=1&quot;y"');
+    expect(email.text).toContain('https://topbid.lol/unsubscribe?token=a&x=1"y');
+  });
+
+  it('keeps output deterministic for identical input including the footer', () => {
+    expect(buildOutbidEmail(BASE_WITH_FOOTER)).toEqual(buildOutbidEmail(BASE_WITH_FOOTER));
+  });
+});

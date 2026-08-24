@@ -47,6 +47,11 @@ export type SendEmailParams = {
   subject: string;
   html: string;
   text?: string;
+  /**
+   * Optional transport headers (Task 6.6: List-Unsubscribe / List-Unsubscribe-Post).
+   * Purely additive and optional - omitted keeps the provider payload unchanged.
+   */
+  headers?: Record<string, string>;
 };
 
 export type SentEmail = {
@@ -58,7 +63,13 @@ export type SentEmail = {
  * descriptive error on provider failure so callers never mistake a failed send for a
  * delivered one.
  */
-export async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<SentEmail> {
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  headers,
+}: SendEmailParams): Promise<SentEmail> {
   const { client, fromAddress } = ensureConfigured();
 
   const { data, error } = await client.emails.send({
@@ -67,6 +78,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     subject,
     html,
     ...(text ? { text } : {}),
+    ...(headers ? { headers } : {}),
   });
 
   if (error) {

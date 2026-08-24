@@ -149,6 +149,20 @@ describe('resend email integration (Task 6.2)', () => {
 
     const callArgs = resendMock.send.mock.calls[0][0] as Record<string, unknown>;
     expect('text' in callArgs).toBe(false);
+    expect('headers' in callArgs).toBe(false);
+  });
+
+  it('passes optional transport headers through to the provider (Task 6.6)', async () => {
+    const { sendEmail } = await importResendModule();
+
+    const headers = {
+      'List-Unsubscribe': '<https://topbid.lol/unsubscribe?token=abc>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    };
+
+    await sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>', headers });
+
+    expect(resendMock.send).toHaveBeenCalledWith(expect.objectContaining({ headers }));
   });
 
   it('propagates provider failures as descriptive errors', async () => {

@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**6.5 completed** — Next recommended: 6.6
+**6.6 completed** — Next recommended: 6.7
 
 ## Completed Tasks
 
@@ -77,6 +77,7 @@
 - 6.3: Outbid email template ✓
 - 6.4: Send outbid notification ✓
 - 6.5: Bid-again link in email ✓
+- 6.6: Unsubscribe handling ✓
 
 ## Tasks in Progress
 
@@ -164,6 +165,7 @@ _None_
 - Resend email provider integration created (src/lib/resend.ts: eager env validation of RESEND_API_KEY/RESEND_FROM_EMAIL with descriptive boot errors, typed sendEmail boundary returning provider message id, server-only module; .env.example gains both variables)
 - Outbid email template created (src/lib/outbid-email-template.ts: pure buildOutbidEmail composer producing subject/HTML/text from authoritative input, full HTML escaping of dynamic values, deterministic output, SendEmailParams-compatible shape; Task 6.5 extended it with an optional bidAgainUrl CTA rendered only when provided)
 - Bid-again link added (outbid-notification.ts derives {NEXT_PUBLIC_APP_URL}/#categories-heading from trusted server config using existing anchor conventions and passes it to the template; missing env throws descriptively; no route invented, per-category URLs remain Task 7.4)
+- Unsubscribe handling added (application-managed suppression: HMAC-SHA256(UNSUBSCRIBE_SECRET, email) capability tokens double as notification_unsubscribes PK - raw emails never stored or URL-exposed; RLS table with zero policies, service-role only; sendOutbidNotification checks isUnsubscribed before composition with 'recipient_unsubscribed' skip; template gains optional attribute-escaped footer link; List-Unsubscribe/List-Unsubscribe-Post headers attached at the transport boundary via additive optional headers passthrough on sendEmail; POST-only /api/unsubscribe (query token for RFC 8058 one-click, form fallback) + dynamic /unsubscribe confirmation page rendering authoritative state; idempotent ON CONFLICT upserts)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -184,7 +186,7 @@ _None_
 
 ## Next Recommended Task
 
-**6.6 — Unsubscribe handling**
+**6.7 — Email failure handling**
 
 ## Notes
 
@@ -261,5 +263,7 @@ Task 6.3 completed successfully. Outbid email template added: pure buildOutbidEm
 Task 6.4 completed successfully. Outbid notification sending orchestrated: src/lib/outbid-notification.ts composes getBidByStripeSessionId (authoritative new-bid resolution) + getPreviousHighestBidder + buildOutbidEmail + sendEmail with typed skip reasons and no-self-notification guard; stripe-webhook.ts dispatches it only on ledger outcome 'converted' so duplicate deliveries can never double-send; provider failures are logged best-effort without failing the payment response; resend.ts validation moved to memoized first-use (identical errors) to keep builds green where email is unconfigured; 192/192 tests passing.
 
 Task 6.5 completed successfully. Bid-again CTA added to the outbid email: buildOutbidEmail accepts an optional bidAgainUrl (absent keeps byte-identical pre-6.5 output; present appends an attribute-escaped HTML anchor plus a plain-text URL line), and outbid-notification.ts derives the absolute destination solely from trusted config as {NEXT_PUBLIC_APP_URL}/#categories-heading using the existing homepage section-anchor convention (no route invented; per-category URLs remain Task 7.4); missing env fails loudly instead of sending a broken-CTA email; template purity, 6.4 send boundary, detection, and webhook wiring untouched; 201/201 tests passing.
+
+Task 6.6 completed successfully. Unsubscribe handling added as application-managed suppression: migration 20260823000015 creates notification_unsubscribes keyed by HMAC-SHA256(UNSUBSCRIBE_SECRET, email) capability tokens (raw emails never stored; RLS enabled, zero policies, service-role only); src/lib/unsubscribe.ts provides token derivation/URL building/header construction/idempotent upsert/suppression checks with lazy validated server-only secret; sendOutbidNotification enforces isUnsubscribed before composition ('recipient_unsubscribed'), renders an optional footer link, and attaches List-Unsubscribe one-click headers via an additive optional headers passthrough on sendEmail; new POST-only /api/unsubscribe route (query token for RFC 8058 one-click + form fallback) redirects to the dynamic /unsubscribe confirmation page which renders authoritative state; provider-managed opt-out unavailable (raw transactional sends), documented honestly; 252/252 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.

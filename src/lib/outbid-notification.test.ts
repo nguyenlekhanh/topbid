@@ -20,6 +20,12 @@ const resendMock = vi.hoisted(() => ({
   sendEmail: vi.fn(),
 }));
 
+const unsubscribeMock = vi.hoisted(() => ({
+  isUnsubscribed: vi.fn(),
+  buildUnsubscribeUrl: vi.fn(),
+  listUnsubscribeHeaders: vi.fn(),
+}));
+
 vi.mock('@/lib/bids', () => ({
   getBidByStripeSessionId: bidsMock.getBidByStripeSessionId,
   getPreviousHighestBidder: bidsMock.getPreviousHighestBidder,
@@ -27,6 +33,12 @@ vi.mock('@/lib/bids', () => ({
 
 vi.mock('@/lib/resend', () => ({
   sendEmail: resendMock.sendEmail,
+}));
+
+vi.mock('@/lib/unsubscribe', () => ({
+  isUnsubscribed: unsubscribeMock.isUnsubscribed,
+  buildUnsubscribeUrl: unsubscribeMock.buildUnsubscribeUrl,
+  listUnsubscribeHeaders: unsubscribeMock.listUnsubscribeHeaders,
 }));
 
 const CATEGORY = { id: 'cat-1', slug: 'retro-gaming', name: 'Retro Gaming' };
@@ -54,6 +66,12 @@ const PREVIOUS_BIDDER = {
 
 const APP_URL = 'https://topbid.lol';
 const BID_AGAIN_URL = `${APP_URL}/#categories-heading`;
+const UNSUBSCRIBE_TOKEN = 'f'.repeat(64);
+const UNSUBSCRIBE_URL = `${APP_URL}/unsubscribe?token=${UNSUBSCRIBE_TOKEN}`;
+const LIST_UNSUBSCRIBE_HEADERS = {
+  'List-Unsubscribe': `<${UNSUBSCRIBE_URL}>`,
+  'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+};
 
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_APP_URL', APP_URL);
@@ -63,6 +81,12 @@ beforeEach(() => {
   bidsMock.getPreviousHighestBidder.mockResolvedValue(PREVIOUS_BIDDER);
   resendMock.sendEmail.mockReset();
   resendMock.sendEmail.mockResolvedValue({ id: 'email-123' });
+  unsubscribeMock.isUnsubscribed.mockReset();
+  unsubscribeMock.isUnsubscribed.mockResolvedValue(false);
+  unsubscribeMock.buildUnsubscribeUrl.mockReset();
+  unsubscribeMock.buildUnsubscribeUrl.mockReturnValue(UNSUBSCRIBE_URL);
+  unsubscribeMock.listUnsubscribeHeaders.mockReset();
+  unsubscribeMock.listUnsubscribeHeaders.mockReturnValue(LIST_UNSUBSCRIBE_HEADERS);
 });
 
 afterEach(() => {
@@ -81,18 +105,23 @@ describe('sendOutbidNotification (Task 6.4)', () => {
   it('sends exactly the template-composed content through the sendEmail boundary', async () => {
     const result = await sendOutbidNotification('cs_new');
 
-    const expectedContent = buildOutbidEmail({
-      to: 'champ@example.com',
-      bidderName: 'Champ',
-      categoryName: 'Retro Gaming',
-      previousAmount: 125000,
-      newAmount: 150000,
-      newBidderName: 'Challenger',
-      bidAgainUrl: BID_AGAIN_URL,
-    });
+    const expectedContent = {
+      ...buildOutbidEmail({
+        to: 'champ@example.com',
+        bidderName: 'Champ',
+        categoryName: 'Retro Gaming',
+        previousAmount: 125000,
+        newAmount: 150000,
+        newBidderName: 'Challenger',
+        bidAgainUrl: BID_AGAIN_URL,
+        unsubscribeUrl: UNSUBSCRIBE_URL,
+      }),
+      headers: LIST_UNSUBSCRIBE_HEADERS,
+    };
 
     expect(resendMock.sendEmail).toHaveBeenCalledTimes(1);
     expect(resendMock.sendEmail).toHaveBeenCalledWith(expectedContent);
+    expect(unsubscribeMock.listUnsubscribeHeaders).toHaveBeenCalledWith(UNSUBSCRIBE_URL);
 
     expect(result).toEqual({
       notified: true,
@@ -110,6 +139,45 @@ describe('sendOutbidNotification (Task 6.4)', () => {
       '<a href="https://topbid.lol/#categories-heading">Bid again</a>'
     );
     expect(content.text).toContain('Bid again: https://topbid.lol/#categories-heading');
+  });
+
+  it('includes the unsubscribe footer and transport headers (Task 6.6)', async () => {
+    await sendOutbidNotification('cs_new');
+
+    expect(unsubscribeMock.buildUnsubscribeUrl).toHaveBeenCalledWith('champ@example.com');
+
+    const content = resendMock.sendEmail.mock.calls[0][0] as {
+      html: string;
+      text: string;
+      headers: Record<string, string>;
+    };
+
+    expect(content.html).toContain(`<a href="${UNSUBSCRIBE_URL}">Unsubscribe</a>`);
+    expect(content.text).toContain(`Don't want these emails? Unsubscribe: ${UNSUBSCRIBE_URL}`);
+    expect(content.headers).toEqual(LIST_UNSUBSCRIBE_HEADERS);
+  });
+
+  it('never emails a recipient who has unsubscribed', async () => {
+    unsubscribeMock.isUnsubscribed.mockResolvedValue(true);
+
+    const result = await sendOutbidNotification('cs_new');
+
+    expect(unsubscribeMock.isUnsubscribed).toHaveBeenCalledWith('champ@example.com');
+    expect(result).toEqual({ notified: false, reason: 'recipient_unsubscribed' });
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('still reports self_outbid before consulting suppression state', async () => {
+    bidsMock.getPreviousHighestBidder.mockResolvedValue({
+      ...PREVIOUS_BIDDER,
+      bidderEmail: 'CHALLENGER@Example.com',
+    });
+
+    const result = await sendOutbidNotification('cs_self');
+
+    expect(result).toEqual({ notified: false, reason: 'self_outbid' });
+    expect(unsubscribeMock.isUnsubscribed).not.toHaveBeenCalled();
+    expect(resendMock.sendEmail).not.toHaveBeenCalled();
   });
 
   it('normalizes a trailing slash on the configured base URL', async () => {
@@ -136,8 +204,8 @@ describe('sendOutbidNotification (Task 6.4)', () => {
 
     await sendOutbidNotification('cs_new');
 
-    expect(resendMock.sendEmail).toHaveBeenCalledWith(
-      buildOutbidEmail({
+    expect(resendMock.sendEmail).toHaveBeenCalledWith({
+      ...buildOutbidEmail({
         to: 'champ@example.com',
         bidderName: null,
         categoryName: 'Retro Gaming',
@@ -145,8 +213,10 @@ describe('sendOutbidNotification (Task 6.4)', () => {
         newAmount: 150000,
         newBidderName: null,
         bidAgainUrl: BID_AGAIN_URL,
-      })
-    );
+        unsubscribeUrl: UNSUBSCRIBE_URL,
+      }),
+      headers: LIST_UNSUBSCRIBE_HEADERS,
+    });
   });
 
   it.each(['', '   '])(

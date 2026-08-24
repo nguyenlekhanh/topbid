@@ -29,6 +29,12 @@ export type OutbidEmailTemplateInput = {
    * Optional: omitted keeps the email identical to the pre-6.5 template (no link).
    */
   bidAgainUrl?: string;
+  /**
+   * Absolute tokenized unsubscribe URL for the footer (Task 6.6). Optional: omitted
+   * keeps the email identical to the pre-6.6 template (no footer). Callers own
+   * constructing it; it is only HTML-escaped here for attribute context.
+   */
+  unsubscribeUrl?: string;
 };
 
 export type OutbidEmailContent = {
@@ -77,6 +83,10 @@ export function buildOutbidEmail(input: OutbidEmailTemplateInput): OutbidEmailCo
   const bidAgainUrl = input.bidAgainUrl?.trim() || null;
   const safeBidAgainUrl = bidAgainUrl ? escapeHtml(bidAgainUrl) : null;
 
+  // Task 6.6: optional unsubscribe footer. Same caller-constructed URL discipline.
+  const unsubscribeUrl = input.unsubscribeUrl?.trim() || null;
+  const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : null;
+
   const htmlParts = [
     `<p>Hi ${safeRecipientName},</p>`,
     `<p>Someone has outbid you on <strong>${safeCategoryName}</strong> on Topbid.</p>`,
@@ -86,6 +96,12 @@ export function buildOutbidEmail(input: OutbidEmailTemplateInput): OutbidEmailCo
 
   if (safeBidAgainUrl) {
     htmlParts.push(`<p><a href="${safeBidAgainUrl}">Bid again</a></p>`);
+  }
+
+  if (safeUnsubscribeUrl) {
+    htmlParts.push(
+      `<p><a href="${safeUnsubscribeUrl}">Unsubscribe</a> from outbid notifications.</p>`
+    );
   }
 
   const html = htmlParts.join('\n');
@@ -102,6 +118,10 @@ export function buildOutbidEmail(input: OutbidEmailTemplateInput): OutbidEmailCo
 
   if (bidAgainUrl) {
     textParts.push('', `Bid again: ${bidAgainUrl}`);
+  }
+
+  if (unsubscribeUrl) {
+    textParts.push('', `Don't want these emails? Unsubscribe: ${unsubscribeUrl}`);
   }
 
   const text = textParts.join('\n');
