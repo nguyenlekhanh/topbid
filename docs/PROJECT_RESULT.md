@@ -1960,6 +1960,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Phase 5 complete — Task 6.1 — Detect previous highest bidder
 
+### Task 6.1
+
+- **Date**: 2026-08-23
+- **Objective**: Detect the previous highest bidder for a category — the detection primitive consumed by Phase 6 outbid-notification tasks
+- **Status**: Completed
+- **Requirement interpretation (from plan/schema, not guessed)**:
+  - "Previous highest bidder" = holder of the top PAID bid for the category excluding a given newly-top bid — derived on demand from authoritative paid-bid history using established ranking semantics (amount DESC + created_at DESC tie-breaker)
+  - No new stored state, ledger table, or RPC required; refunds naturally remove former champions from results (never notify about refunded payments)
+- **What was implemented**:
+  - src/lib/bids.ts: getPreviousHighestBidder(categoryId, excludeBidId): Promise<PreviousHighestBidder | null> + exported type {bidId, bidderEmail, bidderName, amount}
+  - Query reuses existing conventions exactly: supabase-server anon client, paid-only filter (RLS defense in depth), amount DESC/created_at DESC ordering, limit 1
+  - Guards: blank/whitespace categoryId or excludeBidId -> null without querying
+- **Files changed**:
+  - src/lib/bids.ts (additive function + type)
+  - src/lib/bids.test.ts (+5 tests)
+  - docs/6.1.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 152/152 PASSED across 9 files (+5 detection tests: mapping, first-bid null case, three blank-input no-query cases)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static inspection: exclusion semantics, tie-breaker reuse, RLS compliance, guard coverage
+  - Live DB verification: SKIPPED — local Supabase Docker unavailable (consistent with Tasks 2.7–5.7); NOT faked
+- **Important technical decisions**:
+  - Detection is a pure read query rather than state captured during Task 4.8 conversion: paid history is immutable so results are derivable at any later moment, avoiding coupling notification plumbing into the payment path
+  - Deliberately no notifications/emails/badges implemented — strictly the 6.1 primitive for Tasks 6.2+
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 6.2 — Email provider integration (Resend)
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

@@ -1,32 +1,69 @@
 ﻿TASK ID: 6.1
 PHASE: 6
 TITLE: Detect previous highest bidder
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Provide the ability to determine the previous highest bidder for a category as required by PROJECT_PLAN.md ("6.1 | Detect previous highest bidder") - the detection primitive Phase 6 outbid-notification tasks will consume.
+
+INTERPRETATION (derived strictly from plan/schema):
+"Previous highest bidder" = the holder of the top PAID bid for a category excluding a given bid - i.e., who was on top immediately before another bid became the new #1. Ranking semantics are the established ones (paid bids only; amount DESC with created_at DESC tie-breaker). It is DERIVED from authoritative paid-bid history on demand; no new stored state, ledger table, or RPC is required.
 
 SCOPE:
+- src/lib/bids.ts - getPreviousHighestBidder(categoryId, excludeBidId): Promise<PreviousHighestBidder | null> plus exported PreviousHighestBidder type
+- Query reuses existing conventions exactly: supabase-server anon client, paid-only filter (RLS defense in depth), amount DESC + created_at DESC ordering, limit 1
+
+PRESERVED / BOUNDARIES:
+- Ranking semantics unchanged and reused - no new ranking rules invented
+- Authoritative DB state only; no client-supplied bidder/category/amount data involved
+- Tasks 3.5-3.7 validation/concurrency/duplicate behavior untouched (detection is read-only)
+- Task 4.8 conversion semantics untouched; RLS intact; no service-role usage
+- No notifications/emails/badges implemented here (Tasks 6.2+)
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Email provider integration (6.2), outbid template/send (6.3/6.4), bid-again links/unsubscribe (6.5/6.6), failure handling (6.7), any UI changes, schema/migration/RPC changes
 
 FILES EXPECTED TO CHANGE:
+- src/lib/bids.ts
+- src/lib/bids.test.ts
+- docs/6.1.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new detection tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: exclusion semantics, tie-breaker ordering, RLS compliance, guard coverage
 
 DEFINITION OF DONE:
+- Reusable server-side detection of the previous highest bidder exists with predictable null contract; all repo checks green; no scope creep into 6.2+
 
 IMPLEMENTATION NOTES:
+Query shape: .from('bids').select(BID_FIELDS).eq('category_id', categoryId).eq('status','paid').neq('id', excludeBidId).order('amount DESC').order('created_at DESC').limit(1).maybeSingle(). Guards: blank/whitespace categoryId or excludeBidId -> null without querying (consistent trim-based guards used by sibling validators). Null contract: no other paid bids -> null (the excluded/new bid was the first); refunds naturally remove a former champion from results (never notify about refunded payments - documented). Deliberately NOT an RPC inside Task 4.8's conversion: paid history is immutable so detection is derivable at any later moment; capturing it at conversion time would couple notification plumbing into the payment path for no correctness gain. Live DB verification remains unavailable (no Docker) - deterministic unit tests cover mapping/guards instead.
 
 RESULT:
+Implementation complete. Suite: 152/152 PASSED across 9 files (+5 detection tests). typecheck/lint/format:check/build all PASSED. Static inspection confirmed exclusion semantics, tie-breaker ordering reuse, RLS compliance, and zero changes to completed-task logic.
 
 FILES ACTUALLY CHANGED:
+- src/lib/bids.ts (getPreviousHighestBidder + PreviousHighestBidder type)
+- src/lib/bids.test.ts (+5 tests)
+- docs/6.1.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 152/152 PASSED across 9 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live DB verification: SKIPPED - local Supabase Docker unavailable (consistent with Tasks 2.7-5.7); NOT faked
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 6.2 - Email provider integration (Resend)

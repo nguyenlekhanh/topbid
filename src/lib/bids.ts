@@ -560,3 +560,62 @@ function normalizeStripeSessionId(
 
   return { valid: true, stripeSessionId: trimmed };
 }
+
+export type PreviousHighestBidder = {
+  bidId: string;
+  bidderEmail: string;
+  bidderName: string | null;
+  amount: number;
+};
+
+/**
+ * Detect the previous highest bidder for a category (Task 6.1).
+ *
+ * - The previous highest bidder is the holder of the top PAID bid for the category,
+ *   excluding a given bid - i.e., who was on top immediately before another bid became
+ *   the new #1. Derived from authoritative paid-bid history using the established
+ *   ranking semantics (amount DESC, then created_at DESC tie-breaker); nothing is stored.
+ * - Returns null when no other paid bids exist (the excluded bid was the first/only one)
+ *   or when inputs are blank.
+ * - Server-side only (uses supabase-server anon client; RLS paid-only visibility).
+ * - Consumed by Phase 6 outbid-notification tasks; refunds naturally remove a former
+ *   champion from this result (never notify about a refunded payment).
+ */
+export async function getPreviousHighestBidder(
+  categoryId: string,
+  excludeBidId: string
+): Promise<PreviousHighestBidder | null> {
+  if (!categoryId.trim() || !excludeBidId.trim()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('bids')
+    .select(BID_FIELDS)
+    .eq('category_id', categoryId)
+    .eq('status', 'paid')
+    .neq('id', excludeBidId)
+    .order('amount', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch previous highest bidder: ${error.message}`);
+  }
+
+  const row = data as Bid | null;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    bidId: row.id,
+    bidderEmail: row.bidder_email,
+    bidderName: row.bidder_name,
+    amount: row.amount,
+  };
+}

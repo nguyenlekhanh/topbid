@@ -7,6 +7,7 @@ import {
   getIncrementedMinimumBid,
   getInitialMinimumBid,
   getMinimumBidForCategory,
+  getPreviousHighestBidder,
   validateBidAmount,
 } from './bids';
 
@@ -485,5 +486,34 @@ describe('createPendingBid', () => {
         bidderEmail: 'a@b.com',
       })
     ).rejects.toThrow('Failed to create pending bid: bid_error:unknown_reason');
+  });
+});
+
+describe('getPreviousHighestBidder', () => {
+  it('returns the top other paid bid mapped to the detection result', async () => {
+    const champion = paidBid(1500);
+    enqueueServer({ data: champion, error: null });
+
+    await expect(getPreviousHighestBidder('gaming', 'new-bid-id')).resolves.toEqual({
+      bidId: 'bid-1500',
+      bidderEmail: 'winner@example.com',
+      bidderName: 'Winner',
+      amount: 1500,
+    });
+  });
+
+  it('returns null when no other paid bids exist (first bid on the category)', async () => {
+    enqueueServer({ data: null, error: null });
+
+    await expect(getPreviousHighestBidder('gaming', 'excluded')).resolves.toBeNull();
+  });
+
+  it.each([
+    ['', 'excluded'],
+    ['   ', 'excluded'],
+    ['gaming', ''],
+  ])('returns null for blank inputs %j/%j without querying', async (slug, excluded) => {
+    await expect(getPreviousHighestBidder(slug, excluded)).resolves.toBeNull();
+    expect(mocks.serverState.calls).toHaveLength(0);
   });
 });
