@@ -125,6 +125,13 @@ function enqueueService(...results: FakeResult[]) {
   supabaseMock.serviceState.queue.push(...results);
 }
 
+function lastRpcCall(): { method: string; args: unknown[] } | undefined {
+  return (
+    [...supabaseMock.serviceState.calls].reverse().find((call) => call.method === 'rpc') ??
+    undefined
+  );
+}
+
 beforeEach(() => {
   supabaseMock.serverState.queue.length = 0;
   supabaseMock.serviceState.queue.length = 0;
@@ -149,6 +156,7 @@ describe('createCheckoutSession', () => {
       { data: CATEGORY, error: null }
     );
     enqueueService({ data: { ...paidBid(1000), status: 'pending' }, error: null });
+    enqueueService({ data: true, error: null });
 
     const result = await createCheckoutSession({
       categorySlug: 'gaming',
@@ -161,12 +169,18 @@ describe('createCheckoutSession', () => {
     if (result.valid) {
       expect(result.bid.amount).toBe(1000);
       expect(result.checkoutSessionId).toBe('cs_test_abc123');
+      expect(result.stripeSessionId).toBe('cs_test_abc123');
       expect(result.url).toBe('https://checkout.stripe.com/c/pay/cs_test_abc123');
     }
 
     expect(stripeMock.createSession).toHaveBeenCalledTimes(1);
     expect(stripeMock.createSession).toHaveBeenCalledWith({
       mode: 'payment',
+      client_reference_id: 'bid-1000',
+      metadata: {
+        bid_id: 'bid-1000',
+        category_id: CATEGORY.id,
+      },
       line_items: [
         {
           quantity: 1,
@@ -179,6 +193,13 @@ describe('createCheckoutSession', () => {
       ],
       success_url: 'https://topbid.lol/success',
       cancel_url: 'https://topbid.lol/cancel',
+    });
+
+    const rpcCall = lastRpcCall();
+    expect(rpcCall?.args[0]).toBe('attach_stripe_session');
+    expect(rpcCall?.args[1]).toEqual({
+      p_bid_id: 'bid-1000',
+      p_stripe_session_id: 'cs_test_abc123',
     });
   });
 
@@ -255,6 +276,47 @@ describe('createCheckoutSession', () => {
         bidderEmail: 'a@b.com',
       })
     ).rejects.toThrow('Stripe returned no session id/url');
+  });
+
+  it('throws when session attachment reports the bid is no longer eligible', async () => {
+    enqueueServer(
+      { data: CATEGORY, error: null },
+      { data: CATEGORY, error: null },
+      { data: null, error: null },
+      { data: CATEGORY, error: null }
+    );
+    enqueueService({ data: { ...paidBid(1000), status: 'pending' }, error: null });
+    enqueueService({ data: false, error: null });
+
+    await expect(
+      createCheckoutSession({
+        categorySlug: 'gaming',
+        amount: 1000,
+        bidderEmail: 'a@b.com',
+      })
+    ).rejects.toThrow('Failed to link checkout session to bid: bid is no longer eligible');
+  });
+
+  it('wraps session-attachment database failures in descriptive errors', async () => {
+    enqueueServer(
+      { data: CATEGORY, error: null },
+      { data: CATEGORY, error: null },
+      { data: null, error: null },
+      { data: CATEGORY, error: null }
+    );
+    enqueueService({ data: { ...paidBid(1000), status: 'pending' }, error: null });
+    enqueueService({
+      data: null,
+      error: { message: 'bid_error:duplicate_transaction' },
+    });
+
+    await expect(
+      createCheckoutSession({
+        categorySlug: 'gaming',
+        amount: 1000,
+        bidderEmail: 'a@b.com',
+      })
+    ).rejects.toThrow('Failed to link checkout session to bid: bid_error:duplicate_transaction');
   });
 
   it('throws when the app base URL is not configured', async () => {

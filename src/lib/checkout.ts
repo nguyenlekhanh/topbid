@@ -5,6 +5,7 @@ import {
   type PendingBidInput,
 } from '@/lib/bids';
 import { validateCategory } from '@/lib/categories';
+import { createServiceClient } from '@/lib/supabase-service';
 import { stripe } from '@/lib/stripe';
 
 /**
@@ -14,7 +15,13 @@ import { stripe } from '@/lib/stripe';
 export const CHECKOUT_CURRENCY = 'usd';
 
 export type CheckoutSessionResult =
-  | { valid: true; bid: Bid; checkoutSessionId: string; url: string }
+  | {
+      valid: true;
+      bid: Bid;
+      checkoutSessionId: string;
+      stripeSessionId: string;
+      url: string;
+    }
   | { valid: false; reason: CreatePendingBidFailureReason; minimumBid: number | null };
 
 function buildAppUrl(path: string): string {
@@ -36,10 +43,14 @@ function buildAppUrl(path: string): string {
  *   createPendingBid (authoritative validation, explicit status='pending'), and its
  *   validated integer-cent amount becomes the checkout line-item unit amount - client
  *   data is never trusted for pricing
- * - Task sequencing: the session identifier/metadata link between bid and checkout
- *   session is deliberately NOT set here (that is Task 4.2 - Attach category/bid
- *   metadata); the pending bid stores a NULL stripe_session_id, which the UNIQUE
- *   constraint treats as distinct (Task 3.7)
+ * - Task sequencing: the session carries client_reference_id = bid id plus metadata
+ *   {bid_id, category_id} so webhook handling (Task 4.5+) can resolve the bid without
+ *   trusting session data; afterwards the session identifier is persisted onto the bid
+ *   row via the attach_stripe_session RPC, whose UPDATE matches only pending bids with
+ *   no session yet (attach-once; preserves Task 3.7 duplicate semantics at the DB
+ *   boundary). Crash-window note: if the process dies between creation and attachment,
+ *   the bid stays pending with NULL session id (documented reservation behavior) while
+ *   the session still references it via client_reference_id/metadata
  * - Success/cancel URLs are derived from the trusted NEXT_PUBLIC_APP_URL env with
  *   placeholder paths until Tasks 4.3/4.4 introduce the real pages; accepting caller-
  *   supplied URLs was rejected to avoid open-redirect surface
@@ -73,6 +84,13 @@ export async function createCheckoutSession(
   try {
     session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      // Task 4.2 linkage: webhook handling (Task 4.5+) resolves the bid from these
+      // fields without trusting any session data.
+      client_reference_id: bid.id,
+      metadata: {
+        bid_id: bid.id,
+        category_id: bid.category_id,
+      },
       line_items: [
         {
           quantity: 1,
@@ -98,10 +116,28 @@ export async function createCheckoutSession(
     throw new Error('Failed to create Stripe Checkout session: Stripe returned no session id/url');
   }
 
+  // Task 4.2 linkage: persist the session id onto the bid row (attach-once guard
+  // enforced by the RPC at the database boundary).
+  const supabase = createServiceClient();
+
+  const { data: attached, error: attachError } = await supabase.rpc('attach_stripe_session', {
+    p_bid_id: bid.id,
+    p_stripe_session_id: session.id,
+  });
+
+  if (attachError) {
+    throw new Error(`Failed to link checkout session to bid: ${attachError.message}`);
+  }
+
+  if (attached !== true) {
+    throw new Error('Failed to link checkout session to bid: bid is no longer eligible');
+  }
+
   return {
     valid: true,
     bid,
     checkoutSessionId: session.id,
+    stripeSessionId: session.id,
     url: session.url,
   };
 }

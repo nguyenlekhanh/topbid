@@ -1,32 +1,80 @@
 ﻿TASK ID: 4.2
 PHASE: 4
 TITLE: Attach category/bid metadata
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Link the Stripe Checkout Session to its pending bid using the plan-required category/bid metadata mechanism, and persist stripe_session_id onto the authoritative bid record so webhook handling can resolve the bid by session identity.
+
+LINKAGE MECHANISM:
+- client_reference_id = bid.id (Stripe's canonical field for carrying a merchant-side reference)
+- metadata = { bid_id, category_id } - exactly the "category/bid metadata" named by the task; both values come from the DB-validated Bid row, never from client input
+- stripe_session_id persisted on the bids row afterwards via RPC, enabling lookup through idx_bids_stripe_session (Task 2.3) during Tasks 4.5+/4.8
 
 SCOPE:
+- New migration supabase/migrations/20260823000009_attach_stripe_session_function.sql - attach_stripe_session(p_bid_id uuid, p_stripe_session_id text) returns boolean
+  * UPDATE ... WHERE id = p_bid_id AND status = 'pending' AND stripe_session_id IS NULL (attach-once guard)
+  * unique_violation handler raises the established 'bid_error:duplicate_transaction' protocol message (UNIQUE(stripe_session_id) makes concurrent cross-bid attaches impossible - race-safe)
+  * returns true when attached; false when bid missing/not-pending/already-attached
+  * SECURITY DEFINER + pinned search_path; EXECUTE revoked from public/anon/authenticated, granted ONLY to service_role (RLS untouched)
+- src/lib/checkout.ts - session creation now passes client_reference_id + metadata; after creation the session identifier is attached via the service-role RPC; result contract gains additive stripeSessionId field; attachment failures throw descriptive errors
+- src/lib/checkout.test.ts - happy path asserts exact create params incl. linkage fields and the attach RPC invocation; two new failure-path tests (ineligible attach, attach DB error); suite now 8 tests
 
 OUT OF SCOPE:
+- Webhook endpoint/signature verification/payment confirmation (Tasks 4.5-4.9), success/cancel pages (4.3/4.4), refunds, rate limiting; no changes to completed tasks' logic
 
-INPUTS / DEPENDENCIES:
+PRESERVED BEHAVIOR:
+- Task 3.5 authoritative validation unchanged (bid created first, pricing from DB row only)
+- Task 3.6 concurrency RPC untouched; reservation semantics unaffected
+- Task 3.7 duplicate semantics preserved and reinforced: NULL -> session-id transition is one-way at the DB boundary; a second attach of any identifier to another bid hits UNIQUE(stripe_session_id)
+- RLS/security model intact; service credentials confined to server modules
 
-IMPLEMENTATION REQUIREMENTS:
+CRASH-WINDOW NOTE (documented honestly):
+If the process dies between session creation and attachment, the bid remains pending with a NULL session id while the session still references it via client_reference_id/metadata, so Phase 4 confirmation can still resolve it. This mirrors the already-documented abandoned-reservation behavior from Task 3.6.
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000009_attach_stripe_session_function.sql (new)
+- src/lib/checkout.ts
+- src/lib/checkout.test.ts
+- docs/4.2.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new assertions + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static SQL inspection: attach-once WHERE clause, unique-violation handler, grant signature match
 
 DEFINITION OF DONE:
+- Session carries bid/category linkage; session id persisted authoritatively once-only; all checks green; completed tasks untouched except additive integration in checkout.ts
 
 IMPLEMENTATION NOTES:
+Development caught two issues before commit: (1) a stray invalid token left in the migration between the function body and revokes - removed; (2) an incorrect approach mutating the Stripe RESPONSE object's metadata field was replaced with passing client_reference_id/metadata inside sessions.create() params - the correct Stripe mechanism (post-creation mutation of the response is a local no-op). Two Prettier formatting auto-fixes applied via lint:fix. Queue accounting in tests extended by one service entry for the attach RPC.
 
 RESULT:
+Implementation complete. Suite: 46/46 PASSED (38 bids + 8 checkout). typecheck/lint/format:check/build all PASSED. Static inspection confirmed attach-once guard, race-safe duplicate surfacing, hardened privileges, and unchanged prior-task code paths.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000009_attach_stripe_session_function.sql (new)
+- src/lib/checkout.ts (linkage params + attach step + additive result field)
+- src/lib/checkout.test.ts (assertions + 2 new failure-path tests)
+- docs/4.2.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 46/46 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live Stripe/Supabase integration: SKIPPED - no test keys or local Docker available; NOT faked (consistent with Tasks 2.7-4.1)
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 4.3 - Success page

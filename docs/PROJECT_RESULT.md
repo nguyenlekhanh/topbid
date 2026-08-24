@@ -1386,6 +1386,38 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope (live Stripe verification deferred as documented)
 - **Follow-up work**: Task 4.2 — Attach category/bid metadata
 
+### Task 4.2
+
+- **Date**: 2026-08-23
+- **Objective**: Link the Checkout Session to its pending bid via category/bid metadata and persist stripe_session_id onto the authoritative bid record
+- **Status**: Completed
+- **What was implemented**:
+  - Session linkage: client_reference_id = bid.id plus metadata {bid_id, category_id} passed inside sessions.create() params (both values from the DB-validated Bid row; never client input)
+  - Migration 20260823000009_attach_stripe_session_function.sql: attach_stripe_session(p_bid_id, p_stripe_session_id) returns boolean — UPDATE guarded by status='pending' AND stripe_session_id IS NULL (attach-once); unique_violation handler raises the established 'bid_error:duplicate_transaction' protocol; SECURITY DEFINER + pinned search_path, EXECUTE revoked from public/anon/authenticated and granted only to service_role
+  - src/lib/checkout.ts: after session creation, attaches via service-role RPC; false result or RPC error -> descriptive throw; CheckoutSessionResult valid branch gains additive stripeSessionId field
+  - Crash-window documented honestly: death between creation and attachment leaves a pending bid with NULL session id while client_reference_id/metadata still reference it, so Phase 4 confirmation remains resolvable
+- **Files changed**:
+  - supabase/migrations/20260823000009_attach_stripe_session_function.sql (new)
+  - src/lib/checkout.ts (linkage params + attach step + additive result field)
+  - src/lib/checkout.test.ts (linkage assertions + 2 new failure-path tests)
+  - docs/4.2.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 46/46 PASSED (38 bids + 8 checkout)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED (two Prettier auto-fixes during development)
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL inspection: PASSED (attach-once WHERE clause, unique-violation handler, grant signature match)
+  - Live Stripe/Supabase integration: SKIPPED — no test keys or local Docker available; NOT faked
+- **Important technical decisions**:
+  - Development caught an incorrect approach mid-flight: mutating the Stripe RESPONSE object's metadata is a local no-op — replaced with client_reference_id/metadata inside sessions.create() params (the correct mechanism); also removed a stray invalid token from the migration before commit
+  - Attach-once enforced at the DB boundary rather than in application code, keeping duplicate semantics consistent with Task 3.7's constraint-arbitrated design
+  - Additive-only result field keeps Task 4.1 callers compatible
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.3 — Success page
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._
