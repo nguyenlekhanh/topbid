@@ -2445,4 +2445,31 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+### Task 8.2
+
+- **Date**: 2026-08-24
+- **Objective**: Turn the Task 8.1 entry boundary into a minimal operational overview dashboard reusing the existing authorization guard and RLS-safe queries - no management functionality
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/admin-dashboard.ts: loadAdminOverview() runs listCategories + getLeaderboard({limit:10}) + getRecentBids({limit:10}) in parallel (existing RLS-safe queries, zero new SQL/service-role) and maps results into view-model types that structurally exclude bidder emails, Stripe session/payment ids, and internal bid ids
+  - src/app/admin/page.tsx upgraded from status card to dashboard: getAdminAuthorization() first (redirect precedes any data load); stat cards (active categories / top overall bid / recent paid count), top-bids and recent-bids summaries with empty states, identity line + sign-out carried from 8.1; "Management sections" placeholder lists future areas as plain coming-soon text without links or pretend functionality; raw DB errors redirect rather than render
+- **Files changed**:
+  - src/lib/admin-dashboard.ts + test (created, 6 tests)
+  - src/app/admin/page.tsx (dashboard content)
+  - docs/8.2.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 428/428 across 26 files (+6 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Public-data-only scope: inactive-category and pending-bid metrics are NOT cleanly available via public RLS; privileged queries were rejected for this foundation task per omit-don't-invent guidance
+  - Privacy enforced by view-model shape (no email/id fields exist) plus serialized-output pins in tests
+  - Parallel independent reads, no caching (fresh authorization every request), no polling/realtime
+- **Known limitations**: summaries cap at 10 entries (existing query limits); totals would need count-capable queries when a need arises
+- **Follow-up work**: Task 8.3 - Category management
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

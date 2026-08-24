@@ -1,32 +1,39 @@
 ﻿TASK ID: 8.2
 PHASE: 8
 TITLE: Admin dashboard
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Turn the Task 8.1 entry boundary into a minimal operational overview dashboard - reusing the existing server-side authorization guard and RLS-safe queries, with no management functionality (Tasks 8.3+ own it).
 
-SCOPE:
+AUTHORIZATION CONSUMPTION:
+/admin calls getAdminAuthorization() (Task 8.1's fail-closed guard) FIRST; unauthenticated/unauthorized visitors redirect to /admin/login BEFORE any data loads or renders - server-side enforcement, not UI hiding. No duplicated auth logic anywhere.
 
-OUT OF SCOPE:
+DASHBOARD SCOPE / DATA DISPLAYED (all from existing RLS-safe queries via loadAdminOverview):
+- Stat cards: Active categories count (listCategories length); Top bid overall (leaderboard rank-1 amount or em-dash when none); Recent paid bids count ("Last N", N<=10)
+- Top bids summary list (rank + category name + whole-dollar amount)
+- Recent paid bids summary list (category + amount)
+- Identity line (authenticated admin email - already safely available to the signed-in admin) and sign-out button carried over from 8.1
+- "Management sections" placeholder listing future areas as coming-soon text WITHOUT links or pretend functionality
 
-INPUTS / DEPENDENCIES:
+DELIBERATELY OMITTED METRICS (not cleanly available through public RLS; privileged queries rejected for this foundation task): inactive-category counts, pending-bid counts/reservations, payment-failure summaries. No invented business metrics.
 
-IMPLEMENTATION REQUIREMENTS:
+QUERY SOURCES (reused verbatim, zero new SQL):
+listCategories() + getLeaderboard({limit:10}) + getRecentBids({limit:10}) composed in parallel inside src/lib/admin-dashboard.ts loadAdminOverview(); three independent indexed reads, no N+1, no service-role access, no caching (fresh authorization/data every request).
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+SERVER/CLIENT BOUNDARY:
+Entire page is a server component; no client components were added. Privacy is enforced by the view-model types themselves - AdminTopBid/AdminRecentBid expose only rank/categoryName/bidderName/amountCents/createdAt; bidder emails, Stripe session/payment ids, and internal bid ids are absent from the shapes so markup cannot leak them. Raw DB errors never render (redirect to login).
 
 TESTS ACTUALLY RUN:
+- npm run test: 428/428 PASSED across 26 files (+6 new loader tests: composition/parallel-query args, email+identifier stripping pins incl. exact key-set assertions for both lists, null-category tolerance, empty-state shape, failure propagation)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NO 8.3 category mgmt, NO 8.4 bid mgmt, NO 8.5 payment mgmt, NO 8.6 refund action, NO 8.7 fraud/banned-email mgmt, NO 8.8 audit logs; NO CRUD/mutations/actions, NO charts/filtering/pagination, NO analytics, NO new roles/auth mechanisms, NO changes to bidding/payment/webhook/email/share behavior or public pages.
 
 KNOWN ISSUES:
+- Overview caps summaries at the 10 most relevant entries (existing query limits); totals across all paid bids would require a count-capable query - deferred until an actual need exists.
+- Dashboard error path reuses the login redirect rather than a dedicated error screen (consistent with fail-closed philosophy).
 
 FOLLOW-UP:
+Task 8.3 - Category management
