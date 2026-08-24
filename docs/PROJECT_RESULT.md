@@ -2503,4 +2503,32 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+### Task 8.4
+
+- **Date**: 2026-08-24
+- **Objective**: Provide administrators visibility into all bids across every status via a deliberately read-only management view - payment-authoritative fields remain owned exclusively by the verified-webhook RPCs
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/admin-bid-management.ts (server-only): listAllBidsForAdmin() gated by getAdminAuthorization (fail-closed); isolated service-role read (justified: public RLS exposes only PAID bids; oversight requires pending/failed/refunded) selecting ONLY display-safe columns, ordered created_at DESC with LIMIT 100 (bounded window, not pagination)
+  - Privacy enforced twice: query-level column exclusion AND explicit allow-list row mapping (over-provisioned responses still cannot leak bidder_email/stripe ids/internal ids into the view model)
+  - src/app/admin/bids/page.tsx: responsive table (placed timestamp, category, bidder display name or em-dash, whole-dollar amount, colored status badge for pending/paid/failed/refunded) plus an on-page policy note that statuses change only through verified Stripe webhook transactions
+- **Files changed**:
+  - src/lib/admin-bid-management.ts + test (created, 6 tests)
+  - src/app/admin/bids/page.tsx (created)
+  - src/app/admin/page.tsx (Bid management link activated)
+  - docs/8.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 483/483 across 28 files (+6 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/admin/bids registered dynamic)
+- **Important technical decisions**:
+  - Read-only by design: any admin status mutation would create an alternate payment pipeline; refund/failure workflows belong to Tasks 8.5/8.6
+  - Field classification documented: payment-authoritative (status/paid_at/stripe ids/is_highest) forbidden; personal (bidder_email) excluded even though paid-bid emails are publicly readable; display-safe allow-list only
+- **Known limitations**: fixed 100-row window without pagination (intentional minimalism); bidder emails intentionally not shown
+- **Follow-up work**: Task 8.5 - Payment management
+
+---
+
 _This file will be updated after each completed task with actual implementation details._

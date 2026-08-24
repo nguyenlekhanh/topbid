@@ -1,32 +1,43 @@
 ﻿TASK ID: 8.4
 PHASE: 8
 TITLE: Bid management
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Provide administrators operational visibility into ALL bids across every status - deliberately READ-ONLY, because bid status transitions are payment-authoritative state owned exclusively by the verified-webhook RPCs.
 
-SCOPE:
+REQUIREMENT DERIVATION / PAYMENT SAFETY ANALYSIS:
+PROJECT_PLAN.md specifies "8.4 | Bid management | 8.3" - one line. Field classification performed against the Phase-4 state machine before any code:
+- PAYMENT-AUTHORITATIVE (forbidden to admin-mutate): status, paid_at, stripe_session_id, stripe_payment_intent_id, is_highest - written ONLY inside convert_pending_bid_to_paid / fail_pending_bid / refund_paid_bid ledger transactions (Tasks 4.8-4.11)
+- PERSONAL/SENSITIVE (excluded from display): bidder_email, all Stripe identifiers, internal bid id
+- SAFE DISPLAY FIELDS: created_at, category name (embedded), bidder display name, amount, status, paid_at presence
+Any admin status mutation would either duplicate the webhook transaction boundary (forbidden alternate payment path) or invent refund/failure workflows belonging to 8.5/8.6. Therefore 8.4 ships as read/manage-view only; the page states this policy explicitly.
 
-OUT OF SCOPE:
+AUTHORIZATION BOUNDARY (unchanged from 8.1):
+listAllBidsForAdmin() calls getAdminAuthorization() first; non-admins receive {ok:false,reason:'unauthorized'} with zero database access. Page redirects unauthorized visitors server-side to /admin/login.
 
-INPUTS / DEPENDENCIES:
+QUERY MECHANISM:
+Isolated service-role read in src/lib/admin-bid-management.ts (justified: public RLS exposes only PAID bids; operational oversight requires pending/failed/refunded visibility). Column selection excludes bidder_email/stripe ids/internal ids at the QUERY level; rows are additionally mapped through an explicit allow-list picker so even an over-provisioned response cannot leak into the view model. Ordered created_at DESC, LIMIT 100 (bounded management window, not pagination infrastructure). Zero changes to existing public bid queries or their semantics.
 
-IMPLEMENTATION REQUIREMENTS:
+DISPLAYED PER ROW:
+Placed timestamp (medium/short en-US), category name (or Uncategorized), bidder display name (or em-dash), whole-dollar amount, colored status badge (pending/paid/failed/refunded). Policy note on-page explains statuses change only via verified Stripe webhooks.
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/admin-bid-management.ts + test (new, 6 tests incl. column-selection pins, over-provisioned-row stripping proof, all-four-status mapping, window/ordering, unauthorized/db_error fail-closed)
+- src/app/admin/bids/page.tsx (new responsive table + policy note)
+- src/app/admin/page.tsx (Bid management link now active)
+- docs/8.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 483/483 PASSED across 28 files (+6 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/admin/bids registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO mutations of any kind (status/refund/delete/edit), NO 8.5 payment mgmt, NO 8.6 refund action, NO 8.7 fraud tools, NO 8.8 audit logs, NO pagination/search/filtering/bulk ops, NO changes to public bid queries, leaderboard/outbid semantics, notification/unsubscribe/share flows, or the Task 8.1 auth boundary.
 
 KNOWN ISSUES:
+- Fixed 100-row window (no pagination) - intentional minimalism; revisit only if operational need emerges.
+- Bidder emails intentionally not shown even though paid-bid emails are publicly readable by design; re-exposing them would require an explicit future product decision.
 
 FOLLOW-UP:
+Task 8.5 - Payment management
