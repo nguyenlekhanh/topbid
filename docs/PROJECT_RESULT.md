@@ -2056,6 +2056,43 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 6.4 — Send outbid notification
 
+### Task 6.4
+
+- **Date**: 2026-08-24
+- **Objective**: Send the outbid notification by composing Task 6.1 detection, Task 6.3 template, and Task 6.2 delivery into one server-side flow triggered when a verified webhook conversion crowns a new highest bid
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/outbid-notification.ts: sendOutbidNotification(stripeSessionId) resolves the newly paid bid authoritatively via getBidByStripeSessionId (Task 4.3 query; RLS paid-only visibility post-conversion), detects the previous highest bidder via getPreviousHighestBidder (Task 6.1, new bid excluded), composes buildOutbidEmail (Task 6.3), and delivers through sendEmail (Task 6.2) - the only provider boundary; typed OutbidNotificationResult union with skip reasons new_bid_not_found / no_previous_bidder / self_outbid (case-insensitive same-email guard so a bidder outbidding themselves is never notified); provider failures propagate as thrown errors
+  - src/lib/stripe-webhook.ts: deliverOutbidNotification invoked ONLY after processVerifiedEvent returns 'converted'; skips/failures are logged (console.info/console.warn) and never alter the payment response - delivery is best-effort post-commit with retry policy left to Task 6.7
+  - src/lib/resend.ts: validation moved from module-load throw to memoized first-use ensureConfigured() with identical error messages; resend.test.ts updated to the lazy contract (10 tests incl. client memoization/reconfiguration)
+- **Files changed**:
+  - src/lib/outbid-notification.ts (created)
+  - src/lib/outbid-notification.test.ts (created, 10 tests)
+  - src/lib/stripe-webhook.ts (trigger wiring + best-effort wrapper)
+  - src/lib/stripe-webhook.test.ts (+8 dispatch tests)
+  - src/lib/stripe-webhook-signature.test.ts (+notification boundary mock)
+  - src/lib/resend.ts (lazy validation/memoized client)
+  - src/lib/resend.test.ts (rewritten for lazy contract)
+  - docs/6.4.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: PASSED - 192/192 across 12 files (+18)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Live email/webhook delivery: SKIPPED honestly (requires real Resend/Stripe credentials); all boundaries mocked at module level like prior suites
+- **Important technical decisions**:
+  - Trigger point: immediately after the Phase-4 ledger transaction commits 'converted' - the processed_webhook_events event.id PRIMARY KEY makes redelivered events return 'duplicate' before any conversion, so idempotency/duplicate-delivery safety is inherited from the existing transaction boundary (no new notification state, queues, or dedup invented); 'already_paid' also never re-notifies
+  - Email failure cannot usefully fail the webhook (a Stripe retry would hit the ledger's duplicate branch and never re-attempt), so failures are logged loudly instead - Task 6.7 owns retry policy
+  - Integration fix surfaced by this task: Next.js evaluates API route modules during build page-data collection, so resend.ts's module-scope env throw broke `npm run build` wherever RESEND_API_KEY is unset once the webhook route imported the notification flow; lazy memoized validation preserves the descriptive-error/never-silent-failure contract while keeping builds green on unconfigured environments
+  - Zero changes to bids.ts/categories.ts/template logic; recipient resolution reuses one existing authoritative query
+- **Known limitations**:
+  - Provider failure after conversion logs a warning; that email is not retried until Task 6.7
+  - Notification runs synchronously in the webhook request (two RLS queries + provider call); acceptable for MVP per no-queue scope rule
+- **Follow-up work**: Task 6.5 — Bid-again link in email
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

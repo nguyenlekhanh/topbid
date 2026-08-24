@@ -18,11 +18,14 @@ vi.mock('resend', () => ({
   },
 }));
 
+// Task 6.2 originally validated at module load; Task 6.4 moved validation to first use
+// because Next.js evaluates route modules during build page-data collection. The
+// descriptive-error contract is unchanged - it now surfaces from sendEmail.
 type ResendModule = typeof import('./resend');
 
 async function importResendModule(): Promise<ResendModule> {
-  // Clear the ESM cache so each import re-evaluates module-scope validation
-  // against the currently stubbed environment variables.
+  // Clear the ESM cache so each import re-evaluates against the currently stubbed
+  // environment variables and starts with a fresh memoized client.
   vi.resetModules();
 
   return import('./resend');
@@ -41,34 +44,69 @@ afterEach(() => {
 });
 
 describe('resend email integration (Task 6.2)', () => {
-  it('rejects module import when RESEND_API_KEY is missing', async () => {
+  it('rejects sending when RESEND_API_KEY is missing', async () => {
     vi.stubEnv('RESEND_API_KEY', '');
 
-    await expect(importResendModule()).rejects.toThrow(
+    const { sendEmail } = await importResendModule();
+
+    await expect(sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' })).rejects.toThrow(
       'Missing RESEND_API_KEY environment variable'
     );
   });
 
-  it('rejects module import when the API key is whitespace-only', async () => {
+  it('rejects sending when the API key is whitespace-only', async () => {
     vi.stubEnv('RESEND_API_KEY', '   ');
 
-    await expect(importResendModule()).rejects.toThrow(
+    const { sendEmail } = await importResendModule();
+
+    await expect(sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' })).rejects.toThrow(
       'Missing RESEND_API_KEY environment variable'
     );
   });
 
-  it('rejects module import when RESEND_FROM_EMAIL is missing', async () => {
+  it('rejects sending when RESEND_FROM_EMAIL is missing', async () => {
     vi.stubEnv('RESEND_FROM_EMAIL', '');
 
-    await expect(importResendModule()).rejects.toThrow(
+    const { sendEmail } = await importResendModule();
+
+    await expect(sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' })).rejects.toThrow(
       'Missing RESEND_FROM_EMAIL environment variable'
     );
   });
 
-  it('constructs the client with the configured API key', async () => {
-    await importResendModule();
+  it('constructs the client with the configured API key on first send', async () => {
+    const { sendEmail } = await importResendModule();
+
+    const result = await sendEmail({
+      to: 'outbid@example.com',
+      subject: 'You have been outbid',
+      html: '<p>Someone outbid you</p>',
+    });
+
+    expect(result).toEqual({ id: 'email-1' });
+    expect(resendMock.constructedWith).toEqual(['re_test_key']);
+  });
+
+  it('memoizes the client across sends with an unchanged sender address', async () => {
+    const { sendEmail } = await importResendModule();
+
+    await sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' });
+    await sendEmail({ to: 'c@d.com', subject: 'S2', html: '<p>H2</p>' });
 
     expect(resendMock.constructedWith).toEqual(['re_test_key']);
+    expect(resendMock.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconfigures the client when the sender address changes', async () => {
+    const { sendEmail } = await importResendModule();
+
+    await sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' });
+
+    vi.stubEnv('RESEND_FROM_EMAIL', 'Topbid <bounce@topbid.lol>');
+
+    await sendEmail({ to: 'a@b.com', subject: 'S', html: '<p>H</p>' });
+
+    expect(resendMock.constructedWith).toEqual(['re_test_key', 're_test_key']);
   });
 
   it('sends with the configured sender and exact recipient/subject/body params', async () => {

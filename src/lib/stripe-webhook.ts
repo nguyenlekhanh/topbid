@@ -1,3 +1,4 @@
+import { sendOutbidNotification } from '@/lib/outbid-notification';
 import { createServiceClient } from '@/lib/supabase-service';
 import { stripe } from '@/lib/stripe';
 
@@ -361,6 +362,38 @@ async function handleChargeRefunded(
   return refundVerifiedBid(event.id ?? 'unknown', event.type!, paymentIntentId);
 }
 
+/**
+ * Deliver the outbid notification for a converted bid (Task 6.4).
+ *
+ * - Invoked ONLY after processVerifiedEvent returned 'converted': the ledger's
+ *   event.id PRIMARY KEY makes redelivered events return 'duplicate' before any
+ *   conversion, so this path is unreachable for replays - duplicate deliveries can
+ *   never double-send and no extra notification state is required
+ * - Best-effort by design: the payment transaction has already committed, and failing
+ *   the request (500) could not help - Stripe would retry into the ledger's
+ *   'duplicate' branch and never re-attempt conversion or notification. Failures are
+ *   logged for observability; retry/failure policy remains Task 6.7
+ */
+async function deliverOutbidNotification(sessionId: string): Promise<void> {
+  try {
+    const result = await sendOutbidNotification(sessionId);
+
+    if (!result.notified) {
+      console.info(
+        '[stripe-webhook] outbid notification skipped',
+        JSON.stringify({ sessionId, reason: result.reason })
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.warn(
+      '[stripe-webhook] outbid notification failed (best-effort; payment already confirmed)',
+      JSON.stringify({ sessionId, error: message })
+    );
+  }
+}
+
 async function handleCheckoutSessionCompleted(
   event: StripeLikeEvent
 ): Promise<ConversionOutcome | 'unverified'> {
@@ -386,13 +419,21 @@ async function handleCheckoutSessionCompleted(
 
   // Tasks 4.8+4.9: claim the event in the ledger and apply the verified conversion in
   // one atomic database transaction.
-  return processVerifiedEvent(
+  const outcome = await processVerifiedEvent(
     event.id ?? 'unknown',
     event.type!,
     verification.bidReference,
     verification.sessionId,
     verification.paymentIntentId
   );
+
+  // Task 6.4: only a first-time conversion crowns a new highest bid worth notifying
+  // about; duplicates/replays return outcomes that never reach this branch.
+  if (outcome === 'converted') {
+    await deliverOutbidNotification(verification.sessionId);
+  }
+
+  return outcome;
 }
 
 export async function processStripeWebhook(

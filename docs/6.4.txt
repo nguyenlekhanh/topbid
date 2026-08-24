@@ -1,32 +1,74 @@
 ﻿TASK ID: 6.4
 PHASE: 6
 TITLE: Send outbid notification
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Compose Task 6.1 detection, Task 6.3 template composition, and Task 6.2 delivery into one server-side outbid notification flow, triggered at the authoritative point where a newly paid bid becomes the category's highest bid (verified webhook conversion).
 
 SCOPE:
+- New src/lib/outbid-notification.ts: sendOutbidNotification(stripeSessionId) orchestration returning a typed OutbidNotificationResult union ({notified:true, recipient, messageId} | {notified:false, reason}) with reasons new_bid_not_found / no_previous_bidder / self_outbid
+- src/lib/stripe-webhook.ts: after processVerifiedEvent returns 'converted' ONLY, deliverOutbidNotification(sessionId) invokes the flow best-effort (logged skip/failure, payment response unaffected)
+- src/lib/resend.ts: validation moved from module-load to memoized first-use (identical error messages) - required integration fix; see IMPLEMENTATION NOTES
+
+PRESERVED / BOUNDARIES:
+- Recipient/detection sourced authoritatively: getBidByStripeSessionId (Task 4.3, RLS paid-only visibility post-conversion) resolves the new bid {id, category_id, amount, bidder_email, bidder_name} + category name in ONE existing query; getPreviousHighestBidder (Task 6.1) excludes the new bid using established ranking semantics; no client/event-body data trusted
+- Delivery exclusively through sendEmail (Task 6.2); no second provider/client created
+- Template stays pure (Task 6.3 untouched); no CTA/link (Task 6.5), no unsubscribe (6.6), no retry/failure policy beyond error propagation (6.7); no queues/state/scheduling invented
+- Phase 4 idempotency untouched and inherited: the processed_webhook_events event.id PRIMARY KEY makes redelivered events return 'duplicate' BEFORE any conversion, so the notification branch is unreachable for replays - duplicate deliveries can never double-send without any new dedup mechanism
+- Self-notification guard: previous top bidder with the same email (case-insensitive) as the bidder who just became highest is never notified ('self_outbid'); first-ever bid notifies nobody ('no_previous_bidder')
 
 OUT OF SCOPE:
-
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+- Bid-again link (6.5), unsubscribe handling (6.6), email failure handling/retries (6.7), UI changes, schema/migration/RPC changes, notification preferences
 
 FILES EXPECTED TO CHANGE:
+- src/lib/outbid-notification.ts (new)
+- src/lib/outbid-notification.test.ts (new)
+- src/lib/stripe-webhook.ts (trigger wiring)
+- src/lib/stripe-webhook.test.ts (+8 dispatch tests)
+- src/lib/stripe-webhook-signature.test.ts (+boundary mock)
+- src/lib/resend.ts + resend.test.ts (lazy-validation adjustment)
+- docs/6.4.txt, docs/PROJECT_PROGRESS.md, docs/PROJECT_RESULT.md
 
 TEST PLAN:
-
-DEFINITION OF DONE:
+1. npm run test (10 new orchestration tests + 8 new webhook dispatch tests + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static inspection: trigger-point placement, replay safety, secret confinement (server-only import chain)
 
 IMPLEMENTATION NOTES:
+TRIGGER POINT: handleCheckoutSessionCompleted immediately after the ledger RPC commits 'converted'. Alternatives rejected: firing inside DB triggers/RPCs would couple the payment transaction to external HTTP; notifying on already_paid/duplicate would double-send or spam on replays; failing the webhook on email errors could not help since a Stripe retry re-enters the ledger's 'duplicate' branch and never re-attempts conversion or notification - so delivery is best-effort with logged outcomes and retry policy deliberately left to Task 6.7.
+BUILD FIX (integration): wiring stripe-webhook.ts -> outbid-notification.ts put resend.ts inside an API route's module graph for the first time; Next.js evaluates route modules during build page-data collection, so resend.ts's module-scope throw broke `npm run build` wherever RESEND_API_KEY is unset (reproduced locally). Validation moved to a memoized ensureConfigured() used by sendEmail - identical messages ('Missing RESEND_API_KEY environment variable', 'Missing RESEND_FROM_EMAIL environment variable'), identical never-silent-failure contract, client constructed once per sender address. This is the only adjustment to a completed-task file beyond additive wiring, documented here honestly.
 
 RESULT:
+Implementation complete. Suite: 192/192 PASSED across 12 files (+18 tests). typecheck/lint/format:check/build all PASSED (build verified specifically after the resend lazy-validation fix).
 
 FILES ACTUALLY CHANGED:
+- src/lib/outbid-notification.ts (new)
+- src/lib/outbid-notification.test.ts (new, 10 tests)
+- src/lib/stripe-webhook.ts (deliverOutbidNotification wrapper + converted-only dispatch)
+- src/lib/stripe-webhook.test.ts (+8 dispatch tests, boundary mock)
+- src/lib/stripe-webhook-signature.test.ts (+boundary mock)
+- src/lib/resend.ts (lazy validation/memoized client)
+- src/lib/resend.test.ts (rewritten for lazy contract, same error assertions)
+- docs/6.4.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 192/192 PASSED across 12 files
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live email delivery through Resend / live webhook against Stripe+Supabase: SKIPPED - requires real credentials/domain setup; NOT faked. All boundaries mocked at module level exactly like Tasks 4.x/6.2 suites.
 
 KNOWN ISSUES:
+- Email delivery is best-effort at this stage: a provider failure after conversion logs a warning and the email is not retried (retry/failure handling is Task 6.7 per plan decomposition)
+- Notification runs synchronously within the webhook request (two RLS queries + one provider call); acceptable for MVP, no queue invented per scope rules
+- RESEND_API_KEY/RESEND_FROM_EMAIL values remain pending owner setup (.env.example documents both)
 
 FOLLOW-UP:
+Task 6.5 - Bid-again link in email

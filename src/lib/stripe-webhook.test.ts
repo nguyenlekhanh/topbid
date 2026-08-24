@@ -69,6 +69,14 @@ vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: () => supabaseMock.makeFakeClient(),
 }));
 
+const outbidMock = vi.hoisted(() => ({
+  sendOutbidNotification: vi.fn(),
+}));
+
+vi.mock('@/lib/outbid-notification', () => ({
+  sendOutbidNotification: outbidMock.sendOutbidNotification,
+}));
+
 vi.mock('@/lib/stripe', () => ({
   stripe: {
     webhooks: {
@@ -112,6 +120,12 @@ beforeEach(() => {
     payment_intent: 'pi_test_123',
   });
   stripeMock.retrieveCharge.mockReset();
+  outbidMock.sendOutbidNotification.mockReset();
+  outbidMock.sendOutbidNotification.mockResolvedValue({
+    notified: true,
+    recipient: 'prev@example.com',
+    messageId: 'email-1',
+  });
   supabaseMock.state.queue.length = 0;
   supabaseMock.state.calls.length = 0;
   vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -685,5 +699,129 @@ describe('refund handling (Task 4.11)', () => {
 
     expect(result.status).toBe(500);
     expect(result.body).toEqual({ error: 'Webhook processing failed' });
+  });
+});
+
+describe('outbid notification dispatch (Task 6.4)', () => {
+  it('dispatches the notification exactly once after a first-time conversion', async () => {
+    enqueueConversionOutcome('converted');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(outbidMock.sendOutbidNotification).toHaveBeenCalledTimes(1);
+    expect(outbidMock.sendOutbidNotification).toHaveBeenCalledWith('cs_test_abc');
+  });
+
+  it('never dispatches on ledger-reported duplicates (replay-safe by construction)', async () => {
+    enqueueConversionOutcome('duplicate');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not re-dispatch when the bid was already paid by an earlier delivery', async () => {
+    enqueueConversionOutcome('already_paid');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch for unverified sessions', async () => {
+    stripeMock.retrieveSession.mockResolvedValue({
+      id: 'cs_test_abc',
+      payment_status: 'unpaid',
+      client_reference_id: 'bid-1000',
+      metadata: { bid_id: 'bid-1000' },
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch for payment-failure events', async () => {
+    stripeMock.constructEvent.mockReturnValue({
+      id: 'evt_fail_9',
+      type: 'checkout.session.async_payment_failed',
+      data: {
+        object: {
+          id: 'cs_test_abc',
+          client_reference_id: 'bid-1000',
+          metadata: { bid_id: 'bid-1000' },
+        },
+      },
+    });
+    stripeMock.retrieveSession.mockResolvedValue({
+      id: 'cs_test_abc',
+      payment_status: 'unpaid',
+      client_reference_id: 'bid-1000',
+      metadata: { bid_id: 'bid-1000' },
+    });
+    supabaseMock.state.queue.push({ data: 'failed', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch for refund events', async () => {
+    stripeMock.constructEvent.mockReturnValue({
+      id: 'evt_ref_9',
+      type: 'charge.refunded',
+      data: {
+        object: { id: 'ch_test_1', payment_intent: 'pi_test_123', refunded: true },
+      },
+    });
+    stripeMock.retrieveCharge.mockResolvedValue({
+      id: 'ch_test_1',
+      refunded: true,
+      payment_intent: 'pi_test_123',
+    });
+    supabaseMock.state.queue.push({ data: 'refunded', error: null });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(outbidMock.sendOutbidNotification).not.toHaveBeenCalled();
+  });
+
+  it('keeps the payment response successful when the email provider fails', async () => {
+    enqueueConversionOutcome('converted');
+    outbidMock.sendOutbidNotification.mockRejectedValue(
+      new Error('Failed to send email: provider down')
+    );
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ received: 'true' });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('outbid notification failed'),
+      expect.any(String)
+    );
+  });
+
+  it('logs skipped notifications without failing the delivery', async () => {
+    enqueueConversionOutcome('converted');
+    outbidMock.sendOutbidNotification.mockResolvedValue({
+      notified: false,
+      reason: 'no_previous_bidder',
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(console.info).toHaveBeenCalledWith(
+      expect.stringContaining('outbid notification skipped'),
+      expect.any(String)
+    );
   });
 });

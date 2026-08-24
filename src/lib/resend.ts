@@ -1,30 +1,46 @@
 import { Resend } from 'resend';
 
 /**
- * Server-only Resend email integration (Task 6.2).
+ * Server-only Resend email integration (Task 6.2, adjusted by Task 6.4).
  *
  * - RESEND_API_KEY and RESEND_FROM_EMAIL are server-only environment variables (no
  *   NEXT_PUBLIC_ prefix); this module must never be imported by client code
- * - Configuration is validated eagerly at module load with descriptive errors - a
- *   misconfigured email provider must fail loudly at boot, never silently pretend an
- *   email was sent mid-request
- * - Task 6.3 (templates) and Task 6.4 (outbid notification flow) will compose on top of
- *   the sendEmail boundary; no notification business logic lives here
+ * - Configuration is validated with descriptive errors on first use (lazily memoized
+ *   client) - a misconfigured provider fails loudly at send time and NEVER silently
+ *   pretends an email was delivered. Validation deliberately happens at use rather
+ *   than module load: Next.js evaluates API route modules while collecting build/page
+ *   data, so a module-scope throw would break every production build on machines or
+ *   previews where email is not configured yet (surfaced when Task 6.4 wired the
+ *   webhook route to the notification flow)
+ * - Task 6.3 (templates) and Task 6.4 (outbid notification flow) compose on top of the
+ *   sendEmail boundary; no notification business logic lives here
  */
 
-if (!process.env.RESEND_API_KEY || !process.env.RESEND_API_KEY.trim()) {
-  throw new Error('Missing RESEND_API_KEY environment variable');
+let cachedClient: Resend | null = null;
+let cachedFromAddress: string | null = null;
+
+function ensureConfigured(): { client: Resend; fromAddress: string } {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error('Missing RESEND_API_KEY environment variable');
+  }
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL;
+
+  if (!fromAddress || !fromAddress.trim()) {
+    throw new Error('Missing RESEND_FROM_EMAIL environment variable');
+  }
+
+  const trimmedFrom = fromAddress.trim();
+
+  if (!cachedClient || cachedFromAddress !== trimmedFrom) {
+    cachedClient = new Resend(apiKey);
+    cachedFromAddress = trimmedFrom;
+  }
+
+  return { client: cachedClient, fromAddress: trimmedFrom };
 }
-
-const apiKey = process.env.RESEND_API_KEY;
-
-if (!process.env.RESEND_FROM_EMAIL || !process.env.RESEND_FROM_EMAIL.trim()) {
-  throw new Error('Missing RESEND_FROM_EMAIL environment variable');
-}
-
-const fromAddress = process.env.RESEND_FROM_EMAIL.trim();
-
-export const resend = new Resend(apiKey);
 
 export type SendEmailParams = {
   to: string;
@@ -43,7 +59,9 @@ export type SentEmail = {
  * delivered one.
  */
 export async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<SentEmail> {
-  const { data, error } = await resend.emails.send({
+  const { client, fromAddress } = ensureConfigured();
+
+  const { data, error } = await client.emails.send({
     from: fromAddress,
     to,
     subject,

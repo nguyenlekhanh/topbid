@@ -73,6 +73,21 @@ vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: () => supabaseMock.makeFakeClient(),
 }));
 
+// Task 6.4: the notification boundary is mocked so converted flows in this real-crypto
+// suite stay isolated from database/email access - signature properties are what is
+// under test here.
+const outbidMock = vi.hoisted(() => ({
+  sendOutbidNotification: vi.fn().mockResolvedValue({
+    notified: true,
+    recipient: 'prev@example.com',
+    messageId: 'email-real-sig',
+  }),
+}));
+
+vi.mock('@/lib/outbid-notification', () => ({
+  sendOutbidNotification: outbidMock.sendOutbidNotification,
+}));
+
 let processStripeWebhook: typeof import('./stripe-webhook').processStripeWebhook;
 let STRIPE_WEBHOOK_TOLERANCE_SECONDS: number;
 
