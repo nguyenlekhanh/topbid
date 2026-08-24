@@ -2557,7 +2557,28 @@ This file records what has actually been built, not what was planned.
   - Payment identifiers exposed to authenticated admins only (required for cross-referencing); personal fields excluded wholesale as irrelevant to payment oversight
   - Pure read = naturally repeatable/idempotent; no queues/retries/schedulers introduced
 - **Known limitations**: fixed 100-record window; full identifier strings visible in truncated cells to admins only (never on public surfaces)
-- **Follow-up work**: Task 8.6 - Refund action
+- **Follow-up work**: Task 8.7 - Fraud/banned email management
+
+---
+
+### Task 8.6
+
+- **Date**: 2026-08-24
+- **Objective**: Let authorized administrators issue full Stripe refunds for PAID payments, transitioning bids to refunded exclusively through the authoritative Task 4.11 ledger+transition RPC
+- **Status**: Completed
+- **Audit finding (Phase-4 defect fixed)**: refund_paid_bid referenced undeclared p_payment_intent_id in its WHERE clause (declared parameter: p_stripe_payment_intent_id), so every runtime invocation errored - latent because unit tests mocked Supabase and the integration suite skips without credentials. Migration 20260823000019 re-issues the function with the corrected reference; signature/locking/state machine/idempotency/grants unchanged
+- **What was implemented**:
+  - src/lib/admin-refunds.ts (server-only): initiateAdminRefund - guard first; strict-UUID bid lookup requiring paid status + persisted PaymentIntent + amount > 0; stripe.refunds.create through the existing server-only Stripe client with per-bid idempotency key admin-refund-<bidId>; then refund_paid_bid ledger claim + row-locked transition keyed event_id = Stripe refund id / event_type admin.refund; non-terminal Stripe statuses report refund_submitted and defer to the charge.refunded webhook
+  - POST /api/admin/payments/refund: accepts JSON or form bid_id; redirects 303 back to /admin/payments with stable result/error flags; unauthorized redirects to login
+  - src/app/admin/payments/page.tsx: per-row Refund buttons rendered ONLY for status=paid rows with a PaymentIntent, plus result/error banner mapping
+- **Files changed**: migration 20260823000019; src/lib/admin-refunds.ts + test (19 tests); src/app/api/admin/payments/refund/route.ts + route.test.ts (11 tests); src/app/admin/payments/page.tsx; docs/8.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 521/521 across 30 files (+30 net); typecheck/lint/format:check/build all PASSED (/api/admin/payments/refund registered dynamic)
+- **Important technical decisions**:
+  - Stripe refunded FIRST via the existing server-only client with idempotency key admin-refund-<bidId>: double-clicks/retries resolve to the SAME Stripe refund; only then does the authoritative ledger+transition RPC run, so no parallel state machine and no direct bid-row writes exist anywhere
+  - Webhook races converge: the later charge.refunded resolves already_refunded/duplicate as no-ops against the row lock and ledger PK
+  - Provider failure records nothing locally (money has not moved); RPC failure after provider success honestly reports db_pending - retry-safe because the idempotency key and ledger duplicate no-op converge, and the webhook reconciles independently
+- **Known limitations**: db_pending outcomes rely on endpoint retry or webhook reconciliation - alerting recommended; payments without a persisted PaymentIntent cannot be refunded by design
+- **Follow-up work**: Task 8.7 - Fraud/banned email management
 
 ---
 

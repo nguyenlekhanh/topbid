@@ -27,17 +27,41 @@ const STATUS_STYLES: Record<AdminPaymentStatus, string> = {
 
 const STATUS_ORDER: AdminPaymentStatus[] = ['paid', 'pending', 'failed', 'refunded'];
 
+const RESULT_MESSAGES: Record<string, string> = {
+  refunded: 'Refund completed.',
+  already_refunded: 'This payment was already refunded.',
+  refund_submitted: 'Refund submitted - Stripe will confirm via webhook shortly.',
+};
+
+const ERROR_MESSAGES: Record<string, string> = {
+  unauthorized: 'You are not authorized to issue refunds.',
+  invalid_bid_id: 'Invalid refund target.',
+  not_found: 'The targeted payment no longer exists.',
+  not_refundable: 'Only paid payments can be refunded.',
+  missing_payment_intent: 'This payment has no Stripe PaymentIntent to refund.',
+  provider_failed: 'Stripe rejected the refund. No money has moved - please retry later.',
+  db_pending:
+    'The refund succeeded on Stripe but local confirmation failed; it will reconcile automatically via webhook. Do not retry immediately.',
+};
+
 /**
- * Payment management (Task 8.5) - deliberately READ-ONLY.
+ * Payment management (Task 8.5) with the admin refund action (Task 8.6) -
+ * deliberately READ-ONLY except for refunds.
  *
- * Refund initiation is Task 8.6; until it lands, this view provides the payment
- * oversight half of the capability: authoritative status, amounts, timestamps, and
- * the Stripe identifiers administrators need to cross-reference the Stripe dashboard.
- *
- * Payment state itself changes only through verified webhook transactions
- * (Tasks 4.8-4.11); no admin mutation path exists on this page.
+ * Refunds are initiated server-side: Stripe is refunded FIRST through the existing
+ * server-only client (per-bid idempotency key), and bid state changes only through
+ * the authoritative Task 4.11 ledger+transition RPC (or the matching charge.refunded
+ * webhook). No direct bid-row mutation exists on this surface.
  */
-export default async function AdminPaymentsPage() {
+export default async function AdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedParams = await searchParams;
+  const result = typeof resolvedParams.result === 'string' ? resolvedParams.result : null;
+  const error = typeof resolvedParams.error === 'string' ? resolvedParams.error : null;
+
   const listing = await listPaymentsForAdmin();
 
   if (!listing.ok) {
@@ -72,6 +96,21 @@ export default async function AdminPaymentsPage() {
             Back to dashboard
           </Link>
         </div>
+
+        {(result || error) && (
+          <p
+            role="status"
+            className={`mt-6 rounded-lg border px-4 py-3 text-sm ${
+              error
+                ? 'border-destructive/20 bg-destructive/5 text-destructive'
+                : 'border-success/20 bg-success/5 text-foreground'
+            }`}
+          >
+            {error
+              ? (ERROR_MESSAGES[error] ?? 'Something went wrong. Please try again.')
+              : (RESULT_MESSAGES[result!] ?? 'Done.')}
+          </p>
+        )}
 
         <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {STATUS_ORDER.map((status) => (
@@ -116,6 +155,9 @@ export default async function AdminPaymentsPage() {
                     <th scope="col" className="py-2 font-medium">
                       Paid at
                     </th>
+                    <th scope="col" className="py-2 pl-4 font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -156,6 +198,21 @@ export default async function AdminPaymentsPage() {
                               timeStyle: 'short',
                             })
                           : '—'}
+                      </td>
+                      <td className="py-2.5 pl-4">
+                        {payment.status === 'paid' && payment.stripePaymentIntentId ? (
+                          <form action="/api/admin/payments/refund" method="post">
+                            <input type="hidden" name="bid_id" value={payment.bidId} />
+                            <button
+                              type="submit"
+                              className="inline-flex min-h-9 items-center rounded-lg border border-destructive/40 bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                              Refund
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

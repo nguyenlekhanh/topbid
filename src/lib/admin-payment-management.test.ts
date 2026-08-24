@@ -78,6 +78,7 @@ function enqueue(...results: FakeResult[]) {
 }
 
 const FULL_ROW = {
+  id: 'bid-internal-1',
   created_at: '2026-02-01T00:00:00Z',
   amount: 125000,
   status: 'paid',
@@ -115,11 +116,12 @@ describe('listPaymentsForAdmin', () => {
     // Payment-management identifiers are explicitly required by this task:
     expect(selectedColumns).toContain('stripe_session_id');
     expect(selectedColumns).toContain('stripe_payment_intent_id');
+    // The bid id is the operational key for the refund action:
+    expect(selectedColumns).toContain('id');
 
     // Personal / non-payment fields are excluded at the query level:
     expect(selectedColumns).not.toContain('bidder_email');
     expect(selectedColumns).not.toContain('bidder_name');
-    expect(selectedColumns).not.toContain('id');
   });
 
   it('orders newest-first within the bounded 100-record window', async () => {
@@ -137,10 +139,10 @@ describe('listPaymentsForAdmin', () => {
       data: [
         {
           ...FULL_ROW,
-          // Over-provisioned response: must be stripped even if ever returned.
+          // Over-provisioned response: personal fields must be stripped even if ever
+          // returned; the bid id IS intentionally mapped as the operational key.
           bidder_email: 'winner@example.com',
           bidder_name: 'Winner',
-          id: 'internal-bid-id',
         },
       ],
       error: null,
@@ -153,6 +155,7 @@ describe('listPaymentsForAdmin', () => {
     if (result.ok) {
       expect(result.overview.payments).toEqual([
         {
+          bidId: 'bid-internal-1',
           categoryName: 'Art & Collectibles',
           amountCents: 125000,
           status: 'paid',
@@ -166,7 +169,6 @@ describe('listPaymentsForAdmin', () => {
       const serialized = JSON.stringify(result.overview.payments);
       expect(serialized).not.toContain('winner@example.com');
       expect(serialized).not.toContain('"Winner"');
-      expect(serialized).not.toContain('internal-bid-id');
     }
   });
 

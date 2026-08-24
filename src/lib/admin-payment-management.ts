@@ -25,6 +25,8 @@ import { getAdminAuthorization } from '@/lib/admin-auth';
 export type AdminPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 export type AdminPaymentRow = {
+  /** Operational key required by the Task 8.6 refund action (hidden form field). */
+  bidId: string;
   categoryName: string | null;
   amountCents: number;
   status: AdminPaymentStatus;
@@ -70,7 +72,7 @@ export async function listPaymentsForAdmin(): Promise<
   const { data, error } = await supabase
     .from('bids')
     .select(
-      'created_at, amount, status, paid_at, stripe_session_id, stripe_payment_intent_id, categories ( name )'
+      'id, created_at, amount, status, paid_at, stripe_session_id, stripe_payment_intent_id, categories ( name )'
     )
     .order('created_at', { ascending: false })
     .limit(PAYMENT_WINDOW_LIMIT);
@@ -82,6 +84,7 @@ export async function listPaymentsForAdmin(): Promise<
   }
 
   type RawRow = {
+    id: string;
     created_at: string;
     amount: number;
     status: string;
@@ -99,6 +102,7 @@ export async function listPaymentsForAdmin(): Promise<
     counts[status] += 1;
 
     return {
+      bidId: row.id,
       categoryName: row.categories?.name ?? null,
       amountCents: row.amount,
       status,

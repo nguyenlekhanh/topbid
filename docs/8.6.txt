@@ -1,32 +1,54 @@
 ﻿TASK ID: 8.6
 PHASE: 8
 TITLE: Refund action
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Let authorized administrators issue a full Stripe refund for a PAID payment, with the bid transitioning to 'refunded' exclusively through the authoritative Task 4.11 ledger+transition RPC - no parallel state machine, no direct bid-row writes.
 
-SCOPE:
+AUDIT FINDING (concrete Phase-4 defect fixed):
+Migration 20260823000013's refund_paid_bid referenced p_payment_intent_id in its WHERE clause while the declared parameter is p_stripe_payment_intent_id - an undeclared identifier that PL/pgSQL resolves at runtime, so EVERY invocation raised 'column does not exist' (latent: unit tests mocked Supabase; integration skips without credentials). Migration 20260823000019 re-issues the function with the corrected reference; signature, locking, state machine, ledger idempotency, and grants unchanged.
 
-OUT OF SCOPE:
+SAFE ORDER OF OPERATIONS (src/lib/admin-refunds.ts initiateAdminRefund):
+1. getAdminAuthorization() - fail closed before any privileged call
+2. Authoritative lookup by strict-UUID bid id: requires status='paid', amount>0, stripe_payment_intent_id present -> else not_found / not_refundable / missing_payment_intent
+3. stripe.refunds.create({payment_intent}, {idempotencyKey:'admin-refund-<bidId>'}) via the EXISTING server-only Stripe client - full remaining refund; the key makes double-clicks/retries resolve to the SAME refund
+4. On status='succeeded': refund_paid_bid(p_event_id=refundId, p_event_type='admin.refund', p_stripe_payment_intent_id) - the Task 4.11 authoritative transition (ledger claim + row-locked paid->refunded). Non-terminal statuses return outcome 'refund_submitted' and let the charge.refunded webhook finalize.
 
-INPUTS / DEPENDENCIES:
+IDEMPOTENCY SCENARIOS:
+A. Double-click: identical Stripe idempotency key returns the SAME refund; both requests converge on one ledger claim (second sees duplicate/already_refunded no-op)
+B. HTTP retry: same as A
+C. Stripe succeeds, response lost: retry reuses key -> same refund returned; transition is already_refunded/duplicate no-op
+D. Stripe 'already refunded' error: mapped to provider_failed? NO - create() errors are caught; an already-refunded condition surfaces via the DB state machine as already_refunded
+E. DB transition fails after provider success: honestly reported as {ok:false, reason:'db_pending'} + loud log - money HAS moved; retrying is SAFE (key + ledger converge) and the charge.refunded webhook reconciles independently
+F/G. Webhook before/after admin operation: both orders serialize on the bid row lock; second transition resolves already_refunded/duplicate no-op
+H. Two admins concurrently: same convergence via row lock + ledger PK
 
-IMPLEMENTATION REQUIREMENTS:
+RESULT CONTRACT:
+{ok:true, outcome:'refunded'|'already_refunded'|'refund_submitted', refundId} |
+{ok:false, reason:'unauthorized'|'invalid_bid_id'|'not_found'|'not_refundable'|'missing_payment_intent'|'provider_failed'|'db_pending'}
+Provider failure NEVER records local state; db_pending NEVER claims success; unauthorized never touches Stripe or DB.
 
-FILES EXPECTED TO CHANGE:
+ENDPOINT/UI:
+POST /api/admin/payments/refund accepts JSON or form {bid_id}; redirects 303 back to /admin/payments (?result=... | ?error=<reason>; unauthorized -> /admin/login). Payments page adds per-row Refund buttons ONLY for status='paid' rows with a PaymentIntent (server enforces everything regardless), plus result/error banner mapping.
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- supabase/migrations/20260823000019_fix_refund_paid_bid_parameter.sql (new)
+- src/lib/admin-refunds.ts + test (new, 19 tests)
+- src/app/api/admin/payments/refund/route.ts + route.test.ts (new, 11 tests)
+- src/app/admin/payments/page.tsx (refund forms + banners)
+- docs/8.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 521/521 PASSED across 30 files (+30 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/api/admin/payments/refund registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO partial refunds, NO 8.7 fraud/banned-email tools, NO audit logging beyond the existing processed_webhook_events ledger, NO analytics, NO queues/workers/schedulers/retry tables, NO new payment state model, NO changes to bidding/webhook/email/share/category flows beyond the documented parameter-fix migration.
 
 KNOWN ISSUES:
+- db_pending outcomes require either endpoint retry (safe) or automatic webhook reconciliation; monitoring should alert on them.
+- Refund of payments whose PI is missing (legacy/manual rows) is impossible by design (nothing to refund on Stripe).
 
 FOLLOW-UP:
+Task 8.7 - Fraud/banned email management
