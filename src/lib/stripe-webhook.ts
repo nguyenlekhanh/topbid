@@ -1,3 +1,4 @@
+import { createServiceClient } from '@/lib/supabase-service';
 import { stripe } from '@/lib/stripe';
 
 /**
@@ -29,7 +30,12 @@ export type PaymentVerificationFailureReason =
   'missing_bid_reference' | 'session_not_paid' | 'reference_mismatch';
 
 export type PaymentVerificationResult =
-  | { verified: true; sessionId: string; bidReference: string }
+  | {
+      verified: true;
+      sessionId: string;
+      bidReference: string;
+      paymentIntentId: string | null;
+    }
   | { verified: false; reason: PaymentVerificationFailureReason; sessionId: string };
 
 /**
@@ -90,7 +96,53 @@ export async function verifyCheckoutSessionPaid(
     verified: true,
     sessionId: session.id,
     bidReference: clientReferenceId ?? metadataBidId!,
+    // The SDK types payment_intent as string | PaymentIntent | null (expandable);
+    // we never expand it, and only the identifier string is ever persisted.
+    paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null,
   };
+}
+
+export type ConversionOutcome =
+  'converted' | 'already_paid' | 'bid_not_found' | 'invalid_state' | 'session_mismatch';
+
+const KNOWN_CONVERSION_OUTCOMES: readonly ConversionOutcome[] = [
+  'converted',
+  'already_paid',
+  'bid_not_found',
+  'invalid_state',
+  'session_mismatch',
+];
+
+/**
+ * Apply the verified conversion at the database boundary (Task 4.8).
+ * - Delegates to the convert_pending_bid_to_paid RPC (row-locked, attach-once session
+ *   completion, typed outcomes) - never a check-then-update from application code
+ * - RPC errors throw so the endpoint responds 500 and Stripe retries
+ */
+async function convertVerifiedBid(
+  bidId: string,
+  sessionId: string,
+  paymentIntentId: string | null
+): Promise<ConversionOutcome> {
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase.rpc('convert_pending_bid_to_paid', {
+    p_bid_id: bidId,
+    p_stripe_session_id: sessionId,
+    p_stripe_payment_intent_id: paymentIntentId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to convert bid to paid: ${error.message}`);
+  }
+
+  const outcome = data as ConversionOutcome;
+
+  if (!KNOWN_CONVERSION_OUTCOMES.includes(outcome)) {
+    throw new Error(`Failed to convert bid to paid: unknown outcome "${String(data)}"`);
+  }
+
+  return outcome;
 }
 
 /**
@@ -131,8 +183,6 @@ function extractSessionReferences(event: StripeLikeEvent): {
 async function handleCheckoutSessionCompleted(event: StripeLikeEvent): Promise<void> {
   // Task 4.7: the event body only identifies WHICH session to inspect - authoritative
   // payment state comes from Stripe's server-side API via verifyCheckoutSessionPaid.
-  // Task 4.5 boundary still holds: no bid rows are read or written here; conversion to
-  // 'paid' belongs to Task 4.8.
   const references = extractSessionReferences(event);
   const verification = await verifyCheckoutSessionPaid(references.sessionId);
 
@@ -149,15 +199,30 @@ async function handleCheckoutSessionCompleted(event: StripeLikeEvent): Promise<v
     return;
   }
 
-  console.info(
-    '[stripe-webhook] checkout.session.completed payment VERIFIED',
-    JSON.stringify({
-      eventId: event.id ?? 'unknown',
-      sessionId: verification.sessionId,
-      bidReference: verification.bidReference,
-      clientReferenceId: references.clientReferenceId,
-    })
+  // Task 4.8: apply the verified conversion atomically at the database boundary.
+  const outcome = await convertVerifiedBid(
+    verification.bidReference,
+    verification.sessionId,
+    verification.paymentIntentId
   );
+
+  if (outcome === 'converted' || outcome === 'already_paid') {
+    console.info(
+      '[stripe-webhook] checkout.session.completed bid conversion settled',
+      JSON.stringify({
+        eventId: event.id ?? 'unknown',
+        sessionId: verification.sessionId,
+        bidReference: verification.bidReference,
+        outcome,
+      })
+    );
+
+    return;
+  }
+
+  // Anomalies (missing row, non-pending state, session mismatch) are loud failures so
+  // Stripe retries and monitoring surfaces them.
+  throw new Error(`Bid conversion failed with outcome "${outcome}"`);
 }
 
 export async function processStripeWebhook(

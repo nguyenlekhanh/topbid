@@ -19,6 +19,60 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 const SECRET = 'whsec_real_signature_tests';
 
+// Task 4.8: conversion writes go through the service-role client - faked here so the
+// real-crypto suite stays free of database access.
+const supabaseMock = vi.hoisted(() => {
+  type FakeResult = { data: unknown; error: { message: string } | null };
+
+  const state = { queue: [] as FakeResult[] };
+
+  function makeFakeBuilder() {
+    const builder: unknown = new Proxy(
+      {},
+      {
+        get(_target: unknown, property: string | symbol) {
+          if (typeof property !== 'string') {
+            return undefined;
+          }
+          if (property === 'then') {
+            return (resolve: (value: FakeResult) => void) => {
+              void Promise.resolve().then(() => {
+                resolve(state.queue.shift() ?? { data: null, error: null });
+              });
+            };
+          }
+          return builder;
+        },
+      }
+    );
+    return builder;
+  }
+
+  function makeFakeClient() {
+    const client: unknown = new Proxy(
+      {},
+      {
+        get(_target: unknown, property: string | symbol) {
+          if (typeof property !== 'string') {
+            return undefined;
+          }
+          if (property === 'then') {
+            return undefined;
+          }
+          return () => makeFakeBuilder();
+        },
+      }
+    );
+    return client;
+  }
+
+  return { state, makeFakeClient };
+});
+
+vi.mock('@/lib/supabase-service', () => ({
+  createServiceClient: () => supabaseMock.makeFakeClient(),
+}));
+
 let processStripeWebhook: typeof import('./stripe-webhook').processStripeWebhook;
 let STRIPE_WEBHOOK_TOLERANCE_SECONDS: number;
 
@@ -28,10 +82,11 @@ beforeAll(async () => {
   vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_placeholder_for_module_import');
   vi.stubEnv('STRIPE_WEBHOOK_SECRET', SECRET);
 
+  supabaseMock.state.queue.push({ data: 'converted', error: null });
+
   const webhookLib = await import('./stripe-webhook');
   processStripeWebhook = webhookLib.processStripeWebhook;
   STRIPE_WEBHOOK_TOLERANCE_SECONDS = webhookLib.STRIPE_WEBHOOK_TOLERANCE_SECONDS;
-
   // constructEvent above runs GENUINELY (real signature crypto), while the outbound
   // Checkout Session retrieval introduced by Task 4.7 is a network boundary - mocked
   // here so signature properties stay isolated from API availability.
@@ -85,6 +140,8 @@ const TAMPERED_PAYLOAD = JSON.stringify({
 
 describe('processStripeWebhook signature verification (real Stripe crypto)', () => {
   it('accepts a correctly signed payload delivered within the replay window', async () => {
+    supabaseMock.state.queue.push({ data: 'converted', error: null });
+
     const header = signPayload(VALID_PAYLOAD, currentTimestamp());
 
     const result = await processStripeWebhook(VALID_PAYLOAD, header);
@@ -129,6 +186,8 @@ describe('processStripeWebhook signature verification (real Stripe crypto)', () 
   });
 
   it('still accepts timestamps inside the tolerance window', async () => {
+    supabaseMock.state.queue.push({ data: 'converted', error: null });
+
     const recentTimestamp = currentTimestamp() - (STRIPE_WEBHOOK_TOLERANCE_SECONDS - 30);
     const header = signPayload(VALID_PAYLOAD, recentTimestamp);
 

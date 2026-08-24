@@ -1573,6 +1573,41 @@ This file records what has actually been built, not what was planned.
 - **Known limitations**: None within scope
 - **Follow-up work**: Task 4.8 — Convert pending bid to paid
 
+### Task 4.8
+
+- **Date**: 2026-08-23
+- **Objective**: Apply the verified pending->paid conversion atomically at the database boundary after Tasks 4.6/4.7 pass, with retry-safe idempotency keyed on bid+session identity
+- **Status**: Completed
+- **Requirement derivation (from plan/schema, not guessed)**:
+  - Fields changed: status 'pending'->'paid'; paid_at=now(); stripe_payment_intent_id from the retrieved session (id string only — SDK types it expandable, never expanded); stripe_session_id completed ONLY when still NULL (Task 4.2 crash window), a different existing value rejects
+  - is_highest deliberately NOT set: the plan assigns it no role in Task 4.8 and all ranking queries derive order dynamically from amount/status
+  - Outcomes: 'converted' | 'already_paid' (same bid+session replay -> success/no-op; natural idempotency, distinct from Task 4.9's ledger) | 'bid_not_found' | 'invalid_state' | 'session_mismatch'
+- **What was implemented**:
+  - Migration 20260823000010_convert_pending_bid_function.sql: convert_pending_bid_to_paid(p_bid_id, p_stripe_session_id, p_stripe_payment_intent_id) returns text — SELECT ... FOR UPDATE row lock, outcome branching, single UPDATE; SECURITY DEFINER + pinned search_path; EXECUTE service_role only
+  - src/lib/stripe-webhook.ts: PaymentVerificationResult.verified gains paymentIntentId (string-only extraction from the expandable union); convertVerifiedBid() calls the RPC via the existing service-role client and validates the outcome set; handler converts after verification — converted/already_paid answered 200, anomaly outcomes throw -> 500 so Stripe retries and monitoring alerts
+- **Files changed**:
+  - supabase/migrations/20260823000010_convert_pending_bid_function.sql (new)
+  - src/lib/stripe-webhook.ts (conversion wiring + additive verification field)
+  - src/lib/stripe-webhook.test.ts (+6 tests, Supabase fake, queue accounting for converting paths)
+  - src/lib/stripe-webhook-signature.test.ts (service fake so valid-signature paths complete end-to-end)
+  - docs/4.8.txt (updated)
+  - docs/PROJECT_PROGRESS.md (updated; also fixed the stale Next Recommended section left by the previous turn)
+  - docs/PROJECT_RESULT.md (updated)
+- **Tests performed**:
+  - `npm run test`: 87/87 PASSED across 4 files (43 bids + 8 checkout + 28 webhook + 8 real-crypto signature)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+  - Static SQL inspection: PASSED (session-mismatch/attach-once semantics, outcome set validation, grant signature match, no category-lock interaction with Task 3.6)
+  - Live webhook-to-database flow: SKIPPED — Stripe CLI/test keys and local Supabase Docker unavailable; NOT faked; live check documented for Task 4.12
+- **Important technical decisions**:
+  - Idempotency via bid+session identity at the DB boundary (already_paid success/no-op) instead of an early event-id ledger
+  - TypeScript surfaced session.payment_intent's expandable union type — string-only extraction added defensively
+  - Test-side fixes during development: signature-suite fake client was missing its method-function wrapper ('supabase.rpc is not a function') and a shared queue entry caused cross-test consumption — both corrected without touching production logic
+- **Known limitations**: None within scope
+- **Follow-up work**: Task 4.9 — Idempotent webhook handling
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

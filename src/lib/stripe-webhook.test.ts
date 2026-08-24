@@ -7,6 +7,67 @@ const stripeMock = vi.hoisted(() => ({
   retrieveSession: vi.fn(),
 }));
 
+const supabaseMock = vi.hoisted(() => {
+  type FakeResult = { data: unknown; error: { message: string } | null };
+
+  const state = {
+    queue: [] as FakeResult[],
+    calls: [] as Array<{ method: string; args: unknown[] }>,
+  };
+
+  function makeFakeBuilder() {
+    const builder: unknown = new Proxy(
+      {},
+      {
+        get(_target: unknown, property: string | symbol) {
+          if (typeof property !== 'string') {
+            return undefined;
+          }
+          if (property === 'then') {
+            return (resolve: (value: FakeResult) => void) => {
+              void Promise.resolve().then(() => {
+                resolve(state.queue.shift() ?? { data: null, error: null });
+              });
+            };
+          }
+          return (...args: unknown[]) => {
+            state.calls.push({ method: property, args });
+            return builder;
+          };
+        },
+      }
+    );
+    return builder;
+  }
+
+  function makeFakeClient() {
+    const client: unknown = new Proxy(
+      {},
+      {
+        get(_target: unknown, property: string | symbol) {
+          if (typeof property !== 'string') {
+            return undefined;
+          }
+          if (property === 'then') {
+            return undefined;
+          }
+          return (...args: unknown[]) => {
+            state.calls.push({ method: property, args });
+            return makeFakeBuilder();
+          };
+        },
+      }
+    );
+    return client;
+  }
+
+  return { state, makeFakeClient };
+});
+
+vi.mock('@/lib/supabase-service', () => ({
+  createServiceClient: () => supabaseMock.makeFakeClient(),
+}));
+
 vi.mock('@/lib/stripe', () => ({
   stripe: {
     webhooks: {
@@ -44,11 +105,22 @@ beforeEach(() => {
     payment_status: 'paid',
     client_reference_id: 'bid-1000',
     metadata: { bid_id: 'bid-1000' },
+    payment_intent: 'pi_test_123',
   });
+  supabaseMock.state.queue.length = 0;
+  supabaseMock.state.calls.length = 0;
   vi.spyOn(console, 'info').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
+
+function enqueueConversionOutcome(outcome: string) {
+  supabaseMock.state.queue.push({ data: outcome, error: null });
+}
+
+function lastRpcCall(): { method: string; args: unknown[] } | undefined {
+  return [...supabaseMock.state.calls].reverse().find((call) => call.method === 'rpc') ?? undefined;
+}
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -57,6 +129,8 @@ afterEach(() => {
 
 describe('processStripeWebhook', () => {
   it('returns 200 received for a verified plan-required event', async () => {
+    enqueueConversionOutcome('converted');
+
     const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
     expect(result.status).toBe(200);
@@ -70,6 +144,8 @@ describe('processStripeWebhook', () => {
   });
 
   it('passes the raw payload to verification without parsing it first', async () => {
+    enqueueConversionOutcome('converted');
+
     await processStripeWebhook('{"weird":"but raw"}', VALID_SIGNATURE);
 
     expect(stripeMock.constructEvent).toHaveBeenCalledWith(
@@ -131,6 +207,9 @@ describe('processStripeWebhook', () => {
   });
 
   it('returns 200 for duplicate/replayed verified events with no side effects', async () => {
+    enqueueConversionOutcome('converted');
+    enqueueConversionOutcome('already_paid');
+
     const first = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
     const second = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
@@ -163,6 +242,7 @@ describe('verifyCheckoutSessionPaid (Task 4.7)', () => {
       verified: true,
       sessionId: 'cs_test_abc',
       bidReference: 'bid-1000',
+      paymentIntentId: 'pi_test_123',
     });
     expect(stripeMock.retrieveSession).toHaveBeenCalledWith('cs_test_abc');
   });
@@ -179,6 +259,7 @@ describe('verifyCheckoutSessionPaid (Task 4.7)', () => {
       verified: true,
       sessionId: 'cs_test_abc',
       bidReference: 'bid-1000',
+      paymentIntentId: null,
     });
   });
 
@@ -241,6 +322,8 @@ describe('verifyCheckoutSessionPaid (Task 4.7)', () => {
 
 describe('checkout.session.completed verification flow (Task 4.7)', () => {
   it('acknowledges verified events with 200 after successful status verification', async () => {
+    enqueueConversionOutcome('converted');
+
     const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
 
     expect(result.status).toBe(200);
@@ -264,6 +347,7 @@ describe('checkout.session.completed verification flow (Task 4.7)', () => {
       expect.stringContaining('NOT verified (session_not_paid)'),
       expect.any(String)
     );
+    expect(supabaseMock.state.calls).toHaveLength(0);
   });
 
   it('returns 500 when the authoritative session cannot be retrieved', async () => {
@@ -273,6 +357,7 @@ describe('checkout.session.completed verification flow (Task 4.7)', () => {
 
     expect(result.status).toBe(500);
     expect(result.body).toEqual({ error: 'Webhook processing failed' });
+    expect(supabaseMock.state.calls).toHaveLength(0);
   });
 
   it('does not consult Stripe for unsupported event types', async () => {
@@ -285,5 +370,59 @@ describe('checkout.session.completed verification flow (Task 4.7)', () => {
 
     expect(result.status).toBe(200);
     expect(stripeMock.retrieveSession).not.toHaveBeenCalled();
+    expect(supabaseMock.state.calls).toHaveLength(0);
+  });
+});
+
+describe('bid conversion (Task 4.8)', () => {
+  it('converts the linked pending bid via the RPC with authoritative values', async () => {
+    enqueueConversionOutcome('converted');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(lastRpcCall()?.args[0]).toBe('convert_pending_bid_to_paid');
+    expect(lastRpcCall()?.args[1]).toEqual({
+      p_bid_id: 'bid-1000',
+      p_stripe_session_id: 'cs_test_abc',
+      p_stripe_payment_intent_id: 'pi_test_123',
+    });
+  });
+
+  it('treats repeated confirmations of the same session as success without re-converting', async () => {
+    enqueueConversionOutcome('already_paid');
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(200);
+    expect(lastRpcCall()?.args[1]).toEqual({
+      p_bid_id: 'bid-1000',
+      p_stripe_session_id: 'cs_test_abc',
+      p_stripe_payment_intent_id: 'pi_test_123',
+    });
+  });
+
+  it.each(['bid_not_found', 'invalid_state', 'session_mismatch'])(
+    'returns 500 when conversion reports %p so Stripe retries',
+    async (outcome) => {
+      enqueueConversionOutcome(outcome);
+
+      const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+      expect(result.status).toBe(500);
+      expect(result.body).toEqual({ error: 'Webhook processing failed' });
+    }
+  );
+
+  it('returns 500 when the conversion RPC itself fails', async () => {
+    supabaseMock.state.queue.push({
+      data: null,
+      error: { message: 'database unavailable' },
+    });
+
+    const result = await processStripeWebhook('raw-payload', VALID_SIGNATURE);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: 'Webhook processing failed' });
   });
 });

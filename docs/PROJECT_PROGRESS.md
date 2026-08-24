@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**4.7 completed** — Next recommended: 4.8
+**4.8 completed** — Next recommended: 4.9
 
 ## Completed Tasks
 
@@ -60,6 +60,7 @@
 - 4.5: Stripe webhook endpoint ✓
 - 4.6: Verify webhook signature ✓
 - 4.7: Verify payment status ✓
+- 4.8: Convert pending bid to paid ✓
 
 ## Tasks in Progress
 
@@ -131,6 +132,7 @@ _None_
 - Stripe webhook endpoint created (src/lib/stripe-webhook.ts + src/app/api/webhooks/stripe/route.ts: raw-body signature verification against STRIPE_WEBHOOK_SECRET, checkout.session.completed acknowledged with linkage extraction, other events ignored, 400/500/200 semantics; conversion deferred to 4.8)
 - Webhook signature verification hardened (explicit 300s replay-window tolerance passed to constructEvent, blank signature/secret guards; new real-crypto test suite computing genuine HMAC signatures proves tamper rejection, wrong-secret rejection, staleness enforcement, and exact-raw-payload verification without live Stripe)
 - Payment status verification created (verifyCheckoutSessionPaid retrieves the Checkout Session from Stripe's server-side API by id and requires payment_status='paid' plus consistent client_reference_id/metadata.bid_id linkage; unverified sessions acknowledged without mutation; conversion deferred to 4.8)
+- Pending-to-paid conversion created (migration 20260823000010 adds convert_pending_bid_to_paid RPC: row-locked atomic transition setting status='paid', paid_at, stripe_payment_intent_id, completing NULL session linkage only; typed outcomes converted/already_paid/bid_not_found/invalid_state/session_mismatch with retry-safe idempotency via bid+session identity; EXECUTE restricted to service_role)
 
 ## Current Environment/Setup Status
 
@@ -148,7 +150,7 @@ _None_
 
 ## Next Recommended Task
 
-**4.7 — Verify payment status**
+**4.9 — Idempotent webhook handling**
 
 ## Notes
 
@@ -191,3 +193,5 @@ Task 4.5 completed successfully. Stripe webhook endpoint added (src/app/api/webh
 Task 4.6 completed successfully. Signature verification hardened: explicit 300s replay-window tolerance passed to constructEvent (a real bug where an options-object argument silently disabled staleness checks was caught by the new suite and fixed), blank signature/secret guards added; new real-crypto test suite proves tamper rejection, wrong-secret rejection, and replay-window enforcement against the genuine Stripe SDK; 70/70 tests passing.
 
 Task 4.7 completed successfully. verifyCheckoutSessionPaid added: after signature verification the Checkout Session is retrieved again from Stripe's server-side API and payment_status must be 'paid' with consistent client_reference_id/metadata.bid_id linkage; unverified sessions are acknowledged without any mutation; conversion deferred to Task 4.8; 81/81 tests passing.
+
+Task 4.8 completed successfully. Migration 20260823000010 adds convert_pending_bid_to_paid (row-locked, attach-once session completion, typed outcomes); the webhook handler applies the conversion after Task 4.7 verification with converted/already_paid answered 200 and anomalies answered 500 for retry; is_highest deliberately untouched; 87/87 tests passing.

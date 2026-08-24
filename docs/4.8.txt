@@ -1,32 +1,83 @@
 ﻿TASK ID: 4.8
 PHASE: 4
 TITLE: Convert pending bid to paid
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Apply the verified conversion at the database boundary: after Tasks 4.6 (signature) and 4.7 (authoritative payment_status='paid') pass, atomically convert the correct pending bid to paid - with retry-safe idempotency keyed on bid+session identity, and no invented state transitions.
+
+REQUIREMENT DERIVATION FROM PLAN/SCHEMA (not guessed):
+- Fields changed on success: status 'pending'->'paid'; paid_at = now(); stripe_payment_intent_id from the retrieved session (id string only - SDK types it expandable, never expanded); stripe_session_id completed ONLY when still NULL (Task 4.2 crash window), an existing DIFFERENT value rejects
+- is_highest deliberately NOT set here: the plan assigns it no role in Task 4.8 and every ranking query derives order dynamically from amount/status, so nothing depends on it
+- Outcomes: 'converted' | 'already_paid' (same bid+session replay of an applied confirmation -> success/no-op; natural idempotency distinct from Task 4.9's event-id ledger) | 'bid_not_found' | 'invalid_state' (failed/refunded anomalies) | 'session_mismatch'
+- Atomicity: row-locked PL/pgSQL RPC at the DB boundary - no application check-then-update; concurrent webhooks serialize on the bid row and re-read committed state, making double conversion impossible. Category-row locks from Task 3.6 are untouched (different table)
 
 SCOPE:
+- New migration supabase/migrations/20260823000010_convert_pending_bid_function.sql - convert_pending_bid_to_paid(p_bid_id uuid, p_stripe_session_id text, p_stripe_payment_intent_id text) returns text; SECURITY DEFINER + pinned search_path; EXECUTE revoked from public/anon/authenticated, granted ONLY to service_role
+- src/lib/stripe-webhook.ts - PaymentVerificationResult.verified branch gains paymentIntentId (string-only extraction); convertVerifiedBid() invokes the RPC via the existing service-role client and validates outcomes against the known set; handler applies conversion after verification and treats converted/already_paid as success while anomaly outcomes throw -> endpoint 500 so Stripe retries/monitoring alerts
+- Tests: boundary suite gains a Supabase fake (+6 tests); real-crypto signature suite gains the same service fake so its valid-signature paths complete end-to-end (+per-test queue entries)
 
 OUT OF SCOPE:
+- Event-id ledger/idempotency persistence (Task 4.9 - retries are handled by bid+session identity alone), outbid detection/notification (Phase 6), refunds/failures (4.10/4.11), leaderboard realtime (Phase 5)
 
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
+PRESERVED:
+- Tasks 4.5-4.7 signature/payment-status logic byte-for-byte except additive paymentIntentId field; Task 3.5-3.7 creation/concurrency/duplicate semantics untouched; RLS intact; secrets server-only; no new dependencies
 
 FILES EXPECTED TO CHANGE:
+- supabase/migrations/20260823000010_convert_pending_bid_function.sql (new)
+- src/lib/stripe-webhook.ts
+- src/lib/stripe-webhook.test.ts
+- src/lib/stripe-webhook-signature.test.ts
+- docs/4.8.txt
+- docs/PROJECT_PROGRESS.md
+- docs/PROJECT_RESULT.md
 
 TEST PLAN:
+1. npm run test (new suites + full regression)
+2. npm run typecheck
+3. npm run lint
+4. npm run format:check
+5. npm run build
+6. Static SQL inspection: attach-once/session-mismatch WHERE semantics, outcome set, grant signature match
 
 DEFINITION OF DONE:
+- Verified sessions convert exactly the linked pending bid once; replays succeed as no-ops; anomalies fail loudly; all repo checks green; no scope creep into 4.9+
+
+TEST COVERAGE (6 new tests + updated assertions):
+- converts the linked pending bid via RPC with exact authoritative args (bid id / session id / payment intent id)
+- repeated confirmation of same session ('already_paid') -> 200 success without re-conversion
+- each anomaly outcome ('bid_not_found','invalid_state','session_mismatch') -> 500 Webhook processing failed
+- conversion RPC failure -> 500
+- unverified/unpaid/retrieval-failure paths assert ZERO service-role calls (no mutation possible)
+- duplicate/replay regression now exercises converted->already_paid sequence with both 200
+- verifyCheckoutSessionPaid direct tests extended for paymentIntentId passthrough (string id; null when absent)
+- real-crypto signature suite completes full verified->converted path end-to-end
 
 IMPLEMENTATION NOTES:
+Development caught three issues pre-commit: (1) a stray 'exception' keyword in the migration would have broken parsing - removed; (2) an incorrect approach mutating the Stripe RESPONSE object's metadata was replaced with params-in-create (that was 4.2, noted here because the same discipline held); (3) TypeScript flagged session.payment_intent's expandable union type -> string-only extraction added defensively. The real-crypto suite initially exposed 'supabase.rpc is not a function' (incomplete fake-client proxy in that file) and a queue-accounting miss (one shared entry for two converting tests) - both fixed test-side only. Multiple Prettier auto-fixes applied via lint:fix.
 
 RESULT:
+Implementation complete. Suite: 87/87 PASSED across 4 files (43 bids + 8 checkout + 28 webhook + 8 real-crypto signature). typecheck/lint/format:check/build all PASSED. Static inspection confirmed attach-once/session-mismatch semantics, outcome validation, hardened privileges, and unchanged prior-task code.
 
 FILES ACTUALLY CHANGED:
+- supabase/migrations/20260823000010_convert_pending_bid_function.sql (new)
+- src/lib/stripe-webhook.ts (conversion wiring + additive verification field)
+- src/lib/stripe-webhook.test.ts (+6 tests, Supabase fake, queue entries)
+- src/lib/stripe-webhook-signature.test.ts (service fake for end-to-end valid-signature paths)
+- docs/4.8.txt (updated)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
 
 TESTS ACTUALLY RUN:
+- npm run test: 87/87 PASSED
+- npm run typecheck: PASSED
+- npm run lint: PASSED
+- npm run format:check: PASSED
+- npm run build: PASSED
+- Live webhook-to-database flow: SKIPPED - Stripe CLI/test keys and local Supabase Docker unavailable; NOT faked. Intended live check documented for Task 4.12 integration testing.
 
 KNOWN ISSUES:
+- None within scope
 
 FOLLOW-UP:
+Task 4.9 - Idempotent webhook handling
