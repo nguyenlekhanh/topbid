@@ -1,32 +1,56 @@
 ﻿TASK ID: 8.1
 PHASE: 8
 TITLE: Admin authentication
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Establish a minimal, reusable server-side authentication/authorization foundation for all Phase 8 admin work - no dashboard, no management UI (Tasks 8.2-8.8 own that).
 
-SCOPE:
+REQUIREMENT DERIVATION:
+PROJECT_PLAN.md specifies "8.1 | Admin authentication | 0.1" - one line. Architecture derived from the repository: @supabase/ssr has been installed since Task 0.5 specifically with cookie-handling server clients, making the platform's native Supabase Auth the established mechanism; no third-party provider was added and no custom session crypto was invented.
 
-OUT OF SCOPE:
+CHOSEN ARCHITECTURE:
+Supabase Auth email/password + database-backed admin membership.
+- WHO IS AN ADMIN: a Supabase Auth user whose id exists in public.admin_users. Session possession alone grants nothing.
+- WHAT PROVES IT: valid Supabase Auth session cookie (HttpOnly/Secure/SameSite attributes managed by the installed SDK) AND a readable own-row in admin_users - both verified SERVER-SIDE on every request.
+- STORAGE: Supabase Auth session cookies (@supabase/ssr handlers) + admin_users row. No client-visible tokens; service-role key untouched by auth flows.
 
-INPUTS / DEPENDENCIES:
+AUTHORIZATION ENFORCEMENT (fail-closed):
+src/lib/admin-auth.ts getAdminAuthorization(): supabase.auth.getUser() -> if no/invalid user => unauthorized (no DB query); then SELECT own row from admin_users under the caller's JWT - RLS policy admin_users_select_own restricts reads to id = auth.uid(), so least privilege holds and the result cannot be widened. Any error (expired session, DB failure) resolves {authorized:false}. This is THE reusable guard Task 8.2+ must call at the top of every protected page/route.
 
-IMPLEMENTATION REQUIREMENTS:
+PROTECTED BOUNDARY NOW:
+/admin exists as the minimal enforced entry boundary (status card + sign-out only): unauthenticated/unauthorized visitors are redirected to /admin/login server-side BEFORE any content renders (enforcement, not UI hiding). No dashboard/management functionality (Tasks 8.2+).
+PUBLIC ROUTES PRESERVED: /, /success, /cancel, /unsubscribe, /categories/[slug], /categories/[slug]/opengraph-image, /api/webhooks/stripe, /api/unsubscribe, /api/share-events - all unchanged and unprotected.
 
-FILES EXPECTED TO CHANGE:
+LOGIN FLOW:
+- /admin/login: minimal credentials form posting to POST /api/admin/login (progressive enhancement, zero client JS); failures return here with generic ?error=1 - identical response for unknown emails vs wrong passwords (no existence leak)
+- POST /api/admin/login: signInWithPassword server-side; honors `next` ONLY after sanitizeNextPath() open-redirect protection (rejects absolute URLs, '//', '/\' protocol-relative tricks) PLUS belt-and-braces resolved-origin equality check so cross-origin redirects are impossible even if sanitization missed an encoding trick
+- POST /api/admin/logout: signOut + redirect to login; errors indistinguishable from already-ended sessions
+- PROVISIONING: out-of-band SQL/dashboard (create Supabase Auth user, insert id into admin_users). No self-service signup path exists anywhere.
 
-TEST PLAN:
+OPEN REDIRECT HARDENING (caught by tests during development):
+The initial sanitizer accepted '/\evil.example.com' because it starts with '/' - browsers normalize backslash to slash producing a protocol-relative cross-origin redirect. Fixed by rejecting '/\' prefixes too AND verifying resolved.origin === request.origin before redirecting.
 
-DEFINITION OF DONE:
+FILES CHANGED:
+- supabase/migrations/20260823000018_create_admin_users.sql (new; self-read-only RLS policy)
+- src/lib/admin-auth.ts + test (new guard/sanitizer, 18 tests)
+- src/app/api/admin/login/route.ts, logout/route.ts, api/admin/routes.test.ts (new endpoints, 13 tests)
+- src/app/admin/page.tsx, src/app/admin/login/page.tsx (new pages)
+- docs/8.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+ENVIRONMENT:
+No new variables - uses existing NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY via the established server client. Service-role key remains untouched by auth flows and server-only.
 
 TESTS ACTUALLY RUN:
+- npm run test: 422/422 PASSED across 25 files (+31 net)
+- npm run typecheck / lint / format:check / build: all PASSED (/admin, /admin/login, /api/admin/* registered dynamic)
+
+SCOPE BOUNDARY (explicit):
+NO 8.2 dashboard, NO 8.3 category mgmt, NO 8.4 bid mgmt, NO 8.5 payment mgmt, NO 8.6 refund action, NO 8.7 fraud/banned-email mgmt, NO 8.8 audit logs. No RBAC system (single admin role), no third-party auth provider, no middleware.ts (per-route guard is the boundary), no changes to bidding/payment/webhook/email/share behavior or RLS policies beyond the new table's own self-read policy.
 
 KNOWN ISSUES:
+- Admin provisioning is manual SQL until later Phase 8 tasks add management tooling.
+- Login lacks rate limiting/captcha (Phase 9 security tasks territory per plan structure).
 
 FOLLOW-UP:
+Task 8.2 - Admin dashboard

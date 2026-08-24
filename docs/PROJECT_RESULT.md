@@ -2405,4 +2405,44 @@ This file records what has actually been built, not what was planned.
 
 ---
 
+## Phase 8 - Admin
+
+### Task 8.1
+
+- **Date**: 2026-08-24
+- **Objective**: Establish a minimal, reusable server-side admin authentication/authorization foundation for Phase 8 - no dashboard or management UI
+- **Status**: Completed
+- **Audit finding**: no auth code, middleware, user/role tables, or third-party auth dependencies existed; @supabase/ssr has been installed since Task 0.5 specifically with cookie-handling server clients, making the platform's native Supabase Auth the established mechanism
+- **Architecture chosen**: Supabase Auth email/password + DB-backed membership. Admin = a Supabase Auth user whose id exists in public.admin_users; proof = valid session cookie AND a readable own-row, both verified server-side per request
+- **What was implemented**:
+  - supabase/migrations/20260823000018_create_admin_users.sql: admin_users (auth.users id PK ON DELETE CASCADE, created_at) with RLS and exactly one policy - self-read only (id = auth.uid()) - so the guard's row lookup runs under the caller's own JWT with least privilege; inserts remain dashboard/service-role operations
+  - src/lib/admin-auth.ts: getAdminAuthorization() fail-closed guard (no session / invalid session / missing row / any DB error all resolve unauthorized) - THE reusable boundary Task 8.2+ must call; sanitizeNextPath() open-redirect sanitizer
+  - POST /api/admin/login: signInWithPassword server-side through @supabase/ssr cookie handlers (HttpOnly/Secure/SameSite cookies); generic ?error=1 failures identical for unknown emails vs wrong passwords (no existence leak); next honored only after sanitization PLUS resolved-origin equality check
+  - POST /api/admin/logout: signOut + redirect to login (errors indistinguishable from ended sessions)
+  - /admin: minimal enforced entry boundary - unauthenticated/unauthorized visitors are redirected server-side BEFORE rendering (enforcement, not UI hiding); status card + sign-out only
+  - /admin/login: minimal credentials form posting to the endpoint (progressive enhancement, zero client JS); generic failure alert
+- **Files changed**:
+  - supabase/migrations/20260823000018_create_admin_users.sql (created)
+  - src/lib/admin-auth.ts + test (created, 18 tests)
+  - src/app/api/admin/login/route.ts, src/app/api/admin/logout/route.ts, src/app/api/admin/routes.test.ts (created, 13 tests)
+  - src/app/admin/page.tsx, src/app/admin/login/page.tsx (created)
+  - docs/8.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 422/422 across 25 files (+31 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED (/admin, /admin/login, /api/admin/* registered dynamic)
+- **Important technical decisions**:
+  - Supabase Auth over hand-rolled password+HMAC sessions: the platform-native mechanism the repo already wires; battle-tested cookie/session handling instead of invented crypto
+  - Fail-closed guard: infrastructure errors can never accidentally grant access
+  - Open-redirect hardening caught by tests during development: initial sanitizer accepted '/\\evil.example.com' (browsers normalize backslash to slash -> protocol-relative cross-origin redirect); fixed by rejecting '/\\' prefixes AND verifying resolved.origin === request.origin before redirecting (belt-and-braces)
+  - No middleware.ts: per-page/route guard keeps the boundary explicit and small
+- **Known limitations**:
+  - Admin provisioning is manual SQL until later Phase 8 tasks add tooling
+  - Login lacks rate limiting/captcha (Phase 9 security territory)
+- **Follow-up work**: Task 8.2 - Admin dashboard
+
+---
+
 _This file will be updated after each completed task with actual implementation details._
