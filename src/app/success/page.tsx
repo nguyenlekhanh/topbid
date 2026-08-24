@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import SuccessState from '@/components/SuccessState';
 import { extractSessionId, resolveBidSuccessView } from '@/lib/bid-success';
 import { getBidByStripeSessionId } from '@/lib/bids';
+import { buildPublicShareUrl } from '@/lib/share-url';
 import { buildXShareText, buildXShareUrl } from '@/lib/x-share';
 
 export const metadata: Metadata = {
@@ -43,9 +44,11 @@ export default async function SuccessPage({
   const result = sessionId ? await getBidByStripeSessionId(sessionId) : null;
   const view = resolveBidSuccessView(sessionId, result);
 
-  // Task 7.2: share intent built server-side from AUTHORITATIVE data only. The shared
-  // URL is the public leaderboard anchor (an existing convention) - never the
-  // /success session URL, so no Stripe identifiers ever reach the social share.
+  // Tasks 7.2 + 7.3: one canonical public share URL feeds BOTH the X intent and the
+  // copy action. Built server-side from authoritative data only; the destination is
+  // the public leaderboard anchor - never /success?session_id=..., so no Stripe
+  // identifiers ever reach shares or clipboards.
+  const shareUrl = view.view === 'confirmed' ? buildPublicShareUrl(getAppBaseUrl()) : undefined;
   const xShareUrl =
     view.view === 'confirmed'
       ? buildXShareUrl({
@@ -53,7 +56,7 @@ export default async function SuccessPage({
             amountCents: view.amountCents,
             categoryName: view.categoryName,
           }),
-          url: `${getAppBaseUrl()}/#leaderboard-heading`,
+          url: shareUrl!,
         })
       : undefined;
 
@@ -70,6 +73,7 @@ export default async function SuccessPage({
               reference={view.reference || undefined}
               note="Keep this reference for your records."
               xShareUrl={xShareUrl}
+              copyShareUrl={shareUrl}
             />
           ) : (
             <SuccessState

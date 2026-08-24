@@ -1,32 +1,43 @@
 ﻿TASK ID: 7.3
 PHASE: 7
 TITLE: Copy share link
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Add a "Copy link" action to the bid success experience that writes the canonical public share URL to the clipboard on explicit user activation, with success/failure feedback - without inventing Task 7.4's public category URL or copying any payment identifiers.
 
-SCOPE:
+AUDIT FINDINGS:
+- Public routes unchanged (/ / /success, /cancel, /unsubscribe): no category route exists, so the canonical share URL remains exactly Task 7.2's choice: {NEXT_PUBLIC_APP_URL}/#leaderboard-heading (existing valid destination; SuccessState's own CTA targets the same anchor)
+- The URL was previously built inline in success/page.tsx for the X intent - extracted into a reusable pure helper per the avoid-duplication requirement
+- Zero existing clipboard conventions/toast libraries in the repo -> minimal outcome-based abstraction, no dependencies
+- SuccessState is server-rendered with grouped actions; interactive copy isolated in a small 'use client' child so the shared component stays server-safe and all prior consumers remain unchanged
 
-OUT OF SCOPE:
+CANONICAL SHARE URL (unchanged from 7.2):
+{NEXT_PUBLIC_APP_URL}/#leaderboard-heading - safe because it contains no Stripe session id, payment intent id, bidder email, unsubscribe token, internal bid id, or any tracking parameters; it is a real existing public destination. /success?session_id=... explicitly rejected.
 
-INPUTS / DEPENDENCIES:
+IMPLEMENTATION:
+- src/lib/share-url.ts: pure buildPublicShareUrl(baseUrl) with established trailing-slash normalization; SINGLE SOURCE feeding BOTH the X intent url parameter and the clipboard write (they can never diverge)
+- src/lib/copy-to-clipboard.ts: outcome-based copyToClipboard(text, writer?) resolving 'copied' | 'failed'; injected writer for deterministic tests, navigator.clipboard.writeText when available, plain 'failed' when unsupported/rejected/sync-thrown; NEVER throws
+- src/components/CopyShareLink.tsx ('use client'): local idle/copied/failed state with cleanup-safe 2s auto-reset (repeatable), inline SVG check/clipboard icon swap, aria-live="polite" feedback, native button semantics, min-h-11 touch target matching sibling actions
+- src/components/SuccessState.tsx: optional copyShareUrl prop renders CopyShareLink between Share on X and Continue Browsing; omitted keeps all other consumers identical
+- src/app/success/page.tsx: shareUrl computed once (confirmed bids only) and passed to both the X intent input and SuccessState copyShareUrl
 
-IMPLEMENTATION REQUIREMENTS:
+CLIPBOARD BEHAVIOR:
+Copy happens ONLY on button click (never during render); rejected promises and unavailable Clipboard API resolve to visible 'Copy failed' feedback instead of crashing; keyboard accessible; no server round-trip; no analytics/tracking.
 
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+PRIVACY:
+The copied string is exactly buildPublicShareUrl output: origin + /#leaderboard-heading. No session_id/cs_/pi_/email/token can appear (pinned by tests).
 
 TESTS ACTUALLY RUN:
+- npm run test: 327/327 PASSED across 18 files (+12 new: 6 share-url cases incl. normalization/privacy-pins/single-source parity, 6 clipboard-boundary cases incl. verbatim text, rejection, sync-throw, unsupported path, repeated copies)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NOT implemented: 7.4 public category URL (no route/route-generation invented), 7.5 OG metadata, 7.6 OG image, 7.7 tracking (no analytics events or query params). No toast/notification library, no clipboard dependency, no API routes, no migrations.
 
 KNOWN ISSUES:
+- Shared/copied destination points at the global leaderboard until Task 7.4 introduces per-category URLs.
+- Clipboard API requires secure context (https/localhost); insecure contexts see honest 'Copy failed' feedback.
 
 FOLLOW-UP:
+Task 7.4 - Public category URL

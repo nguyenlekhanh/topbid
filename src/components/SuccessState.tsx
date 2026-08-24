@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import CopyShareLink from '@/components/CopyShareLink';
+
 interface SuccessStateProps {
   title?: string;
   description?: string;
@@ -11,6 +13,8 @@ interface SuccessStateProps {
   onViewLeaderboard?: () => void;
   /** Absolute X web-intent URL; when present a "Share on X" action renders. */
   xShareUrl?: string;
+  /** Canonical public share URL; when present a "Copy link" action renders (Task 7.3). */
+  copyShareUrl?: string;
 }
 
 function SuccessIcon() {
@@ -56,6 +60,7 @@ export default function SuccessState({
   onClose,
   onViewLeaderboard,
   xShareUrl,
+  copyShareUrl,
 }: SuccessStateProps) {
   return (
     <div
@@ -126,6 +131,7 @@ export default function SuccessState({
             Share on X
           </a>
         )}
+        {copyShareUrl && <CopyShareLink url={copyShareUrl} />}
         {onClose ? (
           <button
             type="button"

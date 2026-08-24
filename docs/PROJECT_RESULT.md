@@ -2255,6 +2255,37 @@ This file records what has actually been built, not what was planned.
   - Shared destination points at the global leaderboard; revisit once Task 7.4 introduces public per-category URLs
 - **Follow-up work**: Task 7.3 — Copy share link
 
+### Task 7.3
+
+- **Date**: 2026-08-24
+- **Objective**: Add a Copy link action writing the canonical public share URL to the clipboard with honest success/failure feedback, without inventing Task 7.4's category route
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/share-url.ts: pure buildPublicShareUrl(baseUrl) — the single source for the canonical `{NEXT_PUBLIC_APP_URL}/#leaderboard-heading` now feeding BOTH the Task 7.2 X intent and the clipboard (they can never diverge)
+  - src/lib/copy-to-clipboard.ts: outcome-based copyToClipboard(text, writer?) → 'copied' | 'failed'; injected writer for deterministic tests, navigator.clipboard.writeText in production, plain 'failed' for unsupported/rejected/sync-thrown cases; never throws
+  - src/components/CopyShareLink.tsx ('use client'): copy on explicit click only, idle/copied/failed feedback with cleanup-safe 2s auto-reset (repeatable), aria-live="polite", native button semantics, inline check/clipboard SVG swap, min-h-11 touch target
+  - src/components/SuccessState.tsx: optional copyShareUrl prop renders the button in the existing grouped action row; omitted keeps every prior consumer identical
+  - src/app/success/page.tsx: shareUrl computed once server-side (confirmed bids only) and passed to both consumers
+- **Files changed**:
+  - src/lib/share-url.ts + test (created), src/lib/copy-to-clipboard.ts + test (created)
+  - src/components/CopyShareLink.tsx (created), src/components/SuccessState.tsx (optional prop)
+  - src/app/success/page.tsx (single canonical URL source)
+  - docs/7.3.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**:
+  - `npm run test`: PASSED - 327/327 across 18 files (+12 net)
+  - `npm run typecheck`: PASSED
+  - `npm run lint`: PASSED
+  - `npm run format:check`: PASSED
+  - `npm run build`: PASSED
+- **Important technical decisions**:
+  - Copied string is pinned by tests to contain no session_id/cs_/pi_/email/token — /success?session_id=... explicitly rejected as clipboard content
+  - Clipboard boundary injected so all interaction logic is unit-tested without DOM or real browser APIs
+  - No toast library, no clipboard polyfill dependency; failure feedback is honest local state
+- **Known limitations**:
+  - Destination remains the global leaderboard until Task 7.4 lands per-category URLs
+  - Insecure contexts (non-https) lack the Clipboard API → visible 'Copy failed'
+- **Follow-up work**: Task 7.4 — Public category URL
+
 ---
 
 _This file will be updated after each completed task with actual implementation details._

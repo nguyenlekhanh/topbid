@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 7 in progress — 7.2 completed** — Next recommended: 7.3
+**Phase 7 in progress — 7.3 completed** — Next recommended: 7.4
 
 ## Completed Tasks
 
@@ -81,6 +81,7 @@
 - 6.7: Email failure handling ✓
 - 7.1: Bid success page ✓
 - 7.2: Share on X (Twitter) ✓
+- 7.3: Copy share link ✓
 
 ## Tasks in Progress
 
@@ -172,6 +173,7 @@ _None_
 - Email failure handling added (migration 20260823000016 outbid_notification_deliveries keyed by bid_id PK/FK = one logical notification per bid; SendEmailError classifies provider_rejected terminal vs send_unconfirmed retryable at the Resend boundary; attempt gate in sendOutbidNotification short-circuits sent/permanent rows ('already_sent'/'already_handled') and persists every send outcome; webhook dispatch widened to already_paid/duplicate redeliveries so Stripe's own retry schedule drives eventual delivery - transport-unconfirmed failures answer 500 while the ledger keeps conversion exactly-once; payment idempotency and notification-attempt idempotency remain independent domains; unsubscribe/self-outbid guards re-run on every attempt; no queues/cron/polling introduced)
 - Bid success page formalized for Phase 7 (audit confirmed Task 4.3 already delivered the baseline: authoritative DB-only lookup under RLS, confirmed/awaiting states, no Stripe queries from the page, never mutates payment state); delta = pure bid-success.ts resolver (extractSessionId accepts only single string values - repeated query keys previously crashed .trim() on an array with a 500 - plus resolveBidSuccessView mapping to confirmed/awaiting view models), page consumes it with identical rendered output, and the previously missing deterministic suite (21 cases) now covers every success/pending/unknown/malformed path
 - Share on X added (pure x-share.ts: buildXShareText composes claim-free copy from authoritative amount/category only - no winner claims; buildXShareUrl emits canonical percent-encoded https://x.com/intent/tweet intent; shared URL = {NEXT_PUBLIC_APP_URL}/#leaderboard-heading, an existing valid public destination that leaks no session/payment identifiers; optional xShareUrl prop renders a Share-on-X anchor inside SuccessState's existing action group with inline SVG icon; built server-side so no secrets enter the client bundle; no route invented for 7.4, no copy-link/tracking for 7.3/7.7)
+- Copy share link added (pure share-url.ts buildPublicShareUrl = single source for the canonical {APP_URL}/#leaderboard-heading feeding BOTH the X intent and the clipboard; outcome-based copy-to-clipboard.ts abstraction (injected writer for tests, navigator.clipboard in prod, never throws); 'use client' CopyShareLink button with idle/copied/failed feedback + cleanup-safe 2s reset rendered via optional SuccessState prop; copied string pinned to contain no session_id/cs_/pi_/email/token; no toast library, no dependency, no 7.4+ scope)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -192,7 +194,7 @@ _None_
 
 ## Next Recommended Task
 
-**7.3 — Copy share link**
+**7.4 — Public category URL**
 
 ## Notes
 
@@ -277,5 +279,7 @@ Task 6.7 completed successfully. Email failure handling added without new infras
 Task 7.1 completed successfully. Bid success page formalized: read-only audit confirmed Task 4.3 already delivered the full baseline (dynamic server-rendered /success, untrusted session_id, authoritative getBidByStripeSessionId lookup under RLS paid-only visibility, confirmed vs awaiting states, never queries Stripe or mutates payment state); implemented delta = src/lib/bid-success.ts pure resolver fixing a real query-param bug (repeated ?session_id keys arrive as arrays from Next.js and previously crashed .trim() with a 500 - now shape-validated single-string only), page consumes resolveBidSuccessView/extractSessionId with identical rendered output, plus the previously absent deterministic suite covering confirmed/pending/unknown/missing/malformed/oversized paths; 302/302 tests passing. No 7.2+ sharing functionality.
 
 Task 7.2 completed successfully. Share on X added without touching Task 7.4's scope: src/lib/x-share.ts provides pure buildXShareText (claim-free copy from authoritative amount/category only) and buildXShareUrl (canonical percent-encoded x.com/intent/tweet intent); the success page builds the intent server-side from DB-backed view data with shared URL {NEXT_PUBLIC_APP_URL}/#leaderboard-heading - an existing valid public destination that avoids leaking Stripe session identifiers; SuccessState renders an optional Share-on-X anchor in its existing action group; no public category route invented, no copy-link/tracking/OG work; 315/315 tests passing.
+
+Task 7.3 completed successfully. Copy share link added: canonical URL extracted into pure share-url.ts buildPublicShareUrl so the X intent and the clipboard share a single source ({APP_URL}/#leaderboard-heading - unchanged from 7.2, no 7.4 route invented); outcome-based copy-to-clipboard.ts never throws and degrades to honest 'Copy failed' feedback when the API is unavailable or rejects; new client component CopyShareLink renders via optional SuccessState prop with cleanup-safe auto-reset feedback; copied value pinned by tests to contain zero payment identifiers; no toast/clipboard dependencies; 327/327 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
