@@ -1,32 +1,195 @@
 ﻿TASK ID: 10.11
 PHASE: 10
 TITLE: Launch checklist
-STATUS: pending
+STATUS: completed (executable operator runbook produced; LAUNCH NOT PERFORMED - every live step below is operator-executed)
 
 OBJECTIVE:
+Consolidate the Tasks 10.1-10.10 operator checklists into ONE precise, dependency-
+ordered, executable launch runbook - covering environment, database, payments, domain,
+monitoring, smoke tests, stop conditions, and rollback - WITHOUT provisioning anything,
+performing any live action, or adding application functionality.
 
-SCOPE:
+PRE-LAUNCH GATE (A - verified from repository; re-run before executing Step 1):
+- [x] git working tree clean
+- [x] main == origin/main (HEAD at time of writing: see PROJECT_PROGRESS.md)
+- [x] full test suite PASS (685/685 across 47 files)
+- [x] typecheck / lint / format:check / production build ALL PASS
+- [x] no debug artifacts (scripted scan: no console.log/debugger/NODE_ENV-dev branches)
+- [x] no tracked .env.local/secrets (only .env.example is committed; values empty)
+- [ ] migration verification complete -> Step 1 below (operator)
+If ANY gate item regresses: STOP. Fix before launching.
 
-OUT OF SCOPE:
+ENVIRONMENT VARIABLE MANIFEST (verified against actual process.env usage; all values
+OPERATOR-SUPPLIED in Vercel Project Settings -> Environment Variables, Production):
 
-INPUTS / DEPENDENCIES:
+| Variable                          | Class       | Source / notes                                   |
+|-----------------------------------|-------------|--------------------------------------------------|
+| NEXT_PUBLIC_SUPABASE_URL          | PUBLIC      | production Supabase project URL                  |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY     | PUBLIC      | production anon key                              |
+| SUPABASE_SERVICE_ROLE_KEY         | SERVER-ONLY | production service_role secret                   |
+| STRIPE_SECRET_KEY                 | SERVER-ONLY | LIVE secret key (sk_live_...)                    |
+| NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY| PUBLIC      | LIVE publishable key (pk_live_...)               |
+| STRIPE_WEBHOOK_SECRET             | SERVER-ONLY | LIVE webhook ENDPOINT signing secret (whsec_...) |
+| RESEND_API_KEY                    | SERVER-ONLY | production Resend key                            |
+| RESEND_FROM_EMAIL                 | SERVER-ONLY | verified sender address on the domain            |
+| UNSUBSCRIBE_SECRET                | SERVER-ONLY | fresh random value >=32 chars (openssl rand -hex 32); NEVER reuse dev/preview values |
+| NEXT_PUBLIC_APP_URL               | PUBLIC      | https://topbid.lol (final; build-time-inlined)   |
+| SENTRY_DSN                        | SERVER-ONLY | Sentry server/edge DSN                           |
+| NEXT_PUBLIC_SENTRY_DSN            | PUBLIC      | Sentry browser DSN                               |
+| SENTRY_AUTH_TOKEN                 | BUILD-ONLY  | source-map upload token; read ONLY by next.config.ts at build time |
 
-IMPLEMENTATION REQUIREMENTS:
+LAUNCH SEQUENCE (dependency order - do NOT reorder):
 
-FILES EXPECTED TO CHANGE:
+STEP 1 - PRODUCTION DATABASE (Task 10.2 checklist):
+  a. Create the Supabase production project.
+  b. Apply ALL 22 migrations strictly in filename order (`supabase link --project-ref
+     <ref>` + `supabase db push`, or dashboard SQL editor file-by-file).
+  c. Run the post-push verification SQL from docs/10.2.txt: categories count = 6;
+     rowsecurity=false returns ZERO rows; policy counts categories/bids/admin_users=1
+     and zero elsewhere; 6 public functions with prosecdef=true and pinned search_path.
+  d. Anon-denial probe: `set role anon; select * from public.banned_emails;` must ERROR.
+  e. Create the first admin AUTH user in the dashboard, then insert its id into
+     public.admin_users via the SQL editor.
+  STOP if any verification fails.
 
-TEST PLAN:
+STEP 2 - SENTRY PROJECT (Task 10.7 checklist):
+  a. Create the Sentry project (Next.js platform); copy both DSNs + an Auth Token.
+  b. Set SENTRY_DSN, NEXT_PUBLIC_SENTRY_DSN, SENTRY_AUTH_TOKEN in Vercel now so the
+     FIRST production build uploads source maps.
 
-DEFINITION OF DONE:
+STEP 3 - VERCEL ENVIRONMENT (complete set, Production scope only):
+  a. Enter every manifest variable above with PRODUCTION values.
+  b. Keep dev/preview credentials in their own scopes; never mix.
+  c. Note: EVERY env change requires a redeploy to take effect.
 
-IMPLEMENTATION NOTES:
+STEP 4 - CUSTOM DOMAIN (Task 10.4 checklist):
+  a. Vercel Project Settings -> Domains: add topbid.lol (decide apex/www redirect).
+  b. Create EXACTLY the DNS records Vercel displays at your registrar (values are
+     shown per-project - do not copy second-hand records).
+  c. Wait for Vercel to report DNS verified AND TLS certificate issued (https active).
 
-RESULT:
+STEP 5 - FINAL APP URL + REDEPLOY:
+  a. Set NEXT_PUBLIC_APP_URL=https://topbid.lol (Production), then trigger a fresh
+     deployment - NEXT_PUBLIC_* is build-time-inlined; stale builds keep old origins.
 
-FILES ACTUALLY CHANGED:
+STEP 6 - STRIPE LIVE (Task 10.3 checklist):
+  a. Complete Stripe account LIVE activation (business details) in the Dashboard.
+  b. Copy pk_live_... and sk_live_... into the corresponding Vercel variables.
+  c. Redeploy so server runtime env picks up the keys.
 
-TESTS ACTUALLY RUN:
+STEP 7 - STRIPE WEBHOOK ENDPOINT:
+  a. Dashboard -> Developers -> Webhooks: add endpoint
+        https://topbid.lol/api/webhooks/stripe          (repository's actual route)
+     subscribed to EXACTLY: checkout.session.completed,
+     checkout.session.async_payment_failed, charge.refunded.
+  b. Copy the endpoint signing secret whsec_... into STRIPE_WEBHOOK_SECRET
+     (this is NOT the sk_live_ API key). Redeploy after setting it.
 
-KNOWN ISSUES:
+STEP 8 - RESEND PRODUCTION:
+  a. Create the production API key and verify the sending domain; set RESEND_API_KEY /
+     RESEND_FROM_EMAIL accordingly.
+
+STEP 9 - ANALYTICS:
+  a. Vercel Project -> Analytics: enable Web Analytics (no env vars needed).
+
+STEP 10 - SMOKE TESTS (execute in order on https://topbid.lol):
+  [ ] Homepage loads over HTTPS; leaderboard/recent sections render (empty state ok)
+  [ ] Category page renders DB-sourced facts; canonical/OG URLs use topbid.lol
+  [ ] Checkout creation: bid form -> redirect to Stripe Checkout with correct amount
+  [ ] Successful payment: complete ONE operator-authorized real payment (the single
+      sanctioned money movement) -> redirected to /success?session_id=...
+  [ ] Webhook processing: Stripe Dashboard shows delivery 200 for
+      checkout.session.completed; bid status becomes paid
+  [ ] Paid bid visibility: leaderboard updates within seconds (realtime)
+  [ ] Outbid notification: with two paid bids in one category, outbidding sends the
+      email to the previous leader (footer unsubscribe link present)
+  [ ] Unsubscribe: footer link -> confirmation page; POST idempotent; suppression holds
+  [ ] Admin login: authorized account reaches /admin; wrong password gets ?error=1
+  [ ] Admin category management: create/edit/toggle persists and audits
+  [ ] Admin refund flow: refund the test payment; Stripe shows refund; local state
+      converges to refunded (or refund_submitted then webhook finalizes); audit entry
+      written exactly once
+  [ ] Banned-email enforcement: ban an address -> that address cannot bid ('banned'
+      outcome) and receives no notifications; unban restores
+  [ ] Audit log: each admin mutation above appears newest-first
+  [ ] robots.txt served; disallows /admin /api /success /cancel /unsubscribe
+  [ ] sitemap.xml lists homepage + active categories only
+  [ ] Sentry: trigger one controlled staging failure -> event appears WITHOUT query
+      strings/headers/payloads
+  [ ] Vercel Analytics: pageviews appear for public pages; /admin//success absent
+  [ ] Mobile: 375px-wide pass over homepage/category/success + one admin table
+      (horizontal scroll contained, controls >=44px)
+
+STEP 11 - POST-LAUNCH MONITORING (first 48h):
+  - Watch Sentry for unexpected exceptions; Stripe Dashboard webhook success rate;
+    Vercel Analytics traffic shape; Resend delivery/suppression outcomes; audit-log
+    growth matching admin activity.
+
+STOP CONDITIONS (halt launch/immediately roll back if ANY occurs):
+  - Migration verification (Step 1c/d) fails
+  - Webhook signature verification fails (Stripe shows non-200 or app logs signature
+    failures)
+  - The LIVE payment does not reconcile (bid stays pending past webhook retry window,
+    or ledger/state-machine invariant breaks)
+  - Production URL mismatch (success/cancel/unsubscribe/canonical URLs show any other
+    origin)
+  - Secrets appear in client output (bundle scan, browser devtools, error events)
+  - Admin authorization fails open or leaks account existence
+  - Refund does not converge (db_pending never reconciles via webhook)
+  - Rate limits/RLS/ban enforcement behave differently than the suites prove
+
+ROLLBACK GUIDANCE (no invented infrastructure):
+- APPLICATION: Vercel Deployments -> promote/roll back to the previous known-good
+  deployment (instant, no data impact). For a code-level revert: git revert the commit
+  on main and push - a new deployment is created automatically. Never force-push main.
+- DATABASE: DO NOT attempt destructive rollback. The schema is migration-forward-only
+  and payment state transitions are append/transition-only (ledger + status machine);
+  rows are financial records. Corrective actions are new forward migrations only, with
+  the Task 4.x RPCs as the ONLY writers of payment state.
+- PAYMENTS ENTRY: if payments must be halted, disable the webhook endpoint or pause
+  payments in the Stripe Dashboard (provider-side switch; no code change needed).
+  In-flight sessions may still complete - reconcile them through the normal webhook
+  path once re-enabled; the ledger keeps everything exactly-once.
+- DOMAIN: reverting NEXT_PUBLIC_APP_URL/re-pointing DNS is safe post-launch because
+  every absolute URL derives from that one variable (requires redeploy).
+- LEDGER INTEGRITY during rollback is preserved by design: processed_webhook_events +
+  bid-row transitions live in the production database and are independent of any
+  application deployment version.
+
+SECRET-HANDLING CHECKLIST (all mandatory):
+- [ ] No production secret ever committed, pasted into source files, logged, or shared
+      in chat/tickets (Vercel encrypted env vars + Stripe/Sentry dashboards only)
+- [ ] No server-only variable duplicated with a NEXT_PUBLIC_ prefix
+- [ ] Stripe API key (sk_live_) vs webhook signing secret (whsec_) kept distinct
+- [ ] Preview/dev/test credentials stay in separate Vercel scopes; never mixed
+- [ ] SENTRY_AUTH_TOKEN used only as a build-time env var (never in src/** - guarded
+      by src/lib/error-monitor-boundary.test.ts)
+- [ ] After launch: rotate any credential that was ever shared with a human during
+      setup; rotate UNSUBSCRIBE_SECRET only understanding rotation invalidates all
+      previously issued unsubscribe links
+
+VERIFICATION CLASSIFICATION:
+A. Verified from repository/static analysis: everything in PRE-LAUNCH GATE plus route
+   paths (/api/webhooks/stripe), URL single-sourcing, env manifest completeness,
+   migration-chain readiness, integration behavior unconfigured.
+B. Operator action required: every step of the LAUNCH SEQUENCE.
+C. Live production verification required: STEP 10 smoke tests + STEP 11 monitoring.
+D. Must NOT be claimed without evidence: "production is live", "LIVE payments work",
+   "analytics/monitoring active" - none are claimed by this task.
+
+FILES CHANGED:
+- docs/10.11.txt (this file), PROJECT_PROGRESS.md, PROJECT_RESULT.md
+
+TESTS ACTUALLY RUN (post-documentation gate):
+- npm run test: 685/685 PASSED across 47 files
+- npm run typecheck / lint / format:check / production build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+No infrastructure provisioned, no live Stripe resources created, no DNS modified, no
+Supabase project created, no production admin user inserted, no external dashboards
+touched, no real payments performed, no application features added, NO Phase 11+ work.
+
+KNOWN ISSUES: None.
 
 FOLLOW-UP:
+Execute this runbook. Phase 10 closes when Steps 1-10 succeed and smoke tests pass.

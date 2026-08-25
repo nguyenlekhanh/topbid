@@ -3000,4 +3000,20 @@ _
 
 ---
 
+### Task 10.11
+
+- **Date**: 2026-08-25
+- **Objective**: Produce the operator-facing final launch checklist consolidating Tasks 10.1-10.10 into one precise, dependency-ordered, executable runbook - without provisioning infrastructure, performing live actions, or adding application functionality
+- **Status**: Completed as documentation-only runbook. LAUNCH NOT PERFORMED; nothing claimed live
+- **Runbook structure (dependency order)**: pre-launch gate (clean tree / main==origin/main / full automated gate green / no debug artifacts / no tracked secrets / migration verification) -> complete 13-variable env manifest with class + source -> Step 1 production DB (migrations in order + verification SQL incl. anon-denial probe + first admin user) -> Step 2 Sentry before first build (source maps) -> Step 3 full Vercel env set -> Step 4 domain DNS/TLS using exact Vercel-displayed records -> Step 5 NEXT_PUBLIC_APP_URL=https://topbid.lol + mandatory redeploy -> Step 6 Stripe LIVE activation/keys -> Step 7 webhook endpoint https://topbid.lol/api/webhooks/stripe (three handled events; whsec_ != sk_live_) -> Step 8 Resend production -> Step 9 Analytics enablement -> Step 10 eighteen ordered smoke tests (incl. the single sanctioned real payment, outbid notification, unsubscribe idempotency, refund convergence, ban enforcement, audit entries, robots/sitemap, Sentry sanitized capture, Analytics exclusions, mobile pass) -> Step 11 first-48h monitoring
+- **Stop conditions**: failed migration verification; webhook signature failure; LIVE payment non-reconciliation; production URL mismatch; secrets in client output; admin authorization failing open; refund non-convergence; any ledger/state-machine invariant break
+- **Rollback guidance**: Vercel instant deployment rollback or git-revert-via-new-deployment (never force-push); database is forward-only - payment rows are financial records corrected only by forward migrations through the Task 4.x RPCs; provider-side payment/webhook pause via Stripe Dashboard preserves ledger exactly-once semantics; APP_URL re-pointing safe post-launch
+- **Secret-handling checklist**: never commit/paste/log/share production secrets; no server-only var duplicated as NEXT_PUBLIC_; sk_live_ vs whsec_ distinction; scope separation for preview credentials; build-only source-map token (test-guarded); post-launch rotation of shared credentials with the documented UNSUBSCRIBE_SECRET link-invalidation tradeoff
+- **Files changed**: docs/10.11.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md only
+- **Tests performed**: npm run test 685/685 PASSED; typecheck/lint/format:check/build all PASSED
+- **Scope statement**: NO infrastructure provisioned, NO live Stripe resources, NO DNS changes, NO Supabase projects, NO admin users inserted, NO dashboards enabled, NO real payments performed, NO application features added, NO Phase 11+ work started
+- **Follow-up work**: Execute docs/10.11.txt Steps 1-11. Phase 10 closes on successful execution + smoke tests.
+
+---
+
 _This file will be updated after each completed task with actual implementation details.
