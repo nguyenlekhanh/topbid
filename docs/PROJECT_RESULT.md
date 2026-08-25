@@ -2930,4 +2930,23 @@ _
 
 ---
 
+### Task 10.7
+
+- **Date**: 2026-08-25
+- **Objective**: Add production error monitoring via the smallest provider-native integration for the existing Vercel/Next.js architecture - strictly observational, preserving every typed/stable error outcome and generic public response, with hard privacy guarantees
+- **Status**: Completed. Repository implementation + deterministic tests; LIVE monitoring requires operator Sentry/Vercel configuration (not verified, not claimed)
+- **Audit findings**: no monitoring SDK/instrumentation files/custom error boundaries existed; framework defaults only; 30 console.error/warn sites already privacy-disciplined (Task 9.11); error semantics already excellent (typed unions, fail-closed auth, ledger-rolled-back anomalies)
+- **Provider decision**: @sentry/nextjs ^10.71 - official Next.js-native SDK whose instrumentation hooks (register + onRequestError) cover every unhandled server/edge exception with ZERO route/business-code changes; client covered via instrumentation-client.ts; secure build-time source-map upload via withSentryConfig; single provider, no parallel systems
+- **Architecture**: lazy dynamic-import adapter (src/lib/error-monitor.ts) that no-ops honestly without credentials (proven by import-attempt assertions), swallow-all everywhere; instrumentation.ts + instrumentation-client.ts wiring; expected business outcomes (provider_failed/db_pending/refund_submitted/validation/auth refusals/rate limits/duplicates) intentionally keep console logging and never route through monitoring
+- **Privacy filtering**: sanitizeErrorUrl strips queries+fragments (session ids / unsubscribe tokens can never transmit); capture context = {sanitized url, method, optional router_path tag} only - never headers/cookies/bodies/payloads; sendDefaultPii false; tracesSampleRate 0; boundary test proves the build-only source-map token literal appears in zero application source files
+- **Environment variables**: SENTRY_DSN (server-only), NEXT_PUBLIC_SENTRY_DSN (public), SENTRY_AUTH_TOKEN (build-only, never committed) - all optional placeholders in .env.example
+- **Tests added**: 19 deterministic tests - URL sanitization matrix, no-credential no-op behavior, init-once with privacy-first options, report forwarding + swallow-all on provider failure, hostile-fixture proof that secrets/queries/headers never reach capture context, credential-boundary scans
+- **Files changed**: package.json + package-lock.json (@sentry/nextjs), next.config.ts, NEW src/lib/error-monitor.ts + error-monitor.test.ts + error-monitor-boundary.test.ts + src/instrumentation.ts + src/instrumentation-client.ts, .env.example, docs/10.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 683/683 PASSED across 46 files (+19 net); typecheck/lint/format:check/build all PASSED
+- **Operator steps**: create Sentry project -> set three Vercel env vars (classified above) -> redeploy -> trigger a staging failure and confirm the event arrives sanitized
+- **Scope statement**: NO 10.8+ functionality implemented (no perf review/mobile/QA/launch checklist); no retry queues/workers/error tables; Phase 8 audit_logs untouched; no business-logic changes; analytics/SEO untouched
+- **Follow-up work**: Task 10.8 - Performance review
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

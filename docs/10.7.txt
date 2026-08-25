@@ -1,32 +1,118 @@
 ﻿TASK ID: 10.7
 PHASE: 10
 TITLE: Error monitoring
-STATUS: pending
+STATUS: completed (repository implementation; LIVE monitoring requires operator DSN/token configuration in Vercel + Sentry)
 
 OBJECTIVE:
+Add production error monitoring using the smallest provider-native integration for the
+existing Vercel/Next.js architecture - strictly observational, never influencing any
+authoritative flow, preserving every existing typed/stable error outcome and generic
+public response, with hard privacy guarantees about what can never be transmitted.
 
-SCOPE:
+EXISTING ERROR-HANDLING/MONITORING AUDIT:
+- NO monitoring SDK existed (no Sentry/OpenTelemetry/Logtail/Datadog/Bugsnag/Rollbar in
+  package.json or src); no instrumentation.ts/instrumentation-client.ts; no custom
+  error.tsx/global-error.tsx (framework defaults only)
+- 30 console.error/warn call sites across production sources (Task 9.11 audit: limited
+  to identifiers/outcome codes - no emails/tokens/secrets/payloads)
+- Error semantics already excellent (Tasks 4.x-9.x): typed Result unions for expected
+  outcomes, throw-only-for-infrastructure, fail-closed authorization, generic HTTP
+  bodies, ledger-rolled-back anomalies answered 500 for Stripe retries
 
-OUT OF SCOPE:
+PROVIDER DECISION AND RATIONALE:
+@sentry/nextjs ^10.71.0 - the official Next.js-native SDK:
+1. Next.js 16 supports framework-native hooks (src/instrumentation.ts register() +
+   onRequestError) giving coverage of EVERY unhandled server/edge exception with ZERO
+   changes to route handlers, business modules, or webhook processing
+2. Client errors covered separately via src/instrumentation-client.ts
+3. Built-in secure source-map mechanism (build-time token upload through
+   withSentryConfig) without exposing maps publicly
+4. Single provider, no parallel systems; alternatives (Vercel Observability = basic
+   logs not error tracking; LogDrains = enterprise; OTel = heavy self-managed)
+   rejected
 
-INPUTS / DEPENDENCIES:
+INTEGRATION ARCHITECTURE:
+- src/lib/error-monitor.ts: tiny adapter - lazy dynamic import of @sentry/nextjs ONLY
+  when a DSN is configured (unconfigured builds/tests/dev are honest no-ops);
+  initErrorMonitor() server/edge, initErrorMonitorClient() browser,
+  reportError(), reportRequestError(); every SDK interaction swallow-all
+- src/instrumentation.ts: register() initializes; onRequestError() forwards UNHANDLED
+  exceptions only (void - never throws into the runtime)
+- src/instrumentation-client.ts: client init from the PUBLIC DSN only
+- next.config.ts: withSentryConfig wrapper - silent, disableLogger, reads the build-
+  only upload token exclusively at build time; without a token it skips uploads silently
+- Expected business outcomes deliberately DO NOT route through monitoring: typed
+  validation/auth refusals, provider_failed/db_pending/refund_submitted, rate limits,
+  duplicate/idempotent results keep their existing console logging. Only exceptions
+  escaping Next.js are captured - exactly the unexpected class.
 
-IMPLEMENTATION REQUIREMENTS:
+PRIVACY/SECURITY FILTERING (enforced by construction):
+- sanitizeErrorUrl strips query strings AND fragments before transmission - session ids
+  (/success?session_id=...) and capability tokens (/unsubscribe?token=...) can never
+  reach the provider (pinned by tests)
+- Capture context contains ONLY {url(sanitized), method} plus an optional router_path
+  tag - never headers, cookies, request bodies, webhook payloads, or queries (pinned by
+  tests including a hostile fixture carrying cookie/authorization/password fields)
+- sendDefaultPii: false explicit; performance tracing disabled (tracesSampleRate: 0)
+  minimizing data surface
+- The build-only source-map token is read EXCLUSIVELY inside next.config.ts; a boundary
+  test scans all of src/** proving the literal never appears there (so it can never be
+  bundled); it is also documented as never-committed
+- No bidder/admin emails, session cookies, auth tokens, API keys, DB credentials, or
+  environment values are ever forwarded by application code
 
-FILES EXPECTED TO CHANGE:
+ENVIRONMENT VARIABLES (all optional; system is a no-op without them):
+| Variable                  | Classification            | Purpose                          |
+|---------------------------|---------------------------|----------------------------------|
+| SENTRY_DSN                | SERVER-ONLY               | server/edge init                 |
+| NEXT_PUBLIC_SENTRY_DSN    | PUBLIC (inlined client)   | browser init                     |
+| SENTRY_AUTH_TOKEN         | BUILD-ONLY (next.config)  | secure source-map upload         |
+Added as empty placeholders to .env.example with classification comments.
 
-TEST PLAN:
+OPERATOR SETUP STEPS (C):
+1. Create a Sentry project (Next.js platform); copy the DSN.
+2. Vercel Production env vars: SENTRY_DSN, NEXT_PUBLIC_SENTRY_DSN (DSNs), and
+   SENTRY_AUTH_TOKEN (from Sentry Auth Tokens settings) for source-map uploads.
+3. Redeploy (NEXT_PUBLIC_* is build-time-inlined).
+4. Trigger a test failure on a preview/staging deployment and confirm the event appears
+   in Sentry WITHOUT query strings, headers, cookies, or payloads.
+D. Live verification NOT performed here (no Sentry/Vercel access).
 
-DEFINITION OF DONE:
+FAILURE BEHAVIOR:
+Swallow-all everywhere: init/report failures resolve silently; onRequestError returns
+void; unconfigured deployments skip the SDK entirely. Monitoring can never affect page
+rendering, bidding/payment, Stripe webhooks, refunds, unsubscribe, notifications, admin
+operations, or sharing.
 
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- package.json + package-lock.json (@sentry/nextjs ^10.71.0)
+- next.config.ts (withSentryConfig wrapper)
+- NEW src/lib/error-monitor.ts (+error-monitor.test.ts, error-monitor-boundary.test.ts)
+- NEW src/instrumentation.ts, src/instrumentation-client.ts
+- .env.example (placeholders + comments only)
+- docs/10.7.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 683/683 PASSED across 46 files (+19 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+- Boundary scan proving the build-token literal appears in zero application sources
+
+VERIFICATION CLASSIFICATION:
+A. Repository/code verified: adapter contract, sanitization, capture-context allow-
+   list, credential boundary, expected-vs-unexpected separation.
+B. Verified locally: full suite/build green with SDK installed but unconfigured
+   (honest no-op proven by import-attempt assertions).
+C. Operator pending: Sentry project + Vercel env vars + redeploy.
+D. Live production verification: NOT performed - "monitoring is live" is NOT claimed.
+
+SCOPE BOUNDARY (explicit):
+NO 10.8+ work (performance review/mobile/final QA/launch checklist). No retry queues/
+workers/error tables; no new audit-log system (Phase 8 audit_logs untouched); no
+business-logic changes to increase coverage; no metrics/alerts invented; analytics
+(10.6) and SEO (10.5) untouched; payment/auth/security architecture unchanged.
 
 KNOWN ISSUES:
+None.
 
 FOLLOW-UP:
+Task 10.8 - Performance review.
