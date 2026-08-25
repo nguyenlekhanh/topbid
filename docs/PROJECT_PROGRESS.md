@@ -220,7 +220,7 @@ _None_
 
 ## Next Recommended Task
 
-**9.6 - Database security review**
+**9.7 - RLS review**
 
 ## Notes
 

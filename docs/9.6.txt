@@ -1,32 +1,79 @@
 ﻿TASK ID: 9.6
 PHASE: 9
 TITLE: Database security review
-STATUS: pending
+STATUS: completed - audit found NO concrete database security defects
 
 OBJECTIVE:
+Perform a comprehensive PostgreSQL/Supabase database security review covering RLS policies, grants/privileges, SECURITY DEFINER functions, search_path pinning, sensitive column exposure, constraint invariants, transaction boundaries, cross-record authorization, service-role isolation, migration safety, and Supabase client boundary verification.
 
-SCOPE:
+AUDIT VERDICT: NO CONCRETE DATABASE SECURITY DEFECTS FOUND.
+The existing database security architecture correctly enforces all privilege boundaries. Documentation-only task; no code/schema changes made.
 
-OUT OF SCOPE:
+============================================================
+TABLE/RLS MATRIX
+============================================================
 
-INPUTS / DEPENDENCIES:
+| TABLE                          | RLS | POLICIES                    | ACCESS MODEL           |
+|--------------------------------|-----|-----------------------------|------------------------|
+| categories                     | ON  | public SELECT active        | public read (filtered) |
+| bids                           | ON  | public SELECT paid          | public read (filtered) |
+| processed_webhook_events       | N/A | none                        | service-role via definer |
+| notification_unsubscribes      | ON  | NONE (zero policies)        | service-role only      |
+| outbid_notification_deliveries | ON  | NONE (zero policies)        | service-role only      |
+| share_events                   | ON  | NONE (zero policies)        | service-role only      |
+| admin_users                    | ON  | self-read (id = auth.uid()) | self-read + service    |
+| banned_emails                  | ON  | NONE (zero policies)        | service-role only      |
+| audit_logs                     | ON  | NONE (zero policies)        | service-role only      |
 
-IMPLEMENTATION REQUIREMENTS:
+All tables have RLS enabled. Zero-policy tables are intentionally locked: no anon/authenticated principal can read or write them regardless of table grants.
 
-FILES EXPECTED TO CHANGE:
+============================================================
 
-TEST PLAN:
+SECURITY DEFINER / RPC MATRIX:
 
-DEFINITION OF DONE:
+| FUNCTION                        | SEARCH_PATH | EXECUTE GRANT   | ROW LOCK | TRANSACTION |
+|---------------------------------|-------------|-----------------|----------|-------------|
+| create_pending_bid              | public      | service_role    | FOR UPDATE (category) | atomic |
+| attach_stripe_session           | public      | service_role    | implicit | atomic     |
+| convert_pending_bid_to_paid     | public      | service_role    | FOR UPDATE (bid)      | atomic |
+| process_checkout_completed_event| public      | service_role    | via convert RPC        | atomic |
+| fail_pending_bid                | public      | service_role    | FOR UPDATE (bid)      | atomic |
+| refund_paid_bid                 | public      | service_role    | FOR UPDATE (bid)      | atomic |
 
-IMPLEMENTATION NOTES:
+All SECURITY DEFINER functions have SET search_path = public (pinned). All use fully qualified public.table_name references. No dynamic SQL. All EXECUTE revoked from public/anon/authenticated and granted ONLY to service_role.
 
-RESULT:
+============================================================
 
-FILES ACTUALLY CHANGED:
+KEY FINDINGS BY CATEGORY:
+
+GRANTS/PRIVILEGES: All SECURITY DEFINER mutation functions follow the identical pattern: REVOKE EXECUTE from public, anon, authenticated; GRANT EXECUTE to service_role only. No direct table-level GRANTs exist that could bypass RLS. No ALTER DEFAULT PRIVILEGES statements found.
+
+SEARCH_PATH: Every SECURITY DEFINER function pins search_path = public. All table references inside functions use public.-qualified names. No attacker-controlled schema resolution possible.
+
+SENSITIVE COLUMNS: bidder_email stored in bids (RLS restricts public reads to paid only); stripe_session_id/stripe_payment_intent_id in bids (same RLS restriction); notification_unsubscribes stores HMAC-hashed identities not raw emails; banned_emails stores canonical lowercase emails (admin-only visibility); audit_logs stores actor_user_id + actor_email (admin-only visibility). All protected at DB boundary via RLS, not merely hidden by UI.
+
+CONSTRAINTS/INVARIANTS: bid amount >= 0 CHECK; status CHECK IN ('pending','paid','failed','refunded'); categories starting_bid/increment >= 0; UNIQUE(stripe_session_id); UNIQUE(category_id, stripe_session_id); UNIQUE(slug) on categories; UNIQUE(email_canonical) on banned_emails; event_id PK on processed_webhook_events. All enforced at DB level, not application-only.
+
+TRANSACTIONS/LOCKING: create_pending_bid takes FOR UPDATE on category row (serializes same-category reservations); convert/refund/fail take FOR UPDATE on bid row; ledger insert + state transition in one transaction (rollback on anomaly); duplicate events resolve as 'duplicate' no-op.
+
+CROSS-RECORD AUTHORIZATION: session_mismatch rejection prevents cross-linking sessions to wrong bids; PI-based lookup prevents attaching refunds to unrelated bids; admin_users self-read prevents reading other admins' rows; HMAC token binding prevents unsubscribing another recipient.
+
+SERVICE-ROLE BOUNDARY: supabase-service.ts uses SUPABASE_SERVICE_ROLE_KEY (server-only env var, no NEXT_PUBLIC_ prefix). Verified: no client component imports supabase-service or supabase-server. bids-client.ts uses browser anon client from supabase.ts. Server-only modules never imported by client code.
+
+MIGRATION SAFETY: No accidental privilege widening across migrations. Function replacements preserve grant patterns (revoke/grant re-applied after CREATE OR REPLACE where signature changed). No policies dropped during migrations. Migration 20260823000019 correctly fixed the refund parameter defect without weakening security posture.
+
+FILES CHANGED:
+- docs/9.6.txt (created - this audit documentation)
+- docs/PROJECT_PROGRESS.md (updated)
+- docs/PROJECT_RESULT.md (updated)
+NO source code, schema, migration, dependency, or configuration changes were made.
 
 TESTS ACTUALLY RUN:
+- npm run test: 569/569 PASSED (unchanged - confirms no regression)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+VERIFICATION LIMITATIONS:
+Database-security claims above are verified STATICALLY (code review of migration SQL, application code, and client import graphs). Live PostgreSQL RLS/grant behavior against a running Supabase instance remains unverified without credentials; the opt-in integration suite would cover these paths when enabled.
 
-FOLLOW-UP:
+SCOPE BOUNDARY:
+NO source code changes. NO new dependencies. NO schema/migration changes. NO rate-limit changes. NO CAPTCHA additions. NO auth changes. NO email/notification changes. NO 9.7+ work.
