@@ -197,8 +197,8 @@ describe('createCheckoutSession', () => {
           },
         },
       ],
-      success_url: 'https://topbid.lol/success?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://topbid.lol/cancel',
+      success_url: 'https://topbid.lol/',
+      cancel_url: 'https://topbid.lol/',
     });
 
     const rpcCall = lastRpcCall();
@@ -241,7 +241,7 @@ describe('createCheckoutSession', () => {
     expect(result).toEqual({
       valid: false,
       reason: 'amount_below_minimum',
-      minimumBid: 2000,
+      minimumBid: 1600,
     });
     expect(stripeMock.createSession).not.toHaveBeenCalled();
   });

@@ -265,7 +265,7 @@ export async function getIncrementedMinimumBid(categorySlug: string): Promise<nu
   return highestBid.amount + category.increment;
 }
 
-export type MinimumBidBasis = 'starting_bid' | 'highest_bid_plus_increment';
+export type MinimumBidBasis = 'first_bid' | 'maximum_plus_one';
 
 export type MinimumBidInfo = {
   categoryId: string;
@@ -276,8 +276,11 @@ export type MinimumBidInfo = {
 
 /**
  * Determine the current minimum valid bid for a category from authoritative DB data.
- * - No paid bids -> minimum = category.starting_bid
- * - Existing paid highest bid -> minimum = highest_bid.amount + category.increment
+ *
+ * BUSINESS RULE (migration 20260823000023 - matches the create_pending_bid RPC floor):
+ * - No paid bids -> minimum = $1.00 (100 cents)
+ * - Existing paid highest bid -> minimum = highest.amount + $1.00
+ * The configured starting_bid/increment columns no longer participate in pricing.
  * - Returns null when the category does not exist or is inactive
  * - Server-side only (uses supabase-server anon client; respects RLS); never trusts
  *   client-provided minimums or category data
@@ -297,16 +300,16 @@ export async function getMinimumBidForCategory(
     return {
       categoryId: category.id,
       categorySlug: category.slug,
-      minimumBid: category.starting_bid,
-      basis: 'starting_bid',
+      minimumBid: 100,
+      basis: 'first_bid',
     };
   }
 
   return {
     categoryId: category.id,
     categorySlug: category.slug,
-    minimumBid: highestBid.amount + category.increment,
-    basis: 'highest_bid_plus_increment',
+    minimumBid: highestBid.amount + 100,
+    basis: 'maximum_plus_one',
   };
 }
 

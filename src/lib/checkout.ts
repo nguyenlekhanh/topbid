@@ -90,6 +90,9 @@ export async function createCheckoutSession(
       metadata: {
         bid_id: bid.id,
         category_id: bid.category_id,
+        // UI redesign: the bidder's public product URL / @handle travels with the
+        // payment for support/ops cross-reference. Never contains credentials.
+        ...(bid.bidder_name ? { product: bid.bidder_name } : {}),
       },
       line_items: [
         {
@@ -103,10 +106,13 @@ export async function createCheckoutSession(
           },
         },
       ],
-      // Task 4.3: Stripe replaces {CHECKOUT_SESSION_ID} on redirect so the success
-      // page can look up the bid authoritatively by session identifier.
-      success_url: `${buildAppUrl('/success')}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: buildAppUrl('/cancel'),
+      // Post-payment return: the user lands back on Home. The webhook (verified,
+      // exactly-once) remains the ONLY payment authority - the browser return is
+      // never treated as proof of payment, and no session identifier is embedded
+      // in the URL.
+      success_url: `${buildAppUrl('/')}`,
+      // Cancelled checkout also returns straight Home (no separate cancel surface).
+      cancel_url: `${buildAppUrl('/')}`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

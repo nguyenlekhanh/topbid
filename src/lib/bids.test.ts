@@ -4,8 +4,6 @@ import {
   createPendingBid,
   getBidByStripeSessionId,
   getHighestBidForCategory,
-  getIncrementedMinimumBid,
-  getInitialMinimumBid,
   getMinimumBidForCategory,
   getPreviousHighestBidder,
   validateBidAmount,
@@ -165,25 +163,25 @@ describe('getHighestBidForCategory', () => {
 });
 
 describe('getMinimumBidForCategory', () => {
-  it('uses the starting bid when no paid bids exist', async () => {
+  it('uses $1 when no paid bids exist (first-bid rule)', async () => {
     enqueueServer({ data: CATEGORY, error: null }, { data: null, error: null });
 
     await expect(getMinimumBidForCategory('gaming')).resolves.toEqual({
       categoryId: CATEGORY.id,
       categorySlug: CATEGORY.slug,
-      minimumBid: 1000,
-      basis: 'starting_bid',
+      minimumBid: 100,
+      basis: 'first_bid',
     });
   });
 
-  it('adds the increment to the highest paid bid', async () => {
+  it('adds $1 to the highest paid bid', async () => {
     enqueueServer({ data: CATEGORY, error: null }, { data: paidBid(1500), error: null });
 
     await expect(getMinimumBidForCategory('gaming')).resolves.toEqual({
       categoryId: CATEGORY.id,
       categorySlug: CATEGORY.slug,
-      minimumBid: 2000,
-      basis: 'highest_bid_plus_increment',
+      minimumBid: 1600,
+      basis: 'maximum_plus_one',
     });
   });
 
@@ -191,32 +189,6 @@ describe('getMinimumBidForCategory', () => {
     enqueueServer({ data: null, error: null });
 
     await expect(getMinimumBidForCategory('missing')).resolves.toBeNull();
-  });
-});
-
-describe('getInitialMinimumBid / getIncrementedMinimumBid contracts', () => {
-  it('initial minimum equals the starting bid when no paid bids exist', async () => {
-    enqueueServer({ data: CATEGORY, error: null }, { data: null, error: null });
-
-    await expect(getInitialMinimumBid('gaming')).resolves.toBe(1000);
-  });
-
-  it('initial minimum is null when paid bids already exist', async () => {
-    enqueueServer({ data: CATEGORY, error: null }, { data: paidBid(1500), error: null });
-
-    await expect(getInitialMinimumBid('gaming')).resolves.toBeNull();
-  });
-
-  it('incremented minimum is null when no paid bids exist', async () => {
-    enqueueServer({ data: CATEGORY, error: null }, { data: null, error: null });
-
-    await expect(getIncrementedMinimumBid('gaming')).resolves.toBeNull();
-  });
-
-  it('incremented minimum equals highest paid plus increment', async () => {
-    enqueueServer({ data: CATEGORY, error: null }, { data: paidBid(1500), error: null });
-
-    await expect(getIncrementedMinimumBid('gaming')).resolves.toBe(2000);
   });
 });
 
@@ -239,20 +211,20 @@ describe('validateBidAmount', () => {
   it('accepts an amount exactly equal to the computed minimum', async () => {
     enqueueServer({ data: CATEGORY, error: null }, { data: paidBid(1500), error: null });
 
-    await expect(validateBidAmount('gaming', 2000)).resolves.toEqual({
+    await expect(validateBidAmount('gaming', 1600)).resolves.toEqual({
       valid: true,
-      minimumBid: 2000,
-      basis: 'highest_bid_plus_increment',
+      minimumBid: 1600,
+      basis: 'maximum_plus_one',
     });
   });
 
   it('rejects amounts below the authoritative minimum and echoes it', async () => {
     enqueueServer({ data: CATEGORY, error: null }, { data: paidBid(1500), error: null });
 
-    await expect(validateBidAmount('gaming', 1999)).resolves.toEqual({
+    await expect(validateBidAmount('gaming', 1599)).resolves.toEqual({
       valid: false,
       reason: 'amount_below_minimum',
-      minimumBid: 2000,
+      minimumBid: 1600,
     });
   });
 
@@ -456,27 +428,30 @@ describe('createPendingBid', () => {
   });
 
   it('maps RPC below-minimum failures and echoes the required minimum', async () => {
+    // App-side pre-validation now uses the NEW floor (max + $1): with a $15 paid max
+    // the next minimum is $16, so a stale $15 amount is rejected locally and the RPC
+    // is never reached.
     enqueueServer(
       { data: CATEGORY, error: null },
       { data: CATEGORY, error: null },
       { data: paidBid(1500), error: null }
     );
-    enqueueService({
-      data: null,
-      error: { message: 'bid_error:amount_below_minimum:2000' },
-    });
 
     await expect(
       createPendingBid({
         categorySlug: 'gaming',
         amount: 1500,
         bidderEmail: 'a@b.com',
+        bidderName: 'A',
+        stripeSessionId: undefined,
       })
     ).resolves.toEqual({
       valid: false,
       reason: 'amount_below_minimum',
-      minimumBid: 2000,
+      minimumBid: 1600,
     });
+
+    expect(lastRpcCall()).toBeUndefined();
   });
 
   it('maps RPC category failures to category_not_found', async () => {

@@ -79,12 +79,14 @@ export interface RateLimiter {
  * - shareEvents  : 30 / minute per IP   (public telemetry write flood cap)
  * - unsubscribe  : 10 / minute per IP   (public blocklist mutation flood cap)
  * - refund       : 20 / hour per admin  (money movement bounded per administrator)
+ * - bidCheckout  : 10 / minute per IP   (checkout-session creation flood cap)
  */
 export const RATE_LIMIT_RULES = {
   adminLogin: { limit: 10, windowMs: 10 * 60_000 },
   shareEvents: { limit: 30, windowMs: 60_000 },
   unsubscribe: { limit: 10, windowMs: 60_000 },
   refund: { limit: 20, windowMs: 60 * 60_000 },
+  bidCheckout: { limit: 10, windowMs: 60_000 },
 } as const;
 
 /** Shared instances used by the route handlers. */
@@ -95,6 +97,7 @@ export const rateLimiters = {
   shareEvents: createRateLimiter(),
   unsubscribe: createRateLimiter(),
   refund: createRateLimiter(),
+  bidCheckout: createRateLimiter(),
 };
 
 // Track shared instances so tests can deterministically clear window state between
@@ -103,7 +106,8 @@ sharedLimiters.push(
   rateLimiters.adminLogin,
   rateLimiters.shareEvents,
   rateLimiters.unsubscribe,
-  rateLimiters.refund
+  rateLimiters.refund,
+  rateLimiters.bidCheckout
 );
 
 /** Test/operations hook: clears all tracked windows on the shared limiters. */
