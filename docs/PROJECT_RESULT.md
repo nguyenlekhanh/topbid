@@ -2880,4 +2880,19 @@ _
 
 ---
 
+### Task 10.4
+
+- **Date**: 2026-08-25
+- **Objective**: Establish/document the custom-domain configuration using the existing Vercel strategy - identify the intended final HTTPS domain from the repository, audit every absolute-URL consumer, confirm single-source derivation from NEXT_PUBLIC_APP_URL with no hard-coded hosts or untrusted-origin influence - and document the exact operator runbook including the Task 10.3 webhook dependency
+- **Status**: Completed as documentation-only task. Intended domain established (topbid.lol); DNS/Vercel/TLS verification PENDING operator execution. No live infrastructure changed.
+- **Audit findings**: intended domain topbid.lol is repository-established (AGENTS.md product name + env example, SITE_NAME in category metadata, https://topbid.lol stub across every URL-builder suite); all nine production absolute-URL consumers derive solely from NEXT_PUBLIC_APP_URL through builders that normalize trailing slashes identically (checkout success/cancel, success-page share base, buildPublicShareUrl, buildCategoryUrl, canonical/OG metadata, OG image route, bid-again anchor, unsubscribe links, X intent); the ONLY hard-coded absolute host in production code is the intentional third-party https://x.com/intent/tweet destination; scripted scan found no localhost/preview hostnames outside test files; untrusted input cannot control origins (slugs percent-encoded into fixed path segments; admin open-redirect protections untouched); no private identifiers enter public URLs by construction
+- **Webhook correction**: documentation now pins the repository's actual webhook path /api/webhooks/stripe (superseding 10.3's generic placeholder), to be updated to https://topbid.lol/api/webhooks/stripe after domain verification, with the signing-secret rotation caveat on endpoint URL edit
+- **Live vs static**: (a) verified from repository/code: audit above; (b) verified in Vercel/DNS: nothing - registration/DNS/TLS state unknown and unchanged; "custom domain is live" NOT claimed; (c) operator steps in docs/10.4.txt: registrar ownership -> Vercel Domains attachment (apex/www redirect choice) -> create EXACTLY the DNS records Vercel displays (no fabricated values) -> wait for DNS+TLS -> set NEXT_PUBLIC_APP_URL=https://topbid.lol in Production and REDEPLOY (build-time inlined) -> update LIVE Stripe webhook endpoint URL per above -> post-switch spot checks (canonical/OG/share/unsubscribe/checkout over HTTPS)
+- **Files changed**: docs/10.4.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md (no code/config/DNS changes)
+- **Tests performed**: npm run test 617/617 PASSED (existing suites already pin every URL builder against https://topbid.lol incl. trailing slashes, encoding, identifier-free guarantees; NO new tests added because no 10.4 correctness gap was found); typecheck/lint/format:check/build all PASSED
+- **Scope statement**: NO 10.5+ functionality implemented (SEO work limited to preserving existing canonical/OG generation; no analytics/monitoring/perf/mobile/QA)
+- **Follow-up work**: Task 10.5 - SEO optimization (after operator completes items so canonical/OG URLs serve the final domain)
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

@@ -1,32 +1,124 @@
 ﻿TASK ID: 10.4
 PHASE: 10
 TITLE: Custom domain
-STATUS: pending
+STATUS: completed (intended domain established from repository; DNS/Vercel/TLS verification PENDING - operator action required)
 
 OBJECTIVE:
+Establish/document the custom-domain configuration for the production deployment using
+the existing Vercel strategy: identify the intended final HTTPS production domain, audit
+every place the application derives absolute public URLs, confirm they all flow from
+NEXT_PUBLIC_APP_URL with no hard-coded hosts or untrusted-origin influence, and document
+the exact operator steps (Vercel domain + DNS + TLS verification + env update + redeploy
++ webhook endpoint URL update per Task 10.3's dependency note).
 
-SCOPE:
+INTENDED PRODUCTION DOMAIN (repository-established):
+topbid.lol - identified from the repository itself: AGENTS.md names the product
+"Topbid.lol" and its environment-variable documentation uses "https://topbid.lol" as the
+APP_URL example; SITE_NAME 'Topbid.lol' is baked into category metadata; every URL-
+building test suite in the repository already stubs NEXT_PUBLIC_APP_URL as
+https://topbid.lol. This value is therefore used as the intended final domain below -
+clearly marked INTENDED: its registration/DNS/Vercel attachment/TLS state could NOT be
+verified from this environment, so it must not be treated as live.
 
-OUT OF SCOPE:
+ABSOLUTE-URL CONSUMER AUDIT (every production site that derives a public URL):
 
-INPUTS / DEPENDENCIES:
+| Consumer                                   | Derives from        | Notes                                                     |
+|--------------------------------------------|---------------------|-----------------------------------------------------------|
+| checkout.ts buildAppUrl -> success_url / cancel_url | NEXT_PUBLIC_APP_URL | success carries {CHECKOUT_SESSION_ID} template; trailing slashes stripped |
+| success/page.tsx getAppBaseUrl             | NEXT_PUBLIC_APP_URL | feeds X intent + clipboard share destination               |
+| share-url.ts buildPublicShareUrl           | base param (APP_URL)| homepage leaderboard anchor; never leaks session ids       |
+| share-url.ts buildCategoryUrl              | base param (APP_URL)| slug percent-encoded into one path segment                 |
+| category-metadata.ts buildCategoryMetadata | NEXT_PUBLIC_APP_URL | canonical + openGraph.url = public category route          |
+| categories/[slug]/opengraph-image.tsx      | loadCategoryPageData| OG image route; no absolute URLs of its own                |
+| outbid-notification.ts buildBidAgainUrl    | NEXT_PUBLIC_APP_URL | #categories-heading anchor                                 |
+| unsubscribe.ts buildUnsubscribeUrl         | NEXT_PUBLIC_APP_URL | capability-token link; token only, no raw email            |
+| x-share.ts X_INTENT_BASE                   | constant            | https://x.com/intent/tweet - the ONLY hard-coded absolute host in production code; intentional third-party destination, not an app origin |
 
-IMPLEMENTATION REQUIREMENTS:
+VERIFICATION RESULTS:
 
-FILES EXPECTED TO CHANGE:
+A. VERIFIED FROM REPOSITORY/CODE:
+1. Single source of truth: every app-origin URL flows from NEXT_PUBLIC_APP_URL through
+   builders that all normalize trailing slashes identically (replace(/\/+$/, '')).
+   No duplicate/parallel URL architecture exists - nothing needed rewriting.
+2. NO localhost/preview/other hostname is hard-coded anywhere in production sources:
+   scripted scan of all non-test .ts/.tsx found exactly one literal absolute host
+   (x.com intent base above). All localhost occurrences live in test files.
+3. Untrusted input cannot control the origin/base: slugs reach URLs only after
+   encodeURIComponent inside fixed path segments; query params never influence the
+   base; admin post-login redirects keep their 8.1/9.x open-redirect protections
+   (sanitizeNextPath + resolved-origin equality) - untouched.
+4. No private data enters public URLs by construction: shares target anchors on the
+   public homepage/category routes (never /success?session_id=...); unsubscribe links
+   carry only the HMAC capability token; canonical/OG URLs contain DB-sourced names/
+   slugs only.
+5. Webhook route actual path confirmed: src/app/api/webhooks/stripe/route.ts ->
+   POST /api/webhooks/stripe. (Note: this corrects the generic path placeholder used in
+   earlier prose; the repository's actual route path is authoritative.)
+6. HTTPS: production correctness requires NEXT_PUBLIC_APP_URL to be the https:// origin;
+   Vercel-managed domains provide TLS automatically once verification completes. The
+   .env.example dev default remains http://localhost:3000 (dev-only, gitignored values
+   aside).
 
-TEST PLAN:
+B. VERIFIED IN VERCEL/DNS: NOTHING - no Vercel team/project access and no DNS visibility
+   exist in this environment. Domain registration status, DNS records, and TLS state are
+   UNKNOWN and were not changed. "The custom domain is live" is NOT claimed.
 
-DEFINITION OF DONE:
+C. OPERATOR ACTIONS STILL REQUIRED (in order):
+   1. Register/own the topbid.lol domain at the operator's registrar (if not already).
+   2. Vercel Project Settings -> Domains: add topbid.lol to the production project;
+      choose whether www.topbid.lol should redirect to apex (or vice versa) and add both
+      as appropriate.
+   3. At the registrar/DNS provider, create EXACTLY the records Vercel displays for the
+      domain (typically an A record for the apex and/or a CNAME for www pointing at
+      Vercel's endpoints - use the live values shown in the dashboard; do not copy
+      second-hand values). Wait until Vercel reports DNS verified and the TLS
+      certificate is issued (HTTPS active).
+   4. Set NEXT_PUBLIC_APP_URL=https://topbid.lol in Vercel Production environment
+      variables (replacing any placeholder), then REDEPLOY production - NEXT_PUBLIC_*
+      values are inlined at BUILD time, so an existing deployment keeps serving stale
+      origins until rebuilt. Confirm no other scope still carries a localhost/test URL.
+   5. Update the LIVE Stripe webhook endpoint URL (Dashboard -> Developers -> Webhooks)
+      to https://topbid.lol/api/webhooks/stripe (the repository's actual route path),
+      keeping the three subscribed events unchanged. If Stripe rotates the endpoint's
+      signing secret on URL edit, update STRIPE_WEBHOOK_SECRET in Vercel accordingly;
+      if it does not, leave it untouched. Never commit the secret.
+   6. Post-switch spot checks on the live domain (no money movement required): homepage
+      loads over HTTPS, a category page's canonical + OG tags show
+      https://topbid.lol/categories/<slug>, share/copy links carry the new origin,
+      unsubscribe links resolve, checkout redirect lands back on
+      https://topbid.lol/success?session_id=...
 
-IMPLEMENTATION NOTES:
+SECURITY/PRIVACY CONSIDERATIONS:
+- The origin is configuration, never user input: even malformed/malicious route input
+  can only affect path segments (percent-encoded) - never scheme/host/port.
+- Session ids remain confined to the user's own success redirect; shares/unsubscribe/
+  canonical/OG surfaces stay identifier-free as audited.
+- No DNS values were fabricated; operator must use the exact records Vercel displays.
+- No provider credentials handled or committed; no infrastructure was changed by this
+  task.
 
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- docs/10.4.txt (this file), PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 617/617 PASSED across 40 files (existing suites already pin every URL
+  builder against https://topbid.lol incl. trailing-slash normalization, encoding, and
+  identifier-free guarantees - no new tests added because NO 10.4 correctness gap was
+  found)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY:
+NO 10.5+ work: no SEO work beyond preserving existing canonical/OG generation, no
+analytics/monitoring/perf/mobile/QA. NO hosting-provider change, NO DNS edits, NO domain
+purchases, NO code changes (URL architecture already centralized and correct). Task
+10.3's webhook dependency is now fully documented against the real route path; executing
+it remains part of the operator checklist.
 
 KNOWN ISSUES:
+None in code. Operational caveat consistent with 10.1-10.3: the domain is intended but
+NOT live-verified; "custom domain live" may only be claimed after checklist items 1-5
+succeed.
 
 FOLLOW-UP:
+Task 10.5 - SEO optimization (after operator completes items 1-5 so canonical/OG URLs
+serve the final domain).
