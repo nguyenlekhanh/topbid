@@ -78,6 +78,13 @@ type SharedBidsChannel = {
   supabase: ReturnType<typeof createClient>;
   channel: unknown;
   handlers: Set<{ onChange: BidChangeHandler; onStatusChange?: StatusHandler }>;
+  /**
+   * Set when OUR cleanup initiates removeChannel (last subscriber out). Phoenix then
+   * fires the channel's close lifecycle, which surfaces as status CLOSED - an EXPECTED
+   * transition for self-initiated teardown, not an outage. fanOutStatus consults this
+   * flag to stay silent for that case only.
+   */
+  intentionallyClosed: boolean;
 };
 
 const sharedBidsChannels = new WeakMap<object, Map<string, SharedBidsChannel>>();
@@ -103,6 +110,12 @@ export function subscribeToBidChanges(
     let hasDisconnected = false;
 
     const fanOutStatus = (status: string): void => {
+      // Intentional self-teardown (our own removeChannel) surfaces as CLOSED via the
+      // phoenix leave lifecycle. Expected - never an outage signal.
+      if (status === 'CLOSED' && shared?.intentionallyClosed) {
+        return;
+      }
+
       switch (status) {
         case 'CHANNEL_ERROR':
         case 'TIMED_OUT':
@@ -166,7 +179,7 @@ export function subscribeToBidChanges(
       )
       .subscribe(fanOutStatus);
 
-    shared = { supabase, channel, handlers };
+    shared = { supabase, channel, handlers, intentionallyClosed: false };
     byTopic.set(TOPIC, shared);
   }
 
@@ -187,6 +200,10 @@ export function subscribeToBidChanges(
 
     if (current.handlers.size === 0) {
       byTopic.delete(TOPIC);
+
+      // Mark BEFORE removing: phoenix fires the close lifecycle (status CLOSED) as
+      // part of this intentional leave, which fanOutStatus must stay silent about.
+      current.intentionallyClosed = true;
 
       void current.supabase.removeChannel(
         current.channel as Parameters<typeof supabase.removeChannel>[0]

@@ -378,4 +378,77 @@ describe('shared channel fan-out with multiple subscribers (runtime fix)', () =>
     expect(statusesA).toEqual(['disconnected', 'connected']);
     expect(statusesB).toEqual(['disconnected', 'connected']);
   });
+
+  describe('CLOSED lifecycle semantics (intentional teardown vs outage)', () => {
+    it('self-teardown fires CLOSED but logs nothing and emits no disconnected signal', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onStatusChange = vi.fn();
+
+      const unsubscribe = subscribeToBidChanges(() => {}, onStatusChange);
+
+      // Last subscriber out -> intentional removeChannel -> phoenix leave lifecycle
+      // surfaces CLOSED afterwards.
+      unsubscribe();
+
+      for (const handler of [...supabaseMock.state.statusHandlers]) {
+        handler('CLOSED');
+      }
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(onStatusChange).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('an externally generated CLOSED is still treated as an outage', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onStatusChange = vi.fn();
+
+      subscribeToBidChanges(() => {}, onStatusChange);
+
+      // No self-teardown happened: the server/provider closed the topic.
+      supabaseMock.state.statusHandlers[0]('CLOSED');
+
+      expect(errorSpy).toHaveBeenCalledWith('[realtime] bids channel problem: CLOSED');
+      expect(onStatusChange).toHaveBeenCalledWith('disconnected');
+      errorSpy.mockRestore();
+    });
+
+    it('CHANNEL_ERROR/TIMED_OUT handling is unchanged when other subscribers remain', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onStatusChange = vi.fn();
+
+      const leaving = subscribeToBidChanges(() => {});
+      const stayingUnsub = subscribeToBidChanges(() => {}, onStatusChange);
+
+      // Partial unsubscribe: NOT last out -> intentional-teardown flag stays false.
+      leaving();
+
+      for (const handler of [...supabaseMock.state.statusHandlers]) {
+        handler('CHANNEL_ERROR');
+        handler('TIMED_OUT');
+      }
+
+      expect(errorSpy).toHaveBeenCalledTimes(1); // once-per-outage dedup preserved
+      expect(onStatusChange.mock.calls.map(([status]) => status)).toEqual(['disconnected']);
+      expect(stayingUnsub).toBeTypeOf('function');
+      errorSpy.mockRestore();
+    });
+
+    it('a fully-torn-down subscription notifies no subscribers on later statuses', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onStatusChange = vi.fn();
+
+      const unsubscribe = subscribeToBidChanges(() => {}, onStatusChange);
+      unsubscribe();
+
+      for (const handler of [...supabaseMock.state.statusHandlers]) {
+        handler('CHANNEL_ERROR');
+        handler('TIMED_OUT');
+      }
+
+      // No subscriber remains, so no disconnected/connected signal can be emitted.
+      expect(onStatusChange).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+  });
 });
