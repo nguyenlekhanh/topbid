@@ -4,9 +4,12 @@ import { redirect } from 'next/navigation';
 
 import { getAdminAuthorization } from '@/lib/admin-auth';
 import { loadAdminOverview, type AdminOverview } from '@/lib/admin-dashboard';
+import { NO_INDEX } from '@/lib/seo';
 import { createClient } from '@/lib/supabase-server';
 
+// Task 10.5: private admin surface - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Admin dashboard — Topbid.lol',
 };
 

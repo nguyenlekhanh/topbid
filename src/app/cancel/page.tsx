@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { NO_INDEX } from '@/lib/seo';
+
+// Task 10.5: checkout plumbing - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Checkout cancelled — Topbid.lol',
 };
 

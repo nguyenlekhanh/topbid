@@ -13,9 +13,21 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+// Task 10.5: site-wide metadata. metadataBase resolves relative OG/twitter URLs
+// against the single trusted origin (the same NEXT_PUBLIC_APP_URL every other URL
+// builder uses); it is omitted when unconfigured so local builds never crash - Next.js
+// then falls back to relative resolution with a warning instead of an error.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '') || null;
+
 export const metadata: Metadata = {
+  ...(appUrl ? { metadataBase: new URL(appUrl) } : {}),
   title: 'Topbid.lol',
   description: 'A simple public bidding/leaderboard website',
+  openGraph: {
+    type: 'website',
+    siteName: 'Topbid.lol',
+    ...(appUrl ? { url: appUrl } : {}),
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

@@ -1,32 +1,119 @@
 ﻿TASK ID: 10.5
 PHASE: 10
 TITLE: SEO optimization
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Implement the SEO work required by PROJECT_PLAN.md Task 10.5 on top of the Task 7.5/7.6
+metadata foundation: site-wide metadata with a correct metadataBase, framework-native
+robots.txt and sitemap.xml containing ONLY legitimate public/indexable URLs, and
+explicit noindex directives for every private/non-SEO surface - without changing payment,
+authentication, or any security boundary, and without inventing requirements beyond the
+plan.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+EXISTING SEO BEHAVIOR (Tasks 7.5+7.6 - preserved verbatim):
+- /categories/[slug] generateMetadata via category-metadata.ts: title "{name} — Topbid.lol",
+  authoritative-or-fallback description, canonical alternates URL, openGraph
+  title/description/url/siteName/type, twitter summary card; unresolvable slugs fall
+  through to notFound() (no existence leak)
+- Dynamic OG image route (opengraph-image.tsx) at 1200x630 with neutral brand-only card
+  for unresolvable slugs
+- Root layout carried only title + description; no metadataBase, no robots/sitemap files
+- Static `export const metadata` existed on success/cancel and all admin pages (title
+  only); /unsubscribe had NO metadata export at all
 
-INPUTS / DEPENDENCIES:
+ROUTES INVENTORY:
+Public/indexable by design: / (homepage), /categories/[slug].
+Private/non-SEO: /success (session id in URL), /cancel (payment plumbing),
+/unsubscribe (capability-token landing - indexing could expose tokens), all /admin/*
+(authentication + dashboards), /api/* (machine endpoints).
 
-IMPLEMENTATION REQUIREMENTS:
+IMPLEMENTATION:
 
-FILES EXPECTED TO CHANGE:
+1. src/app/layout.tsx - site-wide metadata:
+   - metadataBase = new URL(NEXT_PUBLIC_APP_URL) so relative OG/twitter URLs resolve to
+     absolute ones against the single trusted origin (the same source every builder
+     uses); conditionally applied so local builds without the env never crash
+   - openGraph defaults (type website, siteName Topbid.lol, url)
+2. src/app/robots.ts (NEW, framework-native MetadataRoute.Robots):
+   - allow: '/' for all user agents
+   - disallow prefixes: /admin, /api, /success, /cancel, /unsubscribe
+   - sitemap advertised as {APP_URL}/sitemap.xml (omitted cleanly when APP_URL is
+     unconfigured - never throws)
+3. src/app/sitemap.ts (NEW, force-dynamic, data-authoritative):
+   - homepage + one entry per ACTIVE category from the EXISTING RLS-safe active-only
+     listCategories() query - inactive/nonexistent categories are structurally
+     impossible to list and nothing is hard-coded
+   - URLs built through the existing canonical helper buildCategoryUrl (percent-encodes
+     slugs into fixed path segments) - no duplicated URL logic
+   - database failure degrades to homepage-only rather than erroring the endpoint
+4. src/lib/seo.ts (NEW): single exported NO_INDEX directive ({robots: {index:false,
+   follow:false}}) consumed by every non-indexable page so tests pin the shared object
+   instead of hand-copied variants
+5. NO_INDEX applied to: /success, /cancel, /unsubscribe (new metadata export added),
+   /admin, /admin/login, /admin/categories, /admin/bids, /admin/payments,
+   /admin/banned, /admin/audit-logs
 
-TEST PLAN:
+PRESERVED UNCHANGED:
+- Public URL architecture and NEXT_PUBLIC_APP_URL as the only origin source
+- Category-page dynamic rendering and data authority
+- Open Graph/Twitter behavior from Tasks 7.5-7.6
+- Payment/authentication/webhook/admin-authorization behavior
+- No analytics/tracking/schema.org structured data introduced (not required by plan)
 
-DEFINITION OF DONE:
+SECURITY/PRIVACY CONSIDERATIONS:
+- No secrets, session ids, Stripe ids, emails, unsubscribe tokens, or internal ids in
+  ANY SEO output: sitemap contains origin + encoded slugs only; robots contains path
+  prefixes only; noindex pages additionally tell crawlers to stay away entirely
+- Inactive/nonexistent categories cannot become indexable (RLS active-only query is the
+  same boundary public pages use)
+- Private-resource existence is not advertised: /admin* excluded from robots AND
+  noindex'd (defense in depth); /api excluded
+- Unsubscribe capability tokens can no longer leak into search engines (page noindex +
+  robots disallow)
+- All server-only values stay server-side; metadataBase reads only the PUBLIC env var
 
-IMPLEMENTATION NOTES:
+TESTS ADDED (20 deterministic tests):
+- src/app/robots.test.ts (4): exact rules block every private prefix while allowing '/',
+  absolute sitemap URL from configured origin incl. trailing-slash normalization, clean
+  omission of the sitemap field when APP_URL is absent
+- src/app/sitemap.test.ts (5): homepage + active categories, slug percent-encoding via
+  the shared helper, structural exclusion of /success /cancel /unsubscribe /admin /api,
+  empty result without DB call when APP_URL missing, graceful homepage-only degradation
+  when listCategories throws
+- src/app/private-pages-seo.test.ts (11): imports each private page's static metadata
+  export and pins it to the EXACT shared NO_INDEX object (noindex+nofollow), plus an
+  inventory test covering all ten private surfaces
 
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/app/layout.tsx (site-wide metadata + conditional metadataBase)
+- src/app/robots.ts, src/app/sitemap.ts (new framework-native routes)
+- src/lib/seo.ts (shared NO_INDEX constant)
+- src/app/success/page.tsx, src/app/cancel/page.tsx, src/app/unsubscribe/page.tsx
+  (+7 admin pages): NO_INDEX applied
+- src/app/robots.test.ts, src/app/sitemap.test.ts, src/app/private-pages-seo.test.ts
+  (new tests)
+- docs/10.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 637/637 PASSED across 43 files (+20 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+- Repository-level verification only; live search-engine crawling/indexing behavior
+  requires a deployed production domain (operator checklist items from 10.1-10.4) and
+  was NOT verified
+
+SCOPE BOUNDARY (explicit):
+NO 10.6+ work: no analytics setup (10.6), no error monitoring (10.7), no performance
+review (10.8), no mobile testing (10.9), no final QA (10.10), no launch checklist
+(10.11). No schema.org structured data, no third-party SEO dependencies, no changes to
+Stripe/payment/auth behavior, no security weakening. Production infrastructure untouched.
 
 KNOWN ISSUES:
+None. Operational caveat consistent with prior Phase 10 tasks: robots/sitemap/metadata
+serve correct content immediately after deploy, but real-world indexing depends on the
+live domain/DNS/TLS state covered by the operator checklists.
 
 FOLLOW-UP:
+Task 10.6 - Analytics setup.

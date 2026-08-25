@@ -3,10 +3,13 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { readAuditLogs, type AuditLogRow } from '@/lib/audit-log';
+import { NO_INDEX } from '@/lib/seo';
 
 import { createClient } from '@/lib/supabase-server';
 
+// Task 10.5: private admin surface - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Audit logs — Topbid.lol',
 };
 

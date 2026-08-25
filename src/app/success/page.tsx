@@ -3,10 +3,13 @@ import type { Metadata } from 'next';
 import SuccessState from '@/components/SuccessState';
 import { extractSessionId, resolveBidSuccessView } from '@/lib/bid-success';
 import { getBidByStripeSessionId } from '@/lib/bids';
+import { NO_INDEX } from '@/lib/seo';
 import { buildPublicShareUrl } from '@/lib/share-url';
 import { buildXShareText, buildXShareUrl } from '@/lib/x-share';
 
+// Task 10.5: payment-result surface - never indexed (URL carries a session id).
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Bid success — Topbid.lol',
 };
 

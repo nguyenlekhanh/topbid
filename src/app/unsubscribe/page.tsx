@@ -1,10 +1,18 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { NO_INDEX } from '@/lib/seo';
 import { hasUnsubscribeRecord, isValidUnsubscribeTokenShape } from '@/lib/unsubscribe';
 
 // Reads request searchParams and performs an authoritative suppression lookup per
 // request - never prerendered.
 export const dynamic = 'force-dynamic';
+
+// Task 10.5: capability-token surface - never indexed (indexing could expose tokens).
+export const metadata: Metadata = {
+  ...NO_INDEX,
+  title: 'Unsubscribe — Topbid.lol',
+};
 
 /**
  * Unsubscribe landing page (Task 6.6).

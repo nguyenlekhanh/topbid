@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listBannedEmails } from '@/lib/email-bans';
+import { NO_INDEX } from '@/lib/seo';
 import { lookupRecordValue } from '@/lib/safe-lookup';
 import { createClient } from '@/lib/supabase-server';
 
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Banned emails — Topbid.lol',
 };
 

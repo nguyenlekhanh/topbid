@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { sanitizeNextPath } from '@/lib/admin-auth';
+import { NO_INDEX } from '@/lib/seo';
 
+// Task 10.5: private admin surface - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Admin login — Topbid.lol',
 };
 

@@ -3,9 +3,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listAllBidsForAdmin, type AdminBidStatus } from '@/lib/admin-bid-management';
+import { NO_INDEX } from '@/lib/seo';
 import { createClient } from '@/lib/supabase-server';
 
+// Task 10.5: private admin surface - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Bid management — Topbid.lol',
 };
 

@@ -2895,4 +2895,20 @@ _
 
 ---
 
+### Task 10.5
+
+- **Date**: 2026-08-25
+- **Objective**: Implement the SEO work required by PROJECT_PLAN.md Task 10.5 on the Task 7.5/7.6 metadata foundation - site-wide metadata, framework-native robots.txt and sitemap.xml limited to legitimate public URLs, and explicit noindex for every private surface - without new dependencies, analytics/tracking, or changes to payment/auth behavior
+- **Status**: Completed. Repository-level implementation + deterministic tests; live search-engine behavior requires deployed production domain (operator checklists) and was NOT verified
+- **Audit findings**: Task 7.5/7.6 already provided category canonical/OG/twitter metadata + dynamic OG images; root layout had only title/description (no metadataBase); no robots/sitemap existed; /unsubscribe had no metadata export at all; success/cancel/admin pages had title-only metadata
+- **Implementation**: conditional metadataBase + openGraph defaults in root layout (never crashes unconfigured local builds); src/app/robots.ts (allow '/', disallow /admin|/api|/success|/cancel|/unsubscribe, sitemap advertised from APP_URL); src/app/sitemap.ts (force-dynamic; homepage + ACTIVE categories via existing RLS-safe listCategories and the shared buildCategoryUrl helper with percent-encoded slugs; homepage-only degradation on DB failure); src/lib/seo.ts single NO_INDEX directive applied to all ten private pages
+- **Security/privacy**: sitemap contains origin + encoded slugs only; inactive/nonexistent categories structurally cannot be listed (RLS active-only boundary shared with public pages); private surfaces both robots-disallowed AND noindex'd (defense in depth, no existence advertising); unsubscribe tokens can no longer leak into search engines; no secrets/session ids/payment identifiers/emails/tokens in any SEO output; server-only values stay server-side
+- **Tests added**: 20 deterministic tests - robots rules/sitemap advertisement/trailing-slash normalization/clean missing-env omission; sitemap contents, slug encoding via shared helper, structural exclusion of all private prefixes, DB-failure degradation, empty-without-DB-call when origin missing; every private page's metadata pinned to the exact shared NO_INDEX object plus a full inventory test
+- **Files changed**: src/app/layout.tsx; NEW src/app/robots.ts, src/app/sitemap.ts, src/lib/seo.ts, src/app/robots.test.ts, src/app/sitemap.test.ts, src/app/private-pages-seo.test.ts; NO_INDEX applied in success/cancel/unsubscribe + 7 admin pages; docs/10.5.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 637/637 PASSED across 43 files (+20 net); typecheck/lint/format:check/build all PASSED
+- **Scope statement**: NO 10.6+ functionality implemented (no analytics/monitoring/perf/mobile/QA; no schema.org structured data; no third-party SEO dependencies)
+- **Follow-up work**: Task 10.6 - Analytics setup
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

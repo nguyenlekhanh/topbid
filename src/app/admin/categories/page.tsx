@@ -6,10 +6,13 @@ import {
   listAllCategoriesForAdmin,
   type CategoryManagementErrorReason,
 } from '@/lib/admin-category-management';
+import { NO_INDEX } from '@/lib/seo';
 import { lookupRecordValue } from '@/lib/safe-lookup';
 import { createClient } from '@/lib/supabase-server';
 
+// Task 10.5: private admin surface - never indexed.
 export const metadata: Metadata = {
+  ...NO_INDEX,
   title: 'Category management — Topbid.lol',
 };
 
