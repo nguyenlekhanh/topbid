@@ -1,32 +1,114 @@
 ﻿TASK ID: 10.8
 PHASE: 10
 TITLE: Performance review
-STATUS: pending
+STATUS: completed (documentation-only review; architecture verified appropriate - no production changes required)
 
 OBJECTIVE:
+Review application architecture and performance-sensitive paths, identify actual or
+credible bottlenecks, and make ONLY concrete defensible improvements. Per the task's
+core rule this is a review, not a refactor: documentation-only conclusions are valid
+where the current architecture is already appropriate.
 
-SCOPE:
+METHODOLOGY (repository/build evidence only - no production traffic was measured):
+- Production build route classification (static vs dynamic) from `npm run build`
+- Dependency inspection via package.json + scripted import scans
+- Client/server component inventory (15 components)
+- Query-structure audit against the migration-defined index set (Tasks 2.3/10.2)
+- Caching-primitive scan (`unstable_cache` / `revalidate` / `use cache`)
+- Prior phase audits reused: query helpers (Phase 2/3), tracker coalescing (Phase 5),
+  admin parallelization (8.2), error-path discipline (9.11)
 
-OUT OF SCOPE:
+FINDINGS BY AREA:
 
-INPUTS / DEPENDENCIES:
+1. RENDERING (build-classified):
+   Static (correct): / (presentation shell - ALL live values arrive via client-side
+   RLS-respecting trackers after hydration), /cancel (zero data), /robots.txt (policy
+   only, no DB).
+   Dynamic (correctness-required): /categories/[slug] + opengraph-image (authoritative
+   current highest bid), /sitemap.xml (active categories), /success + /unsubscribe
+   (per-request untrusted-input lookups), /admin/* (auth-gated), all /api/*.
+   Verdict: every static choice is presentation-only; every dynamic choice exists
+   because serving stale data would present non-authoritative state. No changes.
+2. CLIENT/SERVER SPLIT: 10 client components, each justified by interactivity or
+   realtime data (BidButton/BidModal, Leaderboard/RecentBids/HighestBidDisplay/
+   CategoryCards live trackers, CopyShareLink/XShareLink, Navbar, PublicAnalytics);
+   5 pure server-presentational. No unnecessary client components found.
+3. DATABASE: hot bid queries map to existing indexes (idx_bids_category_status,
+   partial idx_bids_category_paid_amount DESC WHERE paid, stripe_session,
+   payment_intent); leaderboard/recent use EMBEDDED FK selects (no N+1 anywhere);
+   admin overview already runs its three independent reads in PARALLEL (Task 8.2);
+   loadCategoryPageData's two sequential queries are genuinely dependent (id needed)
+   - not parallelizable. No missing obvious indexes; no speculative indexes added.
+   No service-role reads bypass RLS on public paths; no unbounded reads (limits
+   everywhere: leaderboards 10, admin lists 100).
+4. SERVER REQUEST PERFORMANCE: one redundancy documented below (checkout pre-RPC
+   reads); no repeated env parsing hot spots (memoized where it matters - resend/
+   unsubscribe secrets); no blocking synchronous work in request paths.
+5. BUNDLE: @stripe/stripe-js is referenced ONLY by src/lib/stripe-client.ts whose
+   getStripe() is imported by NOTHING - tree-shaken out of every bundle (dead code
+   from Phase 1; removal is hygiene, not performance - recommendation only). Sentry
+   SDK loads lazily ONLY when a DSN is configured (proven no-op unconfigured);
+   Vercel Analytics script mounts only on public paths. next/font/google self-hosts
+   fonts at build time. No bundle-heavy client dependencies exist beyond React/
+   Supabase/Stripe-js itself.
+6. IMAGES: OG image stays force-dynamic BY DESIGN - it renders the CURRENT highest
+   bid; caching it would risk presenting stale bidding information as authoritative
+   through social scrapes. 1200x630 generation preserved untouched.
+7. CACHING/REVALIDATION: scripted scan found ZERO caching primitives in the codebase
+   (no unstable_cache/revalidate/use cache). Therefore there is no possibility of
+   stale authorization/payment/fraud state today, and none was introduced. The only
+   prerendered content (homepage shell, cancel copy, robots policy) carries no
+   authoritative financial data. Correctness over speculative cache performance -
+   nothing cached.
+8. NETWORK: Stripe re-retrieval before mutation, webhook timing, ledger/RPC semantics,
+   Resend send boundaries, and idempotency keys untouched. No retries/queues added.
 
-IMPLEMENTATION REQUIREMENTS:
+CONCRETE BOTTLENECKS REQUIRING CHANGES: NONE.
 
-FILES EXPECTED TO CHANGE:
+RECOMMENDATION-ONLY FINDINGS (documented, intentionally NOT changed now):
+R1. Checkout path performs redundant app-level category reads before the authoritative
+    RPC (validateCategory -> validateBidAmount[getCategoryBySlug again +
+    getHighestBidForCategory] -> create_pending_bid revalidates under lock). Documented
+    fast-fail UX with correct security semantics; ZERO production impact today because
+    no public checkout HTTP endpoint exists yet (Task 9.3). When a bid API route is
+    built, collapse these into one authoritative read passed to the RPC.
+R2. sitemap.ts uses listCategories() which selects all columns though only slug is
+    needed - negligible at MVP scale (6 rows); a lean projection could be added if the
+    catalog grows large.
+R3. stripe-client.ts/getStripe() is currently dead code - remove when the real bid
+    flow consumes Stripe.js, keeping the lazy single-promise pattern.
 
-TEST PLAN:
+CHANGES MADE: NONE (production code untouched). This is a documentation-only review;
+every candidate examined either measured as already-optimal (route classification),
+carried correctness constraints forbidding the "optimization" (OG/dynamic pages,
+no-cache posture), or had negligible/zero current impact (R1-R3 above).
 
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+SECURITY/PRIVACY CONSIDERATIONS:
+No RLS bypass, no service-role introduction, no cache that could serve stale
+authorization/payment/fraud decisions, no rate-limit/auth/webhook-verification changes.
+The no-caching posture IS the security-preserving choice.
 
 TESTS ACTUALLY RUN:
+- npm run test: 683/683 PASSED across 46 files (unchanged - no production changes)
+- npm run typecheck / lint / format:check / build: all PASSED
+- Build route classification captured as measurement evidence
 
-KNOWN ISSUES:
+VERIFICATION CLASSIFICATION:
+A. Measured improvement: N/A (nothing changed).
+B. Statically verified: current static/dynamic route classification, zero caching
+   primitives, dead-code tree-shaking, index coverage mapping.
+C. Architectural assessment: rendering/caching/no-N+1 posture appropriate as-is.
+D. Recommendation only: R1-R3 above.
+Production latency/traffic measurement NOT performed (requires deployed domain +
+Vercel analytics dashboards - operator side, per Tasks 10.4/10.6 checklists).
+
+SCOPE BOUNDARY (explicit):
+NO 10.9+ work (mobile testing/final QA/launch checklist). No refactors, no new
+dependencies, no Redis/queues/workers/cron, no speculative indexes, no caching
+introduced, no SEO/analytics/monitoring modifications, no payment/auth/security
+changes.
+
+KNOWN ISSUES: None.
 
 FOLLOW-UP:
+Task 10.9 - Mobile testing. R1 becomes actionable when a public bid API route is built.

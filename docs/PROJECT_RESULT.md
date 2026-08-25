@@ -2949,4 +2949,22 @@ _
 
 ---
 
+### Task 10.8
+
+- **Date**: 2026-08-25
+- **Objective**: Performance review - identify actual or credible bottlenecks and make only concrete defensible improvements; documentation-only conclusions acceptable where the architecture is already appropriate
+- **Status**: Completed as documentation-only review. NO production changes required or made - architecture verified appropriate across all audited areas
+- **Methodology**: build route classification; dependency/import scans; 15-component client/server inventory; query-vs-index mapping from migrations; caching-primitive scan; reuse of prior phase audits (query helpers, tracker coalescing, admin parallelization, error discipline)
+- **Findings by area**: rendering - static choices are presentation-only (homepage shell + live client trackers, cancel, robots policy) and dynamic choices correctness-required (authoritative bids/categories/OG image, per-request lookups, auth gates); components - all 10 client components justified, 5 server-presentational; database - hot queries index-covered, embedded FK selects prevent N+1, admin overview already parallelized, dependent queries correctly sequential, bounded reads everywhere; bundles - @stripe/stripe-js tree-shaken dead code, Sentry lazy no-op unconfigured, Analytics gated to public paths, self-hosted fonts; images - OG force-dynamic is correctness-required (current highest bid); caching - ZERO primitives exist so zero stale-authoritative risk, none introduced
+- **Concrete bottlenecks requiring changes**: NONE
+- **Recommendation-only findings**: R1 collapse checkout's redundant pre-RPC category reads when a public bid API route is built (documented fast-fail UX today with correct security semantics and zero production impact); R2 lean sitemap projection if the category catalog grows; R3 remove dead stripe-client.ts when Stripe.js consumption lands
+- **Changes intentionally NOT made**: no caching (correctness > speculative perf), no speculative indexes, no OG/static conversion (stale-authoritative risk), no dead-code hygiene (not performance), no experimental build flags
+- **Files changed**: docs/10.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md only
+- **Tests performed**: npm run test 683/683 PASSED (unchanged); typecheck/lint/format:check/build all PASSED; route classification captured as evidence
+- **Verification classification**: measured improvement N/A (nothing changed); statically verified classifications/caching/dead-code; architectural assessments as documented; production latency NOT measured (operator dashboards per 10.4/10.6)
+- **Scope statement**: NO 10.9+ functionality implemented (no mobile testing/QA/launch checklist); no refactors/dependencies/infrastructure/speculative indexes/caching introduced
+- **Follow-up work**: Task 10.9 - Mobile testing
+
+---
+
 _This file will be updated after each completed task with actual implementation details.
