@@ -2787,4 +2787,20 @@ _
 
 ---
 
+### Task 9.9
+
+- **Date**: 2026-08-24
+- **Objective**: Prove the duplicate-payment/idempotency guarantees of the Phase 4 payment architecture (dependency: Task 4.9) with deterministic tests - sequential/simultaneous same-event redelivery, distinct events per session, cross-type ordering hazards, refund replays, lifecycle monotonicity - starting from a read-only audit and without redesigning production code
+- **Status**: Completed - audit found NO duplicate-payment defect. Test coverage + documentation only.
+- **Audit scope**: all five defense layers verified against migrations 20260823000008/00009/00010/00011/00012/00013 - creation (UNIQUE(stripe_session_id) -> duplicate_transaction), attachment (attach-once + UNIQUE fallback), verification (authoritative Stripe re-retrieval), conversion (ledger PK(event.id) claim + row-locked already_paid arbitration), failure/refund (same ledger pattern, no paid downgrades, PI-keyed)
+- **Coverage gap addressed**: existing Task 4.x suites assert per-delivery outcomes through a stateless queue mock; Task 9.9 adds src/lib/duplicate-payment.test.ts with a stateful fake mirroring production RPC semantics exactly (claim commits on normal returns, rolls back on raising anomalies bid_not_found/invalid_state/session_mismatch; pending->paid/failed/refunded transitions; PI-keyed refunds), driving the REAL processStripeWebhook through full delivery sequences
+- **Guarantees proven (14 tests)**: one conversion across 3x sequential and 5x simultaneous redeliveries of one event id (losers answered {received, duplicate:'true'}, zero 500s); signature re-verification on every redelivery (no caching short-circuit); unverified completions claim no ledger space; distinct-event-same-session arbitration via already_paid without re-conversion (sequential AND parallel); failure duplicates mark failed exactly once; stale-Stripe-read downgrade refused at DB level (already_paid backstop); late-completion-after-failure surfaces invalid_state as loud 500 with rolled-back retryable claim; refund applied once across duplicate/distinct replays; unknown-PI refunds fail loudly 500 + claim rollback; full lifecycle keeps exactly [paid, refunded] transitions in order with every response 200
+- **Known technical debt recorded**: refund_paid_bid returns bid_not_found/invalid_state instead of raising like sibling wrappers, so anomalous refund events keep their committed claim and retries answer duplicate/200 rather than staying retryable - deviation from that migration's own header comment, NOT a duplication risk, admin refunds (Task 8.6) are the primary path; documented in PROJECT_PROGRESS.md, intentionally not changed in a testing task
+- **Collateral test-only fix**: stripe-webhook-signature.test.ts beforeAll gained an explicit 30s timeout - the heavy real-Stripe-SDK dynamic import exceeded the default 10s hook budget under 38-file parallel load (latent flake exposed by adding a 38th suite)
+- **Files changed**: src/lib/duplicate-payment.test.ts (created, 14 tests), src/lib/stripe-webhook-signature.test.ts (hook timeout only), docs/9.9.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 584/584 PASSED across 38 files (+14 net; 570 baseline re-verified); typecheck/lint/format:check/build all PASSED
+- **Follow-up work**: Task 9.10 - Fraud scenarios
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

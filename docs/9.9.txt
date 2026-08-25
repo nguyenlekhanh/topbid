@@ -1,32 +1,95 @@
 ﻿TASK ID: 9.9
 PHASE: 9
 TITLE: Duplicate payment testing
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prove the duplicate-payment/idempotency guarantees of the Phase 4 payment architecture
+(dependency: Task 4.9) with deterministic tests - sequential and simultaneous redelivery
+of the same event, distinct events for one session, cross-event-type ordering hazards,
+refund replays, and full lifecycle monotonicity - without changing production code.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+Defense layers verified against migrations 20260823000008/00009/00010/00011/00012/00013:
+1. CREATION (Task 3.7): create_pending_bid RPC - UNIQUE(stripe_session_id) is the
+   race-safe arbiter; unique_violation -> bid_error:duplicate_transaction.
+2. ATTACHMENT (Task 4.2): attach_stripe_session RPC - attach-once guard (pending AND
+   NULL session only), UNIQUE fallback on concurrent attaches.
+3. VERIFICATION (Task 4.7): verifyCheckoutSessionPaid re-retrieves the session from
+   Stripe's API; event bodies never trusted for payment state.
+4. CONVERSION (Tasks 4.8+4.9): process_checkout_completed_event claims the event via
+   PK(event.id) INSERT ('duplicate' on violation) then converts row-locked;
+   convert_pending_bid_to_paid answers 'already_paid' for same-session replays.
+5. FAILURE/REFUND (Tasks 4.10+4.11): same ledger pattern; paid bids never downgraded;
+   refunds keyed on stripe_payment_intent_id.
 
-INPUTS / DEPENDENCIES:
+Audit conclusion: NO duplicate-payment defect found. The one concrete RLS defect in this
+area was already fixed by Task 9.7 (migration 20260823000022).
 
-IMPLEMENTATION REQUIREMENTS:
+Audit observation (documented, intentionally NOT changed - see KNOWN ISSUES):
+refunded_paid_bid returns 'bid_not_found'/'invalid_state' instead of raising like its
+sibling wrappers, so anomalous refund events keep their committed ledger claim and later
+retries answer 'duplicate'/200 rather than staying retryable. Not a duplication risk.
 
-FILES EXPECTED TO CHANGE:
+COVERAGE GAP ADDRESSED:
+Existing Task 4.x suites assert per-delivery outcomes through a STATELESS queue mock -
+they cannot prove cross-delivery behavior. Task 9.9 adds a stateful fake that mirrors the
+production RPC semantics exactly (claim commits on normal returns, rolls back on raising
+anomalies 'bid_not_found'/'invalid_state'/'session_mismatch'; pending->paid->failed/
+refunded transitions; PI-keyed refunds) and drives the REAL processStripeWebhook endpoint
+through full delivery sequences.
 
-TEST PLAN:
+DUPLICATE-PAYMENT GUARANTEES PROVEN (14 tests):
+1. SEQUENTIAL REDELIVERY: identical event id delivered three times -> one conversion,
+   then duplicate acknowledgements ({received, duplicate:'true'}); exactly one state
+   transition.
+2. SIMULTANEOUS REDELIVERY: five parallel deliveries of one event id -> exactly one
+   conversion response, four duplicates, zero 500s, one transition.
+3. SIGNATURE DISCIPLINE: every redelivery passes raw payload + signature through
+   constructEvent again - duplicates are arbitrated downstream, never by skipping
+   verification.
+4. LEDGER HYGIENE: unverified (unpaid) completions claim no ledger space and cannot
+   block later legitimate conversion of the same event id.
+5. BID-IDENTITY ARBITRATION: distinct event ids for an already-paid session answer
+   already_paid-shaped 200 without re-conversion (sequential AND simultaneous).
+6. FAILURE DUPLICATES: repeated async_payment_failed marks failed exactly once;
+   repeats answered duplicate/already_failed without further effect.
+7. NO-DOWNGRADE BACKSTOP: a failure notice whose authoritative Stripe read still says
+   unpaid (stale read after conversion) is refused at the DB level via already_paid.
+8. CROSS-TYPE ORDERING HAZARDS: failure-then-late-completion surfaces invalid_state as
+   500 with the claim rolled back (event stays retryable); simultaneous distinct-event
+   cross-type dispatch lands exactly one terminal effect, the loser loud + retryable.
+9. REFUND REPLAYS: refund applied once across duplicate and distinct events
+   (duplicate / already_refunded); unknown-payment-intent refunds fail loudly 500 with
+   rolled-back claim.
+10. LIFECYCLE MONOTONICITY: full sequence (convert -> duplicate -> contradictory failure
+    ignored -> refund -> duplicate refund -> distinct refund) keeps exactly [paid,
+    refunded] transitions in order, all responses 200.
 
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/duplicate-payment.test.ts (created, 14 tests)
+- src/lib/stripe-webhook-signature.test.ts (test-only: explicit 30s beforeAll timeout -
+  the heavy real-Stripe-SDK dynamic import exceeded the default 10s hook budget under
+  38-file parallel load, a latent flake exposed by adding a 38th suite)
+- docs/9.9.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 584/584 PASSED across 38 files (+14 net, baseline 570 re-verified)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY:
+NO Phase 10+ work. NO production code changes. NO schema/migration changes. NO redesign
+of the payment state machine (audit found no duplication defect). Test coverage +
+documentation only.
 
 KNOWN ISSUES:
+- refund_paid_bid anomaly outcomes do not roll back the ledger claim (deviation from its
+  own header comment). Impact limited to Stripe-dashboard-initiated refunds for bids with
+  pre-existing data inconsistencies; admin refunds (Task 8.6) are the primary refund path
+  and are unaffected. Recorded in PROJECT_PROGRESS.md Known Technical Debt.
 
 FOLLOW-UP:
+Optional hardening (not required for correctness): align refund_paid_bid anomaly handling
+with the raise-and-roll-back semantics of migrations 20260823000011/00012 via a new
+migration if ever desired. Next: Task 9.10 - Fraud scenarios.

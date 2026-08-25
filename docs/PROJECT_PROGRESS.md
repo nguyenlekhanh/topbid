@@ -6,7 +6,7 @@
 
 ## Current Task
 
-**Phase 8 complete** — Next recommended: Phase 10 (Production Launch)
+**Task 9.9 complete** — Next recommended: Task 9.10 (Fraud scenarios)
 
 ## Completed Tasks
 
@@ -101,7 +101,8 @@
 - 9.5: Webhook security review ✓
 - 9.6: Database security review ✓
 - 9.7: RLS review ✓
-- 9.8: Concurrency testing ✓ (Phase 9 complete) ✓
+- 9.8: Concurrency testing ✓
+- 9.9: Duplicate payment testing ✓
 
 ## Tasks in Progress
 
@@ -117,7 +118,7 @@ _None_
 
 ## Known Technical Debt
 
-_None_
+- refund_paid_bid (migration 20260823000013) returns 'bid_not_found'/'invalid_state' instead of raising like the sibling ledger wrappers, so anomalous refund events keep their committed claim and Stripe redeliveries answer duplicate/200 instead of staying retryable (deviation from that migration's own header comment). Not a duplication risk; admin refunds (Task 8.6) are the primary refund path. Found during Task 9.9 audit; documented as optional hardening, intentionally not changed in a testing task.
 
 ## Current Architecture Status
 
@@ -339,3 +340,5 @@ Task 8.7 completed successfully. Fraud/banned email management added: migration 
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
 Task 9.8 completed successfully. Concurrency testing added: src/lib/concurrency.test.ts proves exactly-once delivery gating under simulated parallel dispatch (two/three concurrent sendOutbidNotification calls for the same bid produce exactly one email via beginDeliveryAttempt gate), suppression ordering (self_outbid -> recipient_unsubscribed -> recipient_banned checked before beginDeliveryAttempt on every path), and rate-limiter burst boundaries (exact limit enforcement with identity isolation and window expiry); no production changes needed - existing architecture provides documented guarantees; Phase 8 and 9 complete at 570/570 tests.
+
+Task 9.9 completed successfully. Duplicate payment testing added: read-only audit verified all five duplicate-payment defense layers (UNIQUE(stripe_session_id) creation arbitration 3.7, attach-once 4.2, authoritative Stripe re-retrieval 4.7, ledger PK(event.id)+row-locked conversion 4.8/4.9, failure/refund ledger pattern 4.10/4.11) finding NO duplication defect; new src/lib/duplicate-payment.test.ts (14 tests) models the DB idempotency boundary as persistent state mirroring the production RPC semantics (claim commits on normal returns, rolls back on raising anomalies; pending->paid/failed/refunded transitions) and drives the real processStripeWebhook through sequential/simultaneous same-event redelivery (exactly one conversion + duplicate acknowledgements), distinct-events-per-session arbitration (already_paid, no re-conversion), signature re-verification on every redelivery, no-ledger-space for unverified completions, failure duplicates, stale-Stripe-read downgrade refusal via already_paid backstop, cross-type ordering hazards (invalid_state -> 500 with rolled-back retryable claim), refund replays (duplicate/already_refunded; unknown-PI refunds loud 500 + claim rollback), and full-lifecycle monotonicity ([paid, refunded] exactly once, all 200); audit also documented one non-duplication asymmetry as Known Technical Debt (refund_paid_bid anomaly outcomes do not roll back the ledger claim - deviation from its own header comment, operationally harmless, intentionally not changed in a testing task); collateral test-only fix: stripe-webhook-signature.test.ts beforeAll gained an explicit 30s timeout because the heavy real-Stripe-SDK dynamic import exceeded the default 10s hook budget under 38-file parallel load; no production code or schema changes; 584/584 tests passing.

@@ -112,7 +112,10 @@ beforeAll(async () => {
     client_reference_id: 'bid-1000',
     metadata: { bid_id: 'bid-1000' },
   } as never);
-});
+  // Task 9.9: the real Stripe SDK import is heavy and can exceed the default 10s hook
+  // budget when the full suite runs in parallel; pin an explicit generous timeout so the
+  // suite stays deterministic on loaded machines.
+}, 30_000);
 
 function signPayload(payload: string, timestampSeconds: number, secret: string = SECRET): string {
   const signature = createHmac('sha256', secret)
