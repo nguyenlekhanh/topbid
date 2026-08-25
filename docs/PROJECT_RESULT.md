@@ -2629,7 +2629,53 @@ _
   - Best-effort audit inserts immediately after successful mutations; failures loud-logged and never masquerade as success or failure of the business operation
   - processed_webhook_events remains the payment ledger and is NOT duplicated as an audit log; share_events remains product telemetry
 - **Known limitations**: best-effort writes can be lost on DB failure (loud-logged); detail payloads intentionally minimal
-- **Follow-up work**: Phase 9 - Security and Reliability (Task 9.1 Input validation review)
+- **Follow-up work**: Task 9.2 - Rate limiting
+
+---
+
+### Task 9.2
+
+- **Date**: 2026-08-24
+- **Objective**: Cap abusive bursts on externally reachable mutation endpoints
+- **Status**: Completed
+- **What was implemented**: In-memory fixed-window rate limiter for login (10/10min/IP), share-events (30/min/IP), unsubscribe (10/min/IP), refund (20/hour/admin)
+- **Files changed**: src/lib/rate-limit.ts + test, login/share-events/unsubscribe/refund routes
+- **Tests performed**: All passed
+
+---
+
+### Task 9.3
+
+- **Date**: 2026-08-24
+- **Objective**: Determine whether CAPTCHA is needed beyond rate limiting
+- **Status**: Completed - intentionally satisfied without CAPTCHA
+- **Audit conclusion**: No bid creation endpoint publicly exposed; all mutations rate-limited; CAPTCHA unnecessary
+
+---
+
+## Phase 9 - Security and Reliability
+
+---
+
+### Task 9.1
+
+- **Date**: 2026-08-24
+- **Objective**: Review every externally-influenced input entering server-side code
+- **Status**: Completed
+- **What was implemented**: Prototype-safe record lookup helper for admin banner pages; sanitizer deduplication on login page; comprehensive input-validation audit documenting A/B/C/D classifications across all server-side boundaries
+
+### Task 9.8 - Concurrency testing
+
+- **Date**: 2026-08-24
+- **Objective**: Prove exactly-once/idempotency/race-safety guarantees under concurrent execution using deterministic tests
+- **Status**: Completed
+- **What was implemented**:
+  - src/lib/concurrency.test.ts: cross-module concurrency tests proving exactly-once delivery gating under simulated parallel dispatch (two/three concurrent calls produce exactly one email via beginDeliveryAttempt gate); suppression ordering verified (self_outbid -> unsubscribed -> banned checked before beginDeliveryAttempt on every path); rate limiter burst boundaries pinned at exact limits with identity isolation
+  - No production changes needed: existing architecture provides documented guarantees without modification
+- **Files changed**: src/lib/concurrency.test.ts (created, 9 tests); docs/9.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: test 570/570 across 37 files (+1 net); typecheck/lint/format:check/build all PASSED
+- **Known limitations**: true DB-level concurrency requires live Supabase credentials; tests prove application-level gating logic deterministically
+- **Follow-up work**: Phase 9 complete - next Phase 10 Production Launch
 - **Follow-up work**: Task 9.2 - Rate limiting
 
 ---

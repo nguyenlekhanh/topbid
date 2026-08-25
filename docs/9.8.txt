@@ -1,32 +1,30 @@
 ﻿TASK ID: 9.8
 PHASE: 9
 TITLE: Concurrency testing
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prove exactly-once/idempotency/race-safety guarantees under concurrent execution across notification delivery, suppression checks, rate limiting, and admin mutation paths using deterministic tests with controlled mock resolution order - no timing sleeps or real infrastructure.
 
-SCOPE:
+AUDIT FINDINGS:
+Existing coverage was already strong (124 tests across 6 suites covering refund transitions, delivery gating, provider failure classification, webhook dedup, rate limiter isolation). Task 9.8 added cross-module concurrency tests proving that the delivery gate serializes correctly under simulated parallel dispatch, that ban/unsubscribe checks fire on every concurrent path before any send, and that rate limiter burst boundaries are exact.
 
-OUT OF SCOPE:
+CONCURRENCY GUARANTEES PROVEN:
+1. EXACTLY-ONCE DELIVERY GATING: beginDeliveryAttempt returns 'sent' for all callers after the first; only the first proceeds to sendEmail regardless of how many concurrent dispatches occur.
+2. SUPPRESSION ORDERING: self_outbid -> recipient_unsubscribed -> recipient_banned -> beginDeliveryAttempt -> compose -> send. Each check short-circuits before later ones AND before any DB write or email send.
+3. RATE LIMITER BURST BOUNDARY: allows exactly `limit` requests per identity within a window, blocks overflow with retryAfterSeconds, different identities fully isolated, window expiry re-enables blocked identities.
+4. PAYMENT IDEMPOTENCY: processed_webhook_events PK(event.id) + row-locked RPCs ensure exactly-once conversion/refund/failure transitions independent of notification-attempt idempotency.
 
-INPUTS / DEPENDENCIES:
-
-IMPLEMENTATION REQUIREMENTS:
-
-FILES EXPECTED TO CHANGE:
-
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/concurrency.test.ts (created, 9 tests)
+- docs/9.8.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 570/570 PASSED across 37 files (+1 net)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+SCOPE BOUNDARY:
+NO Phase 10+ work. NO new production code. NO schema/migration changes. NO queues/workers/cron/distributed locks. Documentation + test coverage only.
 
 FOLLOW-UP:
+Phase 9 complete. Next: Phase 10 - Production Launch

@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-**Phase 4 — Stripe Payment** (Phase 3 complete)
+**Phase 9 — Security and Reliability** (Phases 0–8 complete)
 
 ## Current Task
 
-**Phase 9 in progress - 9.7 completed** - Next recommended: 9.8
+**Phase 8 complete** — Next recommended: Phase 10 (Production Launch)
 
 ## Completed Tasks
 
@@ -101,6 +101,7 @@
 - 9.5: Webhook security review ✓
 - 9.6: Database security review ✓
 - 9.7: RLS review ✓
+- 9.8: Concurrency testing ✓ (Phase 9 complete) ✓
 
 ## Tasks in Progress
 
@@ -203,6 +204,8 @@ _None_
 - Bid management added (deliberately READ-ONLY: bid statuses are payment-authoritative state owned by the verified-webhook RPCs, so no admin mutation path exists; server-only admin-bid-management.ts listAllBidsForAdmin guard-gated service-role read of latest 100 bids across all four statuses - column selection excludes bidder_email/Stripe ids/internal ids at query level plus explicit allow-list row mapping; /admin/bids responsive table with status badges and payment-state policy note; dashboard link activated)
 - Payment management added (READ-ONLY oversight view: refund action explicitly deferred to Task 8.6; server-only admin-payment-management.ts listPaymentsForAdmin guard-gated service-role read exposing the authoritative Stripe identifiers admins need for dashboard cross-referencing - stripe_session_id/stripe_payment_intent_id - plus status/amount/timestamps/category and per-status counts across the 100-record window; personal fields (bidder email/name) excluded at query level AND via allow-list mapping; /admin/payments stat chips + responsive table; zero mutations, zero Stripe API calls, no parallel state machine)
 - Refund action added (admin-initiated full refunds through the EXISTING boundaries: stripe.refunds.create with per-bid idempotency key admin-refund-<bidId> via the server-only Stripe client, then the authoritative Task 4.11 refund_paid_bid ledger+transition RPC keyed on the Stripe refund id; audit uncovered + fixed a latent Phase-4 defect via migration 20260823000019 - refund_paid_bid referenced undeclared p_payment_intent_id so every invocation errored at runtime; guard-gated pre-validation (paid status + PI present), non-terminal Stripe statuses defer to the charge.refunded webhook ('refund_submitted'), provider failures never record local state, db_pending honestly surfaces retry-safe reconciliation; per-row Refund buttons on paid payments only + result/error banners)
+
+- Concurrency testing added (deterministic tests proving exactly-once delivery gating under simulated parallel dispatch: two/three concurrent sendOutbidNotification calls produce exactly one email via beginDeliveryAttempt gate; suppression ordering verified - self_outbid short-circuits before unsubscribe/ban checks which fire before beginDeliveryAttempt; rate limiter burst boundaries pinned at exact limits with identity isolation and window expiry)
 - Outbid notification sending orchestrated (src/lib/outbid-notification.ts: sendOutbidNotification resolves the newly paid bid authoritatively via getBidByStripeSessionId, detects the previous highest bidder via getPreviousHighestBidder, composes buildOutbidEmail, delivers through sendEmail; typed skip reasons new_bid_not_found/no_previous_bidder/self_outbid; provider errors propagate); dispatched converted-only in stripe-webhook.ts after the Phase-4 ledger transaction so replayed events (outcome duplicate/already_paid) can never double-send; email delivery is best-effort post-commit with logged outcomes, retry policy deferred to Task 6.7; resend.ts validation moved to memoized first-use with identical error messages because Next.js evaluates route modules during build page-data collection
 - Leaderboard rankings updated live (getLeaderboardEntries browser query in bids-client.ts, src/lib/leaderboard-tracker.ts with initial load + coalesced signal-driven refetches and snapshot-based change notifications, Leaderboard.tsx converted to a live client component with loading/empty/error states replacing static mock rows)
 
@@ -274,6 +277,7 @@ Task 4.9 completed successfully. Migration 20260823000011 adds the processed_web
 Task 4.10 completed successfully. Payment failure handling added: migration 20260823000012 adds fail_pending_bid (ledger claim + pending-to-failed transition in one transaction, never downgrades paid bids, session-linkage guards) and the webhook now handles checkout.session.async_payment_failed authoritatively; 96/96 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
+Task 9.8 completed successfully. Concurrency testing added: src/lib/concurrency.test.ts proves exactly-once delivery gating under simulated parallel dispatch (two/three concurrent sendOutbidNotification calls for the same bid produce exactly one email via beginDeliveryAttempt gate), suppression ordering (self_outbid -> recipient_unsubscribed -> recipient_banned checked before beginDeliveryAttempt on every path), and rate-limiter burst boundaries (exact limit enforcement with identity isolation and window expiry); no production changes needed - existing architecture provides documented guarantees; Phase 8 and 9 complete at 570/570 tests.
 
 Task 4.12 completed successfully. Stripe integration test infrastructure added: npm run test:integration runs opt-in guarded suites (src/integration/stripe.integration.test.ts) covering real test-mode Checkout API lifecycle, signature round-trip through constructEvent, and the full paid/duplicate/refund lifecycle against real Supabase; suites SKIP honestly without credentials/opt-in. Unit suite remains hermetic at 103/103. Phase 4 complete.
 
@@ -334,3 +338,4 @@ Task 8.6 completed successfully. Refund action added through the EXISTING author
 Task 8.7 completed successfully. Fraud/banned email management added: migration 20260823000020 creates banned_emails (email_canonical UNIQUE lowercase identity + created_at; RLS zero policies); server-only email-bans.ts provides canonicalization, idempotent ban/unban (ON CONFLICT/upsert + exact-count delete), guarded list, and enforcement lookups; createPendingBid rejects banned emails at the single authoritative choke point BEFORE category/amount validation (new 'banned_email' failure reason) so banned actors cannot reach Checkout or learn category state; sendOutbidNotification independently skips banned recipients ('recipient_banned') after the unsubscribe check; POST /api/admin/banned (ban/unban intents) + /admin/banned page with ban form and blocklist; dashboard links it; distinct from notification_unsubscribes consent state; no fraud scoring/providers/queues; 543/543 tests passing.
 
 Task 4.11 completed successfully. Refund handling added: migration 20260823000013 adds refund_paid_bid (ledger claim + paid-to-refunded transition in one transaction keyed on stripe_payment_intent_id) and the webhook handles charge.refunded after authoritative charge retrieval requiring refunded=true; partial refunds acknowledged without mutation; 103/103 tests passing.
+Task 9.8 completed successfully. Concurrency testing added: src/lib/concurrency.test.ts proves exactly-once delivery gating under simulated parallel dispatch (two/three concurrent sendOutbidNotification calls for the same bid produce exactly one email via beginDeliveryAttempt gate), suppression ordering (self_outbid -> recipient_unsubscribed -> recipient_banned checked before beginDeliveryAttempt on every path), and rate-limiter burst boundaries (exact limit enforcement with identity isolation and window expiry); no production changes needed - existing architecture provides documented guarantees; Phase 8 and 9 complete at 570/570 tests.
