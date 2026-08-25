@@ -106,7 +106,7 @@ export default function RecentBids() {
       aria-labelledby="recent-bids-heading"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-8">
+        <header className="mb-8">
           <div>
             <h2
               id="recent-bids-heading"
@@ -118,21 +118,6 @@ export default function RecentBids() {
               Live feed — newest paid bids first, straight from the leaderboard database.
             </p>
           </div>
-          <a
-            href="/bids"
-            className="group inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md self-start sm:self-auto"
-          >
-            View all
-            <svg
-              className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </a>
         </header>
 
         <div className="overflow-hidden rounded-xl border border-border bg-background">
