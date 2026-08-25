@@ -15,6 +15,10 @@ const supabaseMock = vi.hoisted(() => {
     changeHandlers: [] as ChangeHandler[],
     statusHandlers: [] as Array<(status: string) => void>,
     removedChannels: [] as string[],
+    // When true, createClient() returns ONE singleton (mirrors the @supabase/ssr
+    // browser-client behavior in production) so multiple subscribers share a socket.
+    singletonMode: false,
+    singleton: null as ReturnType<typeof makeClient> | null,
   };
 
   function makeChannel(name: string) {
@@ -54,11 +58,23 @@ const supabaseMock = vi.hoisted(() => {
     return client;
   }
 
-  return { state, makeClient };
+  function getClient() {
+    if (!state.singletonMode) {
+      return makeClient();
+    }
+
+    if (!state.singleton) {
+      state.singleton = makeClient();
+    }
+
+    return state.singleton;
+  }
+
+  return { state, getClient };
 });
 
 vi.mock('@/lib/supabase', () => ({
-  createClient: () => supabaseMock.makeClient(),
+  createClient: () => supabaseMock.getClient(),
 }));
 
 const SAMPLE_ROW = {
@@ -80,6 +96,8 @@ beforeEach(() => {
   supabaseMock.state.changeHandlers.length = 0;
   supabaseMock.state.statusHandlers.length = 0;
   supabaseMock.state.removedChannels.length = 0;
+  supabaseMock.state.singletonMode = false;
+  supabaseMock.state.singleton = null;
 });
 
 describe('subscribeToBidChanges', () => {
@@ -225,5 +243,139 @@ describe('connection/reconnection handling (Task 5.7)', () => {
       supabaseMock.state.statusHandlers[0]('SUBSCRIBED');
       supabaseMock.state.statusHandlers[0]('CHANNEL_ERROR');
     }).not.toThrow();
+  });
+});
+
+describe('shared channel fan-out with multiple subscribers (runtime fix)', () => {
+  beforeEach(() => {
+    // Production reality: the @supabase/ssr browser client is a SINGLETON shared by
+    // every component, and current supabase-js returns the SAME RealtimeChannel for a
+    // repeated topic. Attaching postgres_changes callbacks after subscribe() throws:
+    //   "cannot add `postgres_changes` callbacks ... after `subscribe()`"
+    supabaseMock.state.singletonMode = true;
+  });
+
+  function broadcast(eventType: string, row: Record<string, unknown>): void {
+    for (const handler of [...supabaseMock.state.changeHandlers]) {
+      handler({ eventType, new: { ...SAMPLE_ROW, ...row }, old: {} });
+    }
+  }
+
+  it('never attaches callbacks post-subscribe: N subscribers share exactly ONE channel', () => {
+    const unsubscribers = [
+      subscribeToBidChanges(() => {}),
+      subscribeToBidChanges(() => {}),
+      subscribeToBidChanges(() => {}),
+      subscribeToBidChanges(() => {}),
+    ];
+
+    // The bug this pins: previously each subscriber called channel().on(...) again,
+    // which throws on the already-subscribed shared channel instance.
+    expect(supabaseMock.state.channels).toEqual(['bids-changes']);
+    expect(supabaseMock.state.changeHandlers).toHaveLength(1);
+    expect(supabaseMock.state.statusHandlers).toHaveLength(1);
+
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe();
+    }
+  });
+
+  it('fans every bid event out to all simultaneous subscribers', () => {
+    const seenA: string[] = [];
+    const seenB: string[] = [];
+
+    subscribeToBidChanges((payload) => seenA.push(payload.eventType));
+    subscribeToBidChanges((payload) => seenB.push(payload.eventType));
+
+    broadcast('INSERT', {});
+
+    expect(seenA).toEqual(['INSERT']);
+    expect(seenB).toEqual(['INSERT']);
+  });
+
+  it('a throwing consumer cannot block delivery to other subscribers', () => {
+    const seen: string[] = [];
+
+    subscribeToBidChanges(() => {
+      throw new Error('consumer exploded');
+    });
+    subscribeToBidChanges((payload) => seen.push(payload.eventType));
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    broadcast('UPDATE', {});
+
+    expect(seen).toEqual(['UPDATE']);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('unsubscribing one subscriber keeps the shared channel alive for the rest', () => {
+    const seen: string[] = [];
+    const unsubscribeFirst = subscribeToBidChanges(() => {});
+    subscribeToBidChanges((payload) => seen.push(payload.eventType));
+
+    unsubscribeFirst();
+
+    broadcast('INSERT', {});
+
+    expect(seen).toEqual(['INSERT']);
+    expect(supabaseMock.state.removedChannels).toHaveLength(0);
+  });
+
+  it('removes the channel only when the LAST subscriber leaves', () => {
+    const unsubscribeA = subscribeToBidChanges(() => {});
+    const unsubscribeB = subscribeToBidChanges(() => {});
+
+    unsubscribeA();
+    expect(supabaseMock.state.removedChannels).toHaveLength(0);
+
+    unsubscribeB();
+    expect(supabaseMock.state.removedChannels).toEqual(['bids-changes']);
+  });
+
+  it('re-subscribing after full teardown starts from a FRESH channel (Strict Mode safe)', () => {
+    // Mount -> unmount -> remount cycle: teardown removes the subscribed instance so
+    // the next mount never attaches callbacks to a stale, already-subscribed channel.
+    const first = subscribeToBidChanges(() => {});
+    first();
+
+    const seen: string[] = [];
+    subscribeToBidChanges((payload) => seen.push(payload.eventType));
+
+    // Two PHYSICAL channels existed over time, each carrying exactly ONE internal
+    // postgres_changes handler - the invariant the post-subscribe guard requires.
+    expect(supabaseMock.state.channels).toEqual(['bids-changes', 'bids-changes']);
+    expect(supabaseMock.state.changeHandlers).toHaveLength(2);
+    expect(supabaseMock.state.removedChannels).toEqual(['bids-changes']);
+
+    // The fresh channel delivers to the new subscriber.
+    const latestHandler = supabaseMock.state.changeHandlers.at(-1)!;
+
+    latestHandler({ eventType: 'INSERT', new: { ...SAMPLE_ROW }, old: {} });
+
+    expect(seen).toEqual(['INSERT']);
+  });
+
+  it('fan-outs status changes to every subscriber with once-per-outage dedup intact', () => {
+    const statusesA: string[] = [];
+    const statusesB: string[] = [];
+
+    subscribeToBidChanges(
+      () => {},
+      (status) => statusesA.push(status)
+    );
+    subscribeToBidChanges(
+      () => {},
+      (status) => statusesB.push(status)
+    );
+
+    for (const handler of [...supabaseMock.state.statusHandlers]) {
+      handler('CHANNEL_ERROR');
+      handler('TIMED_OUT');
+      handler('SUBSCRIBED');
+    }
+
+    expect(statusesA).toEqual(['disconnected', 'connected']);
+    expect(statusesB).toEqual(['disconnected', 'connected']);
   });
 });

@@ -46,32 +46,63 @@ export type BidChangePayload = {
 
 export type RealtimeConnectionStatus = 'connected' | 'disconnected';
 
+type BidChangeHandler = (payload: BidChangePayload) => void;
+type StatusHandler = (status: RealtimeConnectionStatus) => void;
+
+/**
+ * Task 10.x runtime fix - SHARED CHANNEL WITH REFERENCE-COUNTED FAN-OUT.
+ *
+ * Current supabase-js REUSES the RealtimeChannel instance for a given topic
+ * (RealtimeClient.channel returns the existing channel) and RealtimeChannel.on()
+ * THROWS "cannot add postgres_changes callbacks for <topic> after subscribe()" when a
+ * callback is attached post-subscribe. The previous implementation called
+ * .channel('bids-changes').on(...).subscribe(...) once PER SUBSCRIBER, so the homepage
+ * (multiple HighestBidDisplay instances + Leaderboard + RecentBids - all sharing the
+ * @supabase/ssr browser-client singleton) crashed on the SECOND subscriber with:
+ *   "cannot add `postgres_changes` callbacks for realtime:bids-changes after subscribe()"
+ *
+ * The fix keeps ONE physical channel per browser client and fans events/statuses out
+ * to any number of subscribers:
+ * - First subscriber creates the channel, attaches ONE internal postgres_changes
+ *   handler, and subscribes.
+ * - Additional subscribers only register their handlers (no further .on/.subscribe
+ *   calls on the shared channel).
+ * - Unsubscribe removes that subscriber's handlers; the LAST one out removes the
+ *   channel entirely, so a later resubscribe starts from a fresh instance (React
+ *   Strict Mode mount/unmount/mount cycles are therefore safe).
+ * - Per-handler invocation is isolated: one throwing consumer can never block others.
+ * The public signature/return contract is unchanged.
+ */
+
+type SharedBidsChannel = {
+  supabase: ReturnType<typeof createClient>;
+  channel: unknown;
+  handlers: Set<{ onChange: BidChangeHandler; onStatusChange?: StatusHandler }>;
+};
+
+const sharedBidsChannels = new WeakMap<object, Map<string, SharedBidsChannel>>();
+
 export function subscribeToBidChanges(
-  onChange: (payload: BidChangePayload) => void,
-  onStatusChange?: (status: RealtimeConnectionStatus) => void
+  onChange: BidChangeHandler,
+  onStatusChange?: StatusHandler
 ): () => void {
   const supabase = createClient();
 
-  let hasDisconnected = false;
+  let byTopic = sharedBidsChannels.get(supabase);
 
-  const channel = supabase
-    .channel('bids-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'bids' },
-      (payload: {
-        eventType: BidChangeEventType;
-        new: Record<string, unknown> | null;
-        old: Record<string, unknown> | null;
-      }) => {
-        onChange({
-          eventType: payload.eventType,
-          new: (payload.new as RealtimeBidRow) ?? null,
-          old: (payload.old as RealtimeBidRow) ?? null,
-        });
-      }
-    )
-    .subscribe((status) => {
+  if (!byTopic) {
+    byTopic = new Map<string, SharedBidsChannel>();
+    sharedBidsChannels.set(supabase, byTopic);
+  }
+
+  const TOPIC = 'bids-changes';
+  let shared = byTopic.get(TOPIC);
+
+  if (!shared) {
+    const handlers = new Set<{ onChange: BidChangeHandler; onStatusChange?: StatusHandler }>();
+    let hasDisconnected = false;
+
+    const fanOutStatus = (status: string): void => {
       switch (status) {
         case 'CHANNEL_ERROR':
         case 'TIMED_OUT':
@@ -81,7 +112,14 @@ export function subscribeToBidChanges(
             hasDisconnected = true;
 
             console.error(`[realtime] bids channel problem: ${status}`);
-            onStatusChange?.('disconnected');
+
+            for (const handler of [...handlers]) {
+              try {
+                handler.onStatusChange?.('disconnected');
+              } catch (error) {
+                console.error('[realtime] onStatusChange handler failed', error);
+              }
+            }
           }
           break;
         case 'SUBSCRIBED':
@@ -89,13 +127,70 @@ export function subscribeToBidChanges(
           if (hasDisconnected) {
             hasDisconnected = false;
 
-            onStatusChange?.('connected');
+            for (const handler of [...handlers]) {
+              try {
+                handler.onStatusChange?.('connected');
+              } catch (error) {
+                console.error('[realtime] onStatusChange handler failed', error);
+              }
+            }
           }
           break;
       }
-    });
+    };
+
+    const channel = supabase
+      .channel(TOPIC)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bids' },
+        (payload: {
+          eventType: BidChangeEventType;
+          new: Record<string, unknown> | null;
+          old: Record<string, unknown> | null;
+        }) => {
+          const normalized: BidChangePayload = {
+            eventType: payload.eventType,
+            new: (payload.new as RealtimeBidRow) ?? null,
+            old: (payload.old as RealtimeBidRow) ?? null,
+          };
+
+          for (const handler of [...handlers]) {
+            try {
+              handler.onChange(normalized);
+            } catch (error) {
+              console.error('[realtime] onChange handler failed', error);
+            }
+          }
+        }
+      )
+      .subscribe(fanOutStatus);
+
+    shared = { supabase, channel, handlers };
+    byTopic.set(TOPIC, shared);
+  }
+
+  const entry = { onChange, onStatusChange };
+
+  shared.handlers.add(entry);
 
   return () => {
-    void supabase.removeChannel(channel);
+    // Re-read from the registry: the shared channel may have been fully torn down and
+    // recreated between subscribe and unsubscribe (Strict Mode cycles).
+    const current = byTopic.get(TOPIC);
+
+    if (!current || !current.handlers.has(entry)) {
+      return;
+    }
+
+    current.handlers.delete(entry);
+
+    if (current.handlers.size === 0) {
+      byTopic.delete(TOPIC);
+
+      void current.supabase.removeChannel(
+        current.channel as Parameters<typeof supabase.removeChannel>[0]
+      );
+    }
   };
 }
