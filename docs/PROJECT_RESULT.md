@@ -2818,4 +2818,19 @@ _
 
 ---
 
+### Task 9.11
+
+- **Date**: 2026-08-24
+- **Objective**: Complete read-only error-handling inventory and verification across every externally reachable and security/payment-sensitive boundary, preserving the seven failure-category distinctions, adding deterministic regression tests only for meaningful coverage gaps
+- **Status**: Completed - audit found NO concrete production defect. Test coverage + documentation only.
+- **Audit scope and verdicts**: (1) Stripe webhook - 400/500/200 semantics correct, generic bodies, anomaly claims rolled back, no secret/payload/trace exposure; (2) bid/payment flow - typed unions complete, banned_email checked first (information-hiding), no partial-state-as-success, no public checkout route; (3) notifications - suppression precedes composition/gate on every attempt, provider_rejected vs send_unconfirmed preserved, sent state only after confirmed success; (4) admin auth - fail-closed context, generic login errors, open-redirect blocked, identical logout; (5) admin mutations - authorization inside every operation, stable flags, provider_failed vs db_pending vs refund_submitted distinction, never-throw audit logging; (6) public endpoints - unsubscribe/share-events/success input shape validation with RLS-indistinguishable unknown states; (7) pages - missing/inactive/malformed collapse to notFound(), framework-default production error boundaries; (8) general - seven failure categories kept distinct, no fail-open path found
+- **Concrete defects found**: NONE
+- **Coverage gaps fixed by tests**: /api/unsubscribe POST route had ZERO tests (only untested externally reachable endpoint) - new suite proves valid-token confirmation redirect, form-body fallback, bare-request redirect without storage access, malformed token rejection via real shape validation before storage, exact 10-then-429 flood cap with Retry-After: 60, GET handler absence (prefetch safety); admin-refunds audit discipline was unasserted - new tests prove failed refunds and business-rule refusals write ZERO audit entries while successful/no-op/submitted transitions audit exactly once with truthful outcome fields
+- **Known limitations**: live-provider error behavior requires credentials (opt-in integration suite skips honestly); pages use Next.js default error boundaries per plan; POST /api/admin/banned rate-limit omission documented in 9.10 as non-defect
+- **Files changed**: src/app/api/unsubscribe/route.test.ts (created, 8 tests), src/lib/admin-refunds.test.ts (+5 tests), docs/9.11.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 617/617 PASSED across 40 files (+13 net); typecheck/lint/format:check/build all PASSED
+- **Follow-up work**: Phase 9 COMPLETE (9.1-9.11). Next: Phase 10 - Production Launch (Task 10.1)
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

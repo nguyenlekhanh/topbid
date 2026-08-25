@@ -70,6 +70,7 @@ const mocks = vi.hoisted(() => {
     getAdminAuthorization: vi.fn(),
     getAdminContext: vi.fn(),
     refundsCreate: vi.fn(),
+    writeAuditLog: vi.fn(),
   };
 
   return { makeFakeClient, state };
@@ -92,7 +93,7 @@ vi.mock('@/lib/admin-auth', () => ({
   getAdminAuthorization: mocks.state.getAdminAuthorization,
 }));
 vi.mock('@/lib/audit-log', () => ({
-  writeAuditLog: vi.fn().mockResolvedValue(true),
+  writeAuditLog: mocks.state.writeAuditLog,
 }));
 
 const BID_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -110,6 +111,8 @@ beforeEach(() => {
   });
   mocks.state.refundsCreate.mockReset();
   mocks.state.refundsCreate.mockResolvedValue({ id: 're_test_1', status: 'succeeded' });
+  mocks.state.writeAuditLog.mockReset();
+  mocks.state.writeAuditLog.mockResolvedValue(true);
   mocks.state.queue.length = 0;
   mocks.state.calls.length = 0;
 });
@@ -285,5 +288,114 @@ describe('Stripe refund execution', () => {
 
     expect(result).toEqual({ ok: true, outcome: 'refund_submitted', refundId: 're_pend_1' });
     expect(mocks.state.calls.filter((call) => call.method === 'rpc')).toHaveLength(0);
+  });
+});
+
+describe('audit discipline (Task 9.11)', () => {
+  const paidLookup = {
+    data: { status: 'paid', amount: 125000, stripe_payment_intent_id: 'pi_test_123' },
+    error: null,
+  };
+
+  it('failed refunds never produce audit entries that could read as successes', async () => {
+    // Provider failure after passing all pre-validation:
+    enqueue(paidLookup);
+    mocks.state.refundsCreate.mockRejectedValue(new Error('provider down'));
+    await expect(initiateAdminRefund({ bidId: BID_ID })).resolves.toMatchObject({
+      ok: false,
+      reason: 'provider_failed',
+    });
+
+    // Restore a succeeding provider for the post-provider-success scenarios below.
+    mocks.state.refundsCreate.mockResolvedValue({ id: 're_test_2', status: 'succeeded' });
+
+    // DB transition failure AFTER provider success (db_pending):
+    enqueue(paidLookup);
+    enqueue({ data: null, error: { message: 'transition failed' } });
+    await expect(initiateAdminRefund({ bidId: BID_ID })).resolves.toMatchObject({
+      ok: false,
+      reason: 'db_pending',
+    });
+
+    // Unexpected RPC outcome:
+    enqueue(paidLookup);
+    enqueue({ data: 'invalid_state', error: null });
+    await expect(initiateAdminRefund({ bidId: BID_ID })).resolves.toMatchObject({
+      ok: false,
+      reason: 'db_pending',
+    });
+
+    expect(mocks.state.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it('business-rule refusals write no audit entries', async () => {
+    for (const setup of [
+      function missingBid() {
+        enqueue({ data: null, error: null });
+      },
+      function notPaid() {
+        enqueue({
+          data: { status: 'pending', amount: 100000, stripe_payment_intent_id: 'pi_x' },
+          error: null,
+        });
+      },
+      function missingPi() {
+        enqueue({
+          data: { status: 'paid', amount: 100000, stripe_payment_intent_id: null },
+          error: null,
+        });
+      },
+    ]) {
+      setup();
+      await initiateAdminRefund({ bidId: BID_ID });
+    }
+
+    mocks.state.getAdminContext.mockResolvedValueOnce({ authorized: false });
+    await initiateAdminRefund({ bidId: BID_ID });
+
+    expect(mocks.state.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['refunded', { outcome: 'refunded', stripe_refund_id: 're_test_1' }],
+    ['duplicate', { outcome: 'duplicate', stripe_refund_id: 're_test_1' }],
+    ['already_refunded', { outcome: 'already_refunded', stripe_refund_id: 're_test_1' }],
+  ])(
+    'successful/no-op transitions audit exactly once with outcome %s',
+    async (rpcOutcome, expectedDetail) => {
+      enqueue(paidLookup);
+      enqueue({ data: rpcOutcome, error: null });
+
+      await expect(initiateAdminRefund({ bidId: BID_ID })).resolves.toMatchObject({
+        ok: true,
+        outcome: rpcOutcome === 'refunded' ? 'refunded' : 'already_refunded',
+      });
+
+      expect(mocks.state.writeAuditLog).toHaveBeenCalledTimes(1);
+      expect(mocks.state.writeAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'payment.refund',
+          targetType: 'bid',
+          targetId: BID_ID,
+          actorUserId: 'admin-1',
+          detail: expectedDetail,
+        })
+      );
+    }
+  );
+
+  it('refund_submitted is audited as a submission, never as a completed refund', async () => {
+    enqueue(paidLookup);
+    mocks.state.refundsCreate.mockResolvedValue({ id: 're_pend_2', status: 'pending' });
+
+    await initiateAdminRefund({ bidId: BID_ID });
+
+    expect(mocks.state.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(mocks.state.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'payment.refund',
+        detail: { outcome: 'refund_submitted', stripe_refund_id: 're_pend_2' },
+      })
+    );
   });
 });

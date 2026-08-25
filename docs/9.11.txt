@@ -1,32 +1,141 @@
 ﻿TASK ID: 9.11
 PHASE: 9
 TITLE: Error handling review
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Complete read-only inventory and verification of error handling across every externally
+reachable and security/payment-sensitive boundary - preserving the distinctions between
+definitely-not-performed / performed-but-unconfirmed / retryable / permanently-rejected /
+already-completed / business-rule-refusal / infrastructure-failure - adding deterministic
+regression tests only for meaningful coverage gaps.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+ERROR-BOUNDARY INVENTORY AND VERDICTS:
 
-INPUTS / DEPENDENCIES:
+1. STRIPE WEBHOOK (route.ts + stripe-webhook.ts):
+   400 invalid/missing signature; 500 missing secret; 200+ignored for unsupported types;
+   authoritative re-retrieval failures throw -> 500 (retry); unverified sessions 200 with
+   NO mutation and NO ledger claim; anomaly outcomes (bid_not_found/invalid_state/
+   session_mismatch) -> 500 with claim rolled back inside the RPC; duplicate/already_paid
+   -> 200 flagged; unknown RPC outcome strings throw -> 500. Response bodies carry only
+   generic flags ('received'/'duplicate'/'ignored'/generic 'error') - payloads, secrets,
+   stack traces, and SQL text never reach the client. VERDICT: correct; covered by
+   stripe-webhook.test.ts + signature suite + Task 4.x suites + 9.9 stateful suite.
 
-IMPLEMENTATION REQUIREMENTS:
+2. BID/PAYMENT FLOW (bids.ts + checkout.ts):
+   Typed discriminated unions for every expected failure (invalid_slug/category_not_found/
+   invalid_amount/amount_below_minimum with echoed minimum/banned_email checked FIRST so
+   banned actors learn nothing/invalid_bidder_email/invalid_bidder_name/
+   invalid_stripe_session_id/duplicate_transaction via bid_error protocol mapping);
+   unexpected DB/RPC failures throw descriptive errors (no HTTP surface exists yet -
+   createCheckoutSession has no public route, consistent with 9.3); no partial state is
+   ever reported as success (pending rows are explicit; payment authority stays with the
+   verified webhook). VERDICT: correct; covered by bids.test.ts + checkout.test.ts.
 
-FILES EXPECTED TO CHANGE:
+3. EMAIL/OUTBID NOTIFICATIONS:
+   Suppression guards (self_outbid/unsubscribed/banned) precede composition and the
+   attempt gate on EVERY attempt including redeliveries; SendEmailError preserves the
+   provider_rejected (definitively not sent, terminal) vs send_unconfirmed (unknown,
+   retryable) distinction; delivery rows record sent ONLY after a successful send -
+   markDeliverySent/markDeliveryFailed failures throw rather than fake success;
+   failed_retryable rides Stripe redelivery while failed_permanent never resends.
+   VERDICT: correct; covered by resend.test.ts + notification-deliveries.test.ts +
+   outbid-notification.test.ts + concurrency/fraud suites.
 
-TEST PLAN:
+4. ADMIN AUTH (admin-auth.ts + login/logout routes):
+   getAdminContext fails closed on any session/membership/DB error; login answers a
+   generic ?error=1 for unknown-email vs wrong-password (no existence leak) and is rate
+   limited per IP; sanitizeNextPath plus resolved-origin equality blocks open redirects
+   including '//' and '/\'; logout always redirects identically (sign-out errors are not
+   distinguishable from an already-ended session). VERDICT: correct; covered by
+   admin-auth.test.ts + admin routes.test.ts.
 
-DEFINITION OF DONE:
+5. ADMIN MUTATIONS (categories/refunds/bans/audit):
+   All operations enforce authorization INSIDE the operation before any privileged work;
+   stable redirect flags (?result=/?error=) map typed reasons; UNIQUE(slug) violations
+   map to slug_taken; zero-row updates map to not_found; refunds distinguish
+   provider_failed (nothing moved, nothing recorded) from db_pending (money moved,
+   honestly retry-safe) and defer non-terminal statuses as refund_submitted;
+   writeAuditLog NEVER throws and failed audit writes never change business results.
+   AUDIT-DISCIPLINE GAP FOUND IN TESTS (not production): no test asserted that FAILED
+   refund paths write zero audit entries or that successful/no-op/submitted paths audit
+   exactly once with truthful outcome fields. FIXED BY TESTS this task (see below).
+   Production behavior was verified correct.
 
-IMPLEMENTATION NOTES:
+6. PUBLIC ENDPOINTS:
+   unsubscribe POST: 429 rate limit BEFORE processing; empty/malformed body swallowed ->
+   bare redirect; malformed token shape -> redirect with ZERO storage access; valid token
+   idempotent upsert; GET deliberately absent (prefetch safety). share-events POST:
+   allow-listed events only, 400/429/500 semantics. /success: untrusted session_id shape-
+   validated (single string only), RLS makes unknown/pending indistinguishable, awaiting
+   state echoes at most 64 chars of the caller's own input. COVERAGE GAP FOUND: the
+   unsubscribe route was the only externally reachable endpoint with NO tests. FIXED BY
+   TESTS this task. Production behavior verified correct.
 
-RESULT:
+7. PAGES/RENDERING:
+   Category page/metadata/OG image collapse missing/inactive/malformed slugs into one
+   notFound() outcome (no existence leak); OG image renders a neutral brand card when
+   data cannot resolve; loaders throw on DB errors which Next.js converts into its
+   generic production error boundary (framework default does not serialize error details
+   to clients; project intentionally adds no custom error UI). VERDICT: acceptable;
+   covered by category-page/metadata/og-image/bid-success suites.
 
-FILES ACTUALLY CHANGED:
+8. GENERAL PATTERNS:
+   Consistent architecture-wide conventions: Result unions for expected failures; throws
+   only for infrastructure/unexpected; authorization fail-closed everywhere; generic
+   HTTP bodies; server-side console logging limited to identifiers/ids/outcome codes
+   (Stripe ids/session ids are operational data shared with Stripe itself; no emails,
+   tokens, secrets, payloads, or stack traces are logged). No fail-open path found.
+   The seven failure categories are kept distinct everywhere; no collapsing found.
+
+CONCRETE PRODUCTION DEFECTS FOUND: NONE.
+
+REGRESSION TESTS ADDED FOR MEANINGFUL GAPS:
+
+A. src/app/api/unsubscribe/route.test.ts (NEW, 8 tests):
+   - valid query token -> 303 confirmation redirect with submitted=1, storage called once
+   - form-body token fallback processed identically
+   - bare request (unparseable body) -> bare redirect, storage untouched
+   - malformed tokens (empty/non-hex/wrong length) -> redirect with zero storage access
+     (REAL shape validation runs; only the storage mutation is mocked)
+   - flood cap: exactly 10 requests pass, 11th gets 429 + Retry-After: 60 before any
+     processing (deterministic fixed-window reset between tests)
+   - GET handler proven absent (email-scanner prefetch can never mutate suppression)
+
+B. src/lib/admin-refunds.test.ts (+5 tests in new 'audit discipline' describe):
+   - failed refunds (provider_failed, db_pending after provider success, unexpected RPC
+     outcome) produce ZERO audit entries - failures can never read as successes
+   - business-rule refusals (not_found/not_refundable/missing_payment_intent/
+     unauthorized) produce ZERO audit entries
+   - refunded/duplicate/already_refunded transitions audit EXACTLY ONCE with action
+     payment.refund, target bid, actor identity, and truthful detail.outcome
+   - refund_submitted audits as a submission, never as a completed refund
+
+KNOWN LIMITATIONS (documented, unchanged):
+- Live-provider error behavior (real Resend/Stripe failure responses) cannot be
+  exercised without credentials; the opt-in integration suite covers those honestly by
+  skipping without credentials.
+- Pages rely on Next.js default error boundaries; no custom error UI is mandated by the
+  plan.
+- POST /api/admin/banned has no rate limit (documented in 9.10): authorization-gated per
+  operation, not a fraud vector.
+
+FILES CHANGED:
+- src/app/api/unsubscribe/route.test.ts (created, 8 tests)
+- src/lib/admin-refunds.test.ts (+5 tests, mock harness exposes writeAuditLog)
+- docs/9.11.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 617/617 PASSED across 40 files (+13 net)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+SCOPE BOUNDARY:
+NO Phase 10+ work. NO production code/schema/migration changes. NO refactors for
+stylistic consistency. NO global error framework. NO new dependencies. Failure-category
+distinctions preserved everywhere.
 
 FOLLOW-UP:
+Phase 9 complete (9.1-9.11). Next per PROJECT_PLAN.md: Phase 10 - Production Launch
+(starting with Task 10.1 - Production environment).
