@@ -1,32 +1,126 @@
 ﻿TASK ID: 10.3
 PHASE: 10
 TITLE: Stripe live mode
-STATUS: pending
+STATUS: completed (preparation verified statically; LIVE activation is PENDING - operator action required)
 
 OBJECTIVE:
+Prepare the application for Stripe LIVE mode according to the existing architecture:
+identify every Stripe-related environment variable from actual code usage, verify no
+test-mode key/endpoint/fixture/hard-coded assumption reaches production code, and
+document the exact operator steps to switch the production deployment to live
+credentials - WITHOUT changing payment code, weakening signature verification, or
+performing any live money movement.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+STRIPE INTEGRATION AUDIT (production files touching Stripe boundaries - complete list):
+| File                    | Role                                                       | Env vars used                              |
+|-------------------------|------------------------------------------------------------|--------------------------------------------|
+| src/lib/stripe.ts       | server-side SDK client (module-scope; apiVersion pinned '2026-07-29.dahlia') | STRIPE_SECRET_KEY (server-only) |
+| src/lib/stripe-client.ts | browser Stripe.js loader (loadStripe)                     | NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (public) |
+| src/app/api/webhooks/stripe/route.ts | POST endpoint; raw body via request.text()    | (none directly)                            |
+| src/lib/stripe-webhook.ts | signature verification (constructEvent, explicit 300s tolerance), authoritative session re-retrieval, ledger/RPC dispatch | STRIPE_WEBHOOK_SECRET (server-only, read per request) |
+| src/lib/checkout.ts     | Checkout Session creation priced from DB-authoritative bid.amount; metadata/client_reference_id linkage | (uses stripe client + NEXT_PUBLIC_APP_URL for success/cancel URLs) |
+| src/lib/admin-refunds.ts | refunds.create with per-bid idempotency key admin-refund-<bidId> | (uses stripe client) |
 
-INPUTS / DEPENDENCIES:
+MODE-AGNOSTIC ARCHITECTURE VERIFIED (A - from repository/code):
+1. ZERO key literals in production sources: scripted scan of every non-test,
+   non-integration .ts/.tsx found no sk_test/sk_live/pk_test/pk_live/whsec_ literals.
+   All cs_test_/pi_test_/whsec_test-style values live exclusively in *.test.ts suites
+   and the opt-in integration suite.
+2. No code branches on test vs live mode anywhere: switching modes is purely an
+   environment-value operation in the Vercel dashboard. The exact same code paths
+   (checkout -> webhook -> ledger RPC) serve both modes.
+3. Server-only boundaries hold by construction: STRIPE_SECRET_KEY is read ONLY inside
+   server module src/lib/stripe.ts; STRIPE_WEBHOOK_SECRET is read ONLY per-request
+   inside processStripeWebhook; neither has any client importer. The only browser-side
+   variable is NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY via loadStripe (inlined at build).
+4. Payment-safety invariants confirmed untouched and mode-independent:
+   - authoritative pricing from the database (client amounts never trusted)
+   - authoritative re-retrieval of the Checkout Session from Stripe's API BEFORE any
+     mutation (verifyCheckoutSessionPaid)
+   - raw-body webhook signature verification with explicit replay-window tolerance
+   - processed_webhook_events ledger + row-locked RPC exactly-once state machine
+   - existing idempotency keys preserved verbatim (admin-refund-<bidId>)
+5. Test-mode tooling stays test-only: RUN_STRIPE_INTEGRATION opt-in flag gates
+   src/integration/stripe.integration.test.ts, which is EXCLUDED from `npm run test`
+   (vitest.config.mts excludes src/**/*.integration.test.ts) and runs only under
+   `npm run test:integration` with explicitly documented TEST-mode credentials and a
+   "NEVER point these tests at production/live credentials" warning. Unchanged.
 
-IMPLEMENTATION REQUIREMENTS:
+LIVE vs STATIC VERIFICATION STATUS:
 
-FILES EXPECTED TO CHANGE:
+A. Verified from repository/code: everything above (integration audit, env
+   classification, zero test-mode leakage into production sources, invariant
+   preservation, test-tooling isolation).
 
-TEST PLAN:
+B. Verified against Stripe LIVE environment: NOTHING. No live credentials exist in this
+   environment; NO live Stripe API interaction of any kind occurred during this task
+   (no sessions created, no webhooks registered, no keys retrieved or printed). "Stripe
+   live mode is active" is NOT claimed.
 
-DEFINITION OF DONE:
+C. OPERATOR ACTIONS STILL REQUIRED (in order):
+   1. Activate LIVE payments on the Stripe account (Dashboard: business/account
+      activation). Live keys are unavailable until this completes.
+   2. Developers -> API keys: copy the LIVE publishable key (pk_live_...) and LIVE
+      secret key (sk_live_...).
+   3. Webhook endpoint registration:
+        URL: https://<final-production-url>/api/webhooks/stripe
+        Events (exactly the three the application handles):
+          checkout.session.completed
+          checkout.session.async_payment_failed
+          charge.refunded
+      Copy the endpoint's LIVE signing secret (whsec_...).
+      DEPENDENCY NOTE (10.4): if deployment initially uses the default Vercel domain,
+      register the webhook with that URL now and UPDATE the endpoint URL after Task
+      10.4 attaches the custom domain (Stripe supports editing an endpoint's URL;
+      whether the signing secret rotates is shown in the Dashboard - if it does, update
+      STRIPE_WEBHOOK_SECRET accordingly). Do NOT guess/invent the final URL here.
+   4. Vercel Project Settings -> Environment Variables (Production environment):
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = pk_live_...
+        STRIPE_SECRET_KEY                  = sk_live_...   (server-only)
+        STRIPE_WEBHOOK_SECRET              = whsec_...     (server-only; LIVE ENDPOINT
+                                           secret - distinct from the sk_live_ API key)
+   5. CRITICAL distinctions:
+        - LIVE webhook signing secret != LIVE secret API key (different values, both
+          required)
+        - Do NOT substitute any test-mode value in production env vars
+        - NEXT_PUBLIC_* values are inlined at BUILD time: changing them requires a
+          redeploy/rebuild to take effect
+   6. Keep test-mode keys configured ONLY for development/preview environments
+      (separate env scopes); never mix scopes.
+   7. Post-switch sanity (operator-authorized real money movement - NOT performed by
+      this task): place one minimal real bid end-to-end on the production deployment and
+      confirm: redirect to Stripe Checkout, paid conversion appears on the leaderboard
+      within seconds (webhook), /success shows "Payment confirmed", and the Stripe
+      Dashboard shows the LIVE payment + successful webhook delivery (200).
 
-IMPLEMENTATION NOTES:
+SECURITY/PRIVACY CONSIDERATIONS:
+- sk_live_/whsec_ values must NEVER enter git, logs, docs, client bundles, or this
+  repository; they exist only in the Stripe Dashboard and Vercel encrypted env vars.
+- Signature verification remains mandatory regardless of mode; nothing was weakened or
+  bypassed pending live configuration.
+- No live/test credentials were echoed into command output or reports during this task;
+  only classifications and key PREFIX conventions (pk_live_/sk_live_/whsec_) appear here.
 
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- docs/10.3.txt (this file), PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 617/617 PASSED across 40 files (unit suite remains hermetic; integration
+  suite skipped honestly without opt-in/credentials)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY:
+NO 10.4+ work: custom domain NOT configured (10.4 dependency documented above), no
+SEO/analytics/error-monitoring/perf/mobile/QA. NO payment-code changes: provider,
+architecture, state machine, idempotency keys, verification semantics all unchanged.
+NO live Stripe interaction occurred.
 
 KNOWN ISSUES:
+None in code. Operational caveat identical to 10.2: LIVE activation itself is operator-
+pending; "Stripe live mode is active" may only be claimed after checklist items 1-5 plus
+the item-7 sanity pass succeed.
 
 FOLLOW-UP:
+Task 10.4 - Custom domain (then update the webhook endpoint URL per step 3 above).

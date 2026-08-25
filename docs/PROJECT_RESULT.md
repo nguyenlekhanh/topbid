@@ -2865,4 +2865,19 @@ _
 
 ---
 
+### Task 10.3
+
+- **Date**: 2026-08-25
+- **Objective**: Prepare the application for Stripe LIVE mode per the existing architecture - identify every Stripe env variable from actual usage, verify no test-mode key/fixture reaches production code, document exact operator steps - without changing payment code or performing live money movement
+- **Status**: Completed as static preparation + operator runbook. LIVE activation NOT claimed; no live Stripe API interaction occurred
+- **Integration audit findings**: six production files touch Stripe boundaries (stripe.ts server client with pinned apiVersion, stripe-client.ts browser loader, webhook route + stripe-webhook.ts verification/retrieval, checkout.ts DB-priced sessions, admin-refunds.ts keyed refunds); architecture is fully mode-agnostic - switching to live is purely a Vercel environment-value operation; scripted scan found ZERO key literals in non-test production sources (all cs_test_/pi_test_/whsec_ values confined to *.test.ts suites and the opt-in integration suite); server-only boundaries hold by construction (STRIPE_SECRET_KEY only in stripe.ts, STRIPE_WEBHOOK_SECRET only per-request in processStripeWebhook, no client importers); payment-safety invariants confirmed untouched and mode-independent (DB-authoritative pricing, authoritative re-retrieval before mutation, raw-body signature verification, ledger/RPC exactly-once, admin-refund-<bidId> keys); RUN_STRIPE_INTEGRATION stays test-only, excluded from unit runs
+- **Live vs static**: (a) verified from code: audit above; (b) verified against Stripe LIVE: nothing; (c) operator steps in docs/10.3.txt: account LIVE activation -> pk_live_/sk_live_ retrieval -> webhook endpoint registration for exactly the three handled events (checkout.session.completed, checkout.session.async_payment_failed, charge.refunded) with explicit 10.4 dependency note (register initial URL, update after custom domain) -> Vercel Production env placement with the critical LIVE-signing-secret-vs-LIVE-API-key distinction -> rebuild/redeploy required since NEXT_PUBLIC_* is build-time-inlined -> keep test keys scoped to dev/previews only -> one operator-authorized real end-to-end sanity bid post-switch
+- **Security**: sk_live_/whsec_ values must never enter git/logs/docs/bundles; signature verification remains mandatory regardless of mode; nothing weakened pending live config; no credentials echoed into output
+- **Files changed**: docs/10.3.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md (no code/config changes)
+- **Tests performed**: npm run test 617/617 PASSED (integration suite honestly skipped); typecheck/lint/format:check/build all PASSED
+- **Scope statement**: NO 10.4+ functionality implemented (custom domain not touched; no SEO/analytics/monitoring/QA)
+- **Follow-up work**: Task 10.4 - Custom domain (then update webhook endpoint URL per docs/10.3.txt step 3)
+
+---
+
 _This file will be updated after each completed task with actual implementation details.
