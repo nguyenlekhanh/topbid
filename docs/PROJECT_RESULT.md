@@ -2911,4 +2911,23 @@ _
 
 ---
 
+### Task 10.6
+
+- **Date**: 2026-08-25
+- **Objective**: Implement the smallest production-ready analytics consistent with the existing project and Vercel deployment strategy - best-effort only, fully separated from authoritative flows, preserving the privacy model and first-party share_events telemetry
+- **Status**: Completed. Repository implementation + deterministic tests; LIVE analytics data requires operator activation in the Vercel dashboard (not verified, not claimed)
+- **Existing analytics audit**: no provider existed anywhere (no GA/PostHog/Plausible/Fathom/Umami/Mixpanel/Segment/Amplitude/Matomo/Vercel references); sole telemetry = Task 7.7 share_events (allow-listed events, event-name-only payload, rate-limited validating endpoint, RLS zero policies, non-authoritative); no analytics cookies/fingerprinting/IP/UA collection
+- **Provider decision**: @vercel/analytics ^2.0.1 - native to the established Vercel platform, cookieless, ZERO environment variables, smallest SDK footprint, non-blocking injection, single dashboard toggle; GA rejected (heavy/cookies/consent), PostHog/Plausible/Mixpanel rejected (keys + larger clients), self-built pageviews rejected (would duplicate share_events)
+- **Events/data**: pageviews ONLY on public routes; no custom events (share/copy already tracked first-party); no email/session ids/Stripe ids/bid ids/tokens/admin identities/sensitive URLs collected by construction; no fingerprinting/cookies added
+- **Implementation**: pure analytics-gate.ts (segment-exact blocking of /admin|/api|/success|/cancel|/unsubscribe - same private set as 10.5; /administrator-guide-style routes can never be swallowed; malformed input fails closed) + PublicAnalytics client component (usePathname -> gate -> <Analytics/> or null) mounted once in root layout
+- **Failure behavior**: best-effort by construction - null-or-async-script rendering can never affect rendering/bidding/payment/webhooks/auth/unsubscribe/notifications/admin/sharing; analytics state never read by business logic
+- **Tests added**: 27 deterministic tests - gate matrix (public/private/nested/trailing-slash/segment-exactness/fail-closed) and server-side render proofs that the analytics marker mounts exactly on public paths with empty markup on every private path and null pathname
+- **Files changed**: package.json + package-lock.json (@vercel/analytics), src/lib/analytics-gate.ts, src/components/PublicAnalytics.tsx, src/app/layout.tsx (+mount), src/lib/analytics-gate.test.ts, src/components/public-analytics.test.ts, docs/10.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 664/664 PASSED across 45 files (+27 net); typecheck/lint/format:check/build all PASSED
+- **Operator steps**: deploy -> enable Web Analytics in Vercel Project Analytics tab -> spot-check public pages report while /admin//success visits do not appear
+- **Scope statement**: NO 10.7+ functionality implemented (no error monitoring/perf/mobile/QA); no custom metrics/marketing pixels/SEO changes/payment-auth-security modifications/share_events duplication
+- **Follow-up work**: Task 10.7 - Error monitoring
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

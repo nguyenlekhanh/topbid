@@ -1,32 +1,120 @@
 ﻿TASK ID: 10.6
 PHASE: 10
 TITLE: Analytics setup
-STATUS: pending
+STATUS: completed (repository implementation; LIVE analytics data requires operator activation in Vercel)
 
 OBJECTIVE:
+Implement the smallest production-ready analytics consistent with the existing project
+and Vercel deployment strategy - best-effort only, completely separated from all
+authoritative flows, preserving the privacy/data-minimization model and the existing
+first-party share_events telemetry.
 
-SCOPE:
+EXISTING ANALYTICS/TRACKING AUDIT:
+- package.json contained NO analytics provider (no GA/PostHog/Plausible/Fathom/Umami/
+  Mixpanel/Segment/Amplitude/Matomo/Vercel references anywhere in src)
+- The ONLY first-party telemetry is share_events (Task 7.7): allow-listed x_share |
+  copy_link events, event-name-only payload, validating POST /api/share-events with
+  per-IP rate limiting, RLS zero policies, strictly non-authoritative
+- No cookies for analytics existed; no fingerprinting; no IP/UA collection
 
-OUT OF SCOPE:
+PROVIDER DECISION AND RATIONALE:
+@vercel/analytics (Vercel Web Analytics) chosen because:
+1. Vercel is the established deployment platform (AGENTS.md + plan Deployment Strategy);
+   the integration is native and zero-configuration on it
+2. Cookieless by design - no consent burden, no new cookies introduced (explicitly not
+   required by the task)
+3. ZERO environment variables required (unlike GA/PostHog/Plausible which need keys or
+   origin allow-lists) - nothing new to classify or leak
+4. Smallest possible SDK footprint; script injection is non-blocking by provider design
+5. Operator activation is a single dashboard toggle, matching the established Phase 10
+   operator-checklist pattern
+Alternatives rejected: Google Analytics (heavy SDK, cookies, consent complexity),
+PostHog/Plausible/Mixpanel (require keys/endpoints + larger clients), self-built
+pageview pipeline (would duplicate share_events infrastructure and add DB writes).
 
-INPUTS / DEPENDENCIES:
+EVENTS / DATA COLLECTED:
+- Pageviews ONLY, via the provider's automatic tracking on PUBLIC routes.
+- NO custom events are sent. Share/copy actions already have first-party share_events
+  telemetry (Task 7.7) which remains untouched and is NOT duplicated.
+- Provider-aggregate dimensions only (Vercel dashboard: page counts, referrers,
+  countries, device classes). No application code supplies any payload.
 
-IMPLEMENTATION REQUIREMENTS:
+DATA EXPLICITLY NOT COLLECTED (by construction):
+No email addresses, session ids, Stripe session/payment-intent ids, bid ids,
+unsubscribe tokens, admin user ids/emails, raw sensitive URLs (private routes render no
+script at all), no custom fingerprinting, no analytics cookies, no IP/UA handling in
+application code (provider aggregates are outside app control but the product is
+cookieless and privacy-oriented).
 
-FILES EXPECTED TO CHANGE:
+IMPLEMENTATION:
+- src/lib/analytics-gate.ts (pure): isPublicAnalyticsPath(pathname) - everything is
+  public EXCEPT segment-exact matches of /admin, /api, /success, /cancel,
+  /unsubscribe (the same private set Task 10.5 excludes from indexing). Segment-exact
+  matching means a hypothetical future public route like /administrator-guide can never
+  be swallowed. Malformed input fails closed to "not tracked".
+- src/components/PublicAnalytics.tsx ('use client'): usePathname() -> gate ->
+  renders <Analytics /> or null. Mounted once in src/app/layout.tsx.
+- No server-only module touches analytics; no env vars added to .env.example (none
+  exist for this provider); no build-time configuration required beyond a normal deploy.
 
-TEST PLAN:
+FAILURE BEHAVIOR:
+Best-effort by construction: the component renders null or an async script tag - it can
+never block page rendering, bidding/payment, Stripe webhooks, authentication,
+unsubscribe, notifications, admin operations, or sharing UX. An analytics outage is
+invisible to every authoritative flow. Analytics state is never read by any business
+logic (presentation-only).
 
-DEFINITION OF DONE:
+PRIVACY/SECURITY CONSIDERATIONS:
+- Private surfaces are structurally untracked (no script rendered there), mirroring and
+  complementing the Task 10.5 robots/noindex exclusions
+- share_events remains independent first-party telemetry - unchanged and unduplicated
+- No real credentials exist anywhere; none were invented
 
-IMPLEMENTATION NOTES:
+ENVIRONMENT VARIABLES: NONE required by @vercel/analytics (dashboard-toggled product).
+RUN_STRIPE_INTEGRATION remains test-only as before.
 
-RESULT:
+OPERATOR SETUP STEPS (C - required for live data):
+1. Deploy (already flowing through the established Vercel strategy).
+2. Vercel Project -> Analytics tab: enable Web Analytics for Production.
+3. Verify pageview data begins appearing for public pages only (spot-check that
+   /admin/* and /success visits do NOT appear after exercising them).
+D. Live production verification was NOT performed (no Vercel access here).
 
-FILES ACTUALLY CHANGED:
+TESTS ADDED (27 deterministic tests):
+- src/lib/analytics-gate.test.ts (17): public paths allowed; every private prefix +
+  nested route blocked; trailing-slash variants blocked; segment-exact matching proven
+  (/administrator-guide etc. stay public); malformed input (null/undefined/empty/
+  non-path/absolute URL) fails closed
+- src/components/public-analytics.test.ts (10): real component rendered via
+  react-dom/server with mocked router/provider - analytics marker mounted exactly on
+  public paths, empty markup on every private path, null pathname fails closed
+
+FILES CHANGED:
+- package.json + package-lock.json (@vercel/analytics ^2.0.1)
+- src/lib/analytics-gate.ts, src/components/PublicAnalytics.tsx (new)
+- src/app/layout.tsx (+ mount)
+- src/lib/analytics-gate.test.ts, src/components/public-analytics.test.ts (new tests)
+- docs/10.6.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 664/664 PASSED across 45 files (+27 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+VERIFICATION CLASSIFICATION:
+A. Verified from repository/code: gate semantics, mount gating, provider isolation,
+   share_events independence.
+B. Verified locally: full unit suite + typecheck/lint/format/build with the dependency
+   installed.
+C. Operator configuration pending: enable Web Analytics in the Vercel dashboard.
+D. Live production verification: NOT performed; "analytics is live" is NOT claimed.
+
+SCOPE BOUNDARY (explicit):
+NO 10.7+ work (error monitoring/perf/mobile/QA/launch checklist). No custom business
+metrics, no marketing pixels, no SEO changes beyond what exists, no payment/auth/
+security modifications, no share_events duplication or schema changes.
 
 KNOWN ISSUES:
+None.
 
 FOLLOW-UP:
+Task 10.7 - Error monitoring.
