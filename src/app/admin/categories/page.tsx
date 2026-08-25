@@ -218,7 +218,7 @@ export default async function AdminCategoriesPage({
                         <input type="hidden" name="active" value={String(!category.is_active)} />
                         <button
                           type="submit"
-                          className="inline-flex min-h-9 items-center rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="inline-flex min-h-11 items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                           {category.is_active ? 'Deactivate' : 'Activate'}
                         </button>
@@ -226,7 +226,7 @@ export default async function AdminCategoriesPage({
                     </div>
 
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-xs font-medium text-primary">
+                      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-medium text-primary">
                         Edit details
                       </summary>
                       <form action="/api/admin/categories" method="post" className="mt-3 space-y-3">

@@ -1,32 +1,82 @@
 ﻿TASK ID: 10.9
 PHASE: 10
 TITLE: Mobile testing
-STATUS: pending
+STATUS: completed (static/responsive audit + 4 concrete touch-target fixes; real-device verification NOT performed)
 
 OBJECTIVE:
+Audit the entire user-facing application for mobile/responsive behavior, fix only
+concrete defensible defects, and pin the fixes with deterministic regression coverage -
+without changing any business, security, or privacy semantics.
 
-SCOPE:
+AUDIT METHODOLOGY:
+- Static source audit of every page/component for mobile-hostile patterns: fixed pixel
+  widths, missing overflow wrappers on tables, whitespace-nowrap without truncation,
+  sub-standard interactive-control heights, long-text handling (break-all/truncate),
+  flex/grid stacking breakpoints
+- Cross-check against the project's own established responsive standard from Task 1.14
+  ("320/375/390/430 verified, overflow fixed, touch targets 44px")
+- Scripted scans for overflow-x-auto table wrappers and height tokens (min-h-8/9/10/11,
+  h-8/h-9) across all admin pages and components
+- Manual inspection of the highest-risk surfaces added since Task 1.14: admin bids/
+  payments tables, refund action, category management forms/toggles, banned list,
+  audit-log feed
 
-OUT OF SCOPE:
+SURFACES REVIEWED (all clear unless noted):
+- Public: homepage (static shell + client trackers already mobile-refined in 1.14),
+  Leaderboard/RecentBids (overflow-x-auto wrappers present), category pages (server-
+  rendered text content, no fixed widths), BidModal/success/cancel (1.14-refined),
+  unsubscribe page (single-column card, w-full form), Navbar (min-h-11 min-w-11 toggle)
+- Admin: login (w-full min-h-11 form), dashboard (card summaries), bids table
+  (overflow-x-auto wrapper present), payments table (wrapper + truncated Stripe id
+  columns with max-w), banned list (truncate emails), audit-log feed (break-all on
+  actor/target/detail JSON), categories management
 
-INPUTS / DEPENDENCIES:
+CONCRETE DEFECTS FOUND AND FIXED (severity: medium - sub-44px tap targets on
+consequential admin mutation controls, inconsistent with the codebase's own 1.14
+standard; small targets inside dense rows/lists raise mis-tap risk on money/state
+actions):
+1. /admin/payments Refund button: min-h-9 px-3 py-1.5 text-xs -> min-h-11 px-4 py-2
+   text-sm (destructive-styled money action)
+2. /admin/categories Activate|Deactivate button: same token upgrade (state-changing
+   mutation)
+3. /admin/categories Edit-details <summary>: bare text-xs cursor-pointer ->
+   inline-flex min-h-11 items-center text-sm (tap target now 44px tall)
+4. /admin/banned Unban button: same token upgrade as #2
+Desktop appearance preserved (same visual style family, slightly larger controls);
+no behavior/markup/security changes.
 
-IMPLEMENTATION REQUIREMENTS:
+REGRESSION GUARD ADDED:
+src/app/admin/touch-targets.test.ts (2 tests):
+- scans ALL admin pages for sub-standard control height tokens (min-h-8/9,
+  min-h-[36px], h-8/h-9) on className-bearing lines - the scan itself caught a fourth
+  offender (Unban) during development, proving its value
+- pins the three audited controls to explicit compliant class strings
 
-FILES EXPECTED TO CHANGE:
+LIMITATIONS:
+- Real iOS/Android device verification NOT performed (no device automation exists in
+  the repository and no deployed production environment is available) - this is a
+  static/responsive-source audit per the task's allowance
+- Layout correctness at specific viewports relies on Tailwind responsive utilities
+  already verified in Task 1.14 plus the class-level guarantees pinned here; live
+  visual verification remains operator-side after deployment (Task 10.4 checklist)
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/app/admin/payments/page.tsx (refund button touch target)
+- src/app/admin/categories/page.tsx (toggle button + edit summary touch targets)
+- src/app/admin/banned/page.tsx (unban button touch target)
+- src/app/admin/touch-targets.test.ts (new regression guard, 2 tests)
+- docs/10.9.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 685/685 PASSED across 47 files (+2 net)
+- npm run typecheck / lint / format:check / build: all PASSED
 
-KNOWN ISSUES:
+SCOPE BOUNDARY (explicit):
+NO 10.10+ work (final QA/launch checklist). No UI framework/dependency introduced; no
+redesigns or preference-driven visual changes; no business/security/validation/auth/RLS/
+rate-limit/webhook/payment-state changes; no Phase 11+ functionality.
+
+KNOWN ISSUES: None.
 
 FOLLOW-UP:
+Task 10.10 - Final QA.

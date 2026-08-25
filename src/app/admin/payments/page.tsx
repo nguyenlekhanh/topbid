@@ -209,7 +209,7 @@ export default async function AdminPaymentsPage({
                             <input type="hidden" name="bid_id" value={payment.bidId} />
                             <button
                               type="submit"
-                              className="inline-flex min-h-9 items-center rounded-lg border border-destructive/40 bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              className="inline-flex min-h-11 items-center rounded-lg border border-destructive/40 bg-background px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
                               Refund
                             </button>

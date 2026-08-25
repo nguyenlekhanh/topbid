@@ -2967,4 +2967,21 @@ _
 
 ---
 
+### Task 10.9
+
+- **Date**: 2026-08-25
+- **Objective**: Audit all user-facing surfaces for mobile/responsive behavior, fix only concrete defensible defects, pin fixes with deterministic tests; real-device verification explicitly out of reach (no automation in repo, no deployed environment)
+- **Status**: Completed as static/responsive audit + 4 concrete touch-target fixes + regression guard
+- **Methodology**: source-level scan of every page/component for fixed widths, missing table overflow wrappers, truncation/break-all handling, stacking breakpoints, and interactive-control heights cross-checked against the Task 1.14 standard (44px targets); manual inspection of highest-risk post-1.14 surfaces (admin tables/refunds/category forms/banned list/audit feed)
+- **Surfaces verified clear**: leaderboard/recent tables (overflow-x-auto), navbar toggle (min-h-11 min-w-11), payments/bids tables (overflow-x-auto + truncated Stripe id columns with max-w), banned emails (truncate), audit logs (break-all card feed), unsubscribe (single-column w-full form), login/dashboard forms, bid modal/success/cancel (Task 1.14-refined)
+- **Defects found and fixed** (medium severity - sub-44px tap targets on consequential admin mutations inside dense rows/lists): payments Refund button, categories Activate/Deactivate button, categories Edit-details bare <summary>, banned Unban button - all upgraded from min-h-9/text-xs to min-h-11/px-4/py-2/text-sm preserving visual family, desktop behavior, markup, and security semantics
+- **Regression guard**: src/app/admin/touch-targets.test.ts scans ALL admin pages for sub-standard height tokens (caught a fourth offender during development, proving its value) and pins the audited controls to explicit compliant strings
+- **Files changed**: src/app/admin/payments/page.tsx, src/app/admin/categories/page.tsx, src/app/admin/banned/page.tsx, NEW src/app/admin/touch-targets.test.ts, docs/10.9.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 685/685 PASSED across 47 files (+2 net); typecheck/lint/format:check/build all PASSED
+- **Limitations**: no real iOS/Android device verification (no automation available); live visual checks remain operator-side after deployment
+- **Scope statement**: NO 10.10+ functionality implemented; no UI framework/dependency added; no redesigns; no business/security/validation/auth changes
+- **Follow-up work**: Task 10.10 - Final QA
+
+---
+
 _This file will be updated after each completed task with actual implementation details.
