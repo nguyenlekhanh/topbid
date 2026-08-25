@@ -1,32 +1,156 @@
 ﻿TASK ID: 10.2
 PHASE: 10
 TITLE: Production database
-STATUS: pending
+STATUS: completed (static verification; live provisioning PENDING - operator action required)
 
 OBJECTIVE:
+Establish the production database according to the existing migration architecture:
+verify the complete migration chain is suitable for a FRESH production Supabase
+project, that ordering/dependencies are correct, that no migration relies on local-only
+state, and that the schema exactly matches what the application expects - preserving
+the existing RLS/security model without weakening anything.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+MIGRATION CHAIN INVENTORY (22 migrations, strictly ordered 20260823000001..22):
 
-INPUTS / DEPENDENCIES:
+| #   | Migration                                | Establishes                                              | Depends on |
+|-----|------------------------------------------|----------------------------------------------------------|------------|
+| 01  | create_categories                        | pgcrypto extension; public.categories                     | -          |
+| 02  | create_bids                              | public.bids (FK->categories CASCADE; UNIQUE stripe_session_id; UNIQUE(category_id,stripe_session_id)) | 01 |
+| 03  | add_bids_indexes                         | 4 bids indexes incl. partial paid/amount DESC             | 02         |
+| 04  | add_constraints                          | CHECKs: starting_bid>=0, increment>=0, amount>=0, status IN (pending,paid,failed,refunded) | 01,02 |
+| 05  | enable_rls                               | RLS on categories+bids; SELECT policies active-only/paid-only; NO public writes | 01,02 |
+| 06  | seed_categories                          | 6 MVP categories, idempotent ON CONFLICT (slug) DO NOTHING | 01        |
+| 07  | create_pending_bid fn                    | RPC v1 (4-param), SECURITY DEFINER + pinned search_path, service_role-only EXECUTE | 01,02 |
+| 08  | create_pending_bid stripe session        | DROPS 4-param fn, recreates 5-param w/ duplicate_transaction protocol; re-grants | 07 |
+| 09  | attach_stripe_session fn                 | attach-once RPC; service_role-only                        | 02         |
+| 10  | convert_pending_bid_to_paid fn           | row-locked conversion RPC; service_role-only              | 02         |
+| 11  | processed_webhook_events + wrapper RPC   | event-id ledger table + process_checkout_completed_event  | 10         |
+| 12  | fail_pending_bid fn                      | ledger claim + failed transition; never downgrades paid   | 11         |
+| 13  | refund_paid_bid fn                       | ledger claim + refunded transition keyed on PI            | 11         |
+| 14  | enable_bids_realtime                     | guarded/idempotent supabase_realtime publication membership for bids | 02 |
+| 15  | notification_unsubscribes                | capability-hash consent table; RLS zero policies          | -          |
+| 16  | outbid_notification_deliveries           | per-bid delivery state FK->bids; RLS zero policies        | 02         |
+| 17  | share_events                             | minimal telemetry table; RLS zero policies                | -          |
+| 18  | admin_users                              | auth.users-keyed admin membership; RLS self-read policy   | auth schema (Supabase default) |
+| 19  | fix_refund_paid_bid_parameter            | CREATE OR REPLACE same-signature bugfix; grants re-asserted | 13,11    |
+| 20  | banned_emails                            | canonical blocklist; RLS zero policies                    | -          |
+| 21  | audit_logs                               | immutable audit trail + index; RLS zero policies          | -          |
+| 22  | processed_webhook_events RLS             | enables RLS (zero policies) - Task 9.7 defect fix         | 11         |
 
-IMPLEMENTATION REQUIREMENTS:
+STATIC VERIFICATION RESULTS (verified from repository/migrations):
 
-FILES EXPECTED TO CHANGE:
+A. ORDERING/DEPENDENCIES: filenames sort lexicographically in true dependency order;
+   every referenced object is created in an earlier migration. Migration 08 explicitly
+   drops the superseded 4-parameter signature before creating the 5-parameter one, so a
+   FRESH database ends with exactly ONE create_pending_bid signature (no stale
+   overloads). Migration 19 replaces refund_paid_bid in place (same signature).
 
-TEST PLAN:
+B. NO LOCAL-ONLY STATE: no migrations reference local files, environment values,
+   secrets, or connection strings. Seeds are idempotent (ON CONFLICT DO NOTHING); the
+   realtime publication change is guarded (checks pg_publication_tables before ALTER).
+   The only external-schema dependency is auth.users (migration 18), which exists on
+   every Supabase project by default.
 
-DEFINITION OF DONE:
+C. TABLES: 10 tables total. All 8 tables queried/written via .from() by application code
+   (categories, bids, admin_users, audit_logs, banned_emails, notification_unsubscribes,
+   outbid_notification_deliveries, share_events) verified present by scripted grep.
+   processed_webhook_events is accessed ONLY inside SECURITY DEFINER functions (by
+   design) and exists via migration 11.
 
-IMPLEMENTATION NOTES:
+D. RPCs: all 5 directly-called RPCs (attach_stripe_session, create_pending_bid,
+   fail_pending_bid, process_checkout_completed_event, refund_paid_bid) verified present
+   by scripted grep; convert_pending_bid_to_paid exists and is invoked inside the
+   process_checkout_completed_event wrapper (never called from app code directly).
 
-RESULT:
+E. FUNCTION SECURITY: 8 function definitions across the chain; each pairs
+   `security definer` WITH `set search_path = public` and is followed by revokes of
+   EXECUTE from public/anon/authenticated and a grant to service_role ONLY - verified
+   counts: 8 pinned search_path statements, 8 grant statements, 24 revoke statements.
 
-FILES ACTUALLY CHANGED:
+F. RLS MODEL: 10 `enable row level security` statements = 10/10 tables. Policies:
+   exactly 3 exist (categories_public_select_active, bids_public_select_paid,
+   admin_users_select_own). SEVEN tables are deliberately ZERO-POLICY (service-role
+   only): processed_webhook_events, notification_unsubscribes,
+   outbid_notification_deliveries, share_events, banned_emails, audit_logs (+ none
+   needed for categories/bids beyond their SELECT policies). Nothing was weakened.
+
+G. INDEXES/CONSTRAINTS: bids indexes (category+status; partial category+amount DESC
+   WHERE paid; stripe_session; payment_intent) plus unique-constraint backing indexes;
+   audit_logs(created_at DESC); UNIQUEs on slug/stripe_session_id/email_canonical/
+   recipient_hash/event_id; CHECK constraints on amounts/status enums/delivery states/
+   audit actions/share events - all represented by migrations.
+
+H. NO SECRETS: scripted scan found no secret-like literals (sk_live/sk_test/whsec/sbp
+   patterns) anywhere in migrations.
+
+LIVE vs STATIC VERIFICATION STATUS:
+
+a. VERIFIED FROM REPOSITORY/MIGRATIONS: everything above (A-H).
+b. VERIFIED AGAINST A LIVE PRODUCTION DATABASE: NOTHING - no production Supabase
+   project/credentials exist in this environment (local .env.local holds development
+   values only and was NOT used as a substitute). Live provisioning and live RLS/
+   function/grant verification were NOT performed and MUST be executed by the operator.
+c. OPERATOR ACTIONS STILL REQUIRED (run in order):
+   1. Create the production Supabase project (region per operator requirements).
+   2. Apply ALL 22 migrations in filename order to the production database:
+      `supabase link --project-ref <ref>` then `supabase db push`, OR paste-and-run each
+      file in the dashboard SQL editor strictly in filename order.
+   3. Post-push verification (SQL editor, expect exact results):
+        select count(*) from public.categories;                          -- expect 6
+        select tablename from pg_tables
+         where schemaname='public' and rowsecurity=false;                -- expect 0 rows
+        select tablename, policycount from pg_tables t
+         join (select relname, count(*) policycount from pg_policies
+               where schemaname='public' group by relname) p
+          on p.relname=t.tablename where schemaname='public';            -- categories=1,
+                                                                         -- bids=1, admin_users=1, rest NULL/0
+        select proname, prosecdef, proconfig from pg_proc
+         where pronamespace='public'::regnamespace and prokind='f';      -- 6 functions,
+                                                                         -- prosecdef=true,
+                                                                         -- proconfig includes search_path
+      And confirm anon denial, e.g.:
+        set role anon; select * from public.banned_emails;               -- must ERROR
+        reset role;
+   4. Create the production admin AUTH user (dashboard) and insert its id into
+      public.admin_users (SQL editor):
+        insert into public.admin_users (id)
+        values ('<auth-user-uuid>');                                     -- operator value
+   5. Record the production values for NEXT_PUBLIC_SUPABASE_URL /
+      NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in Vercel Production
+      env vars per docs/10.1.txt (values themselves are operator-supplied secrets -
+      never committed here).
+   6. Realtime note: migration 14 adds bids to supabase_realtime; confirm delivery after
+      first paid bid (leaderboard updates live).
+
+SECURITY/PRIVACY CONSIDERATIONS:
+- The security model ships entirely through migrations: nothing depends on dashboard
+  clicks to be safe on a fresh project (RLS + grants + definer pinning are all IN the
+  chain). The one intentional out-of-band step is creating the first admin auth user
+  (auth users cannot be created by SQL migrations).
+- No production credentials were invented, requested, stored, echoed, or committed.
+- Development .env.local values were never used against any database during this task.
+
+FILES CHANGED:
+- docs/10.2.txt (this file), PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 617/617 PASSED across 40 files
+- npm run typecheck / lint / format:check / build: all PASSED
+- Scripted static cross-checks (RPC/table existence, grant/revoke/policy/RLS counts,
+  secret-literal scan): ALL PASS (documented above)
+
+SCOPE BOUNDARY:
+NO 10.3+ work: Stripe NOT switched to live, webhook endpoint NOT configured, Resend
+production NOT configured, custom domain NOT touched, no SEO/analytics/monitoring/QA.
+NO changes to migrations, RLS, functions, grants, or application behavior. NO new
+infrastructure tooling added.
 
 KNOWN ISSUES:
+None in the migration chain itself. The single operational caveat: live execution of
+the chain against an actual production project remains operator-pending (step c above);
+"production database ready" may only be claimed after that verification succeeds.
 
 FOLLOW-UP:
+Task 10.3 - Stripe live mode (after operator completes the 10.2 checklist).

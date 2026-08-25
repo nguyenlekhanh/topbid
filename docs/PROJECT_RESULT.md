@@ -2849,4 +2849,20 @@ _
 
 ---
 
+### Task 10.2
+
+- **Date**: 2026-08-25
+- **Objective**: Establish the production database according to the existing migration architecture - verify the complete migration chain is suitable for a fresh production Supabase project with correct ordering/dependencies, no local-only state, and exact application-schema agreement - preserving the RLS/security model without weakening anything
+- **Status**: Completed as exhaustive STATIC verification + operator runbook. LIVE provisioning/RLS verification NOT performed (no production credentials exist in this environment; development values were never substituted)
+- **Migration/schema audit findings**: 22 migrations strictly dependency-ordered (lexicographic = logical order); migration 08 drops the superseded signature so a fresh DB ends with exactly ONE create_pending_bid definition; migration 19 fixes refund_paid_bid in place; seeds idempotent (ON CONFLICT DO NOTHING); realtime publication change guarded against duplicates; only external-schema dependency is auth.users (Supabase default); no secret-like literals anywhere
+- **Scripted static verification (all PASS)**: all 8 application-queried tables exist in migrations; all 5 directly-called RPCs exist (+ convert_pending_bid_to_paid invoked inside the wrapper); 8 function definitions each pair security definer WITH pinned search_path = public and carry 3 revokes (public/anon/authenticated) + 1 grant (service_role) = 24 revokes/8 grants total; RLS enabled on 10/10 tables; exactly 3 policies (active-categories SELECT, paid-bids SELECT, admin_users self-read); 7 tables deliberately zero-policy service-role-only
+- **Live vs static**: (a) verified from repository/migrations: everything above; (b) verified against live production database: nothing - explicitly PENDING operator execution; (c) operator steps documented in docs/10.2.txt: create production project, apply all 22 migrations in filename order (supabase db push or SQL editor), run the provided post-push verification SQL (expected counts/policies/prosecdef + anon-denial probe), create admin auth user + insert into admin_users, record production env values per docs/10.1.txt, confirm realtime delivery after first paid bid
+- **Security**: security model ships entirely through migrations (RLS/grants/definer pinning are in the chain itself); the one intentional out-of-band step is creating the first admin auth user (auth users cannot be created by SQL); no production secrets invented/stored/committed; dev .env.local never used against any database
+- **Files changed**: docs/10.2.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md (no code/schema/migration changes)
+- **Tests performed**: npm run test 617/617 PASSED; typecheck/lint/format:check/build all PASSED; scripted migration cross-checks ALL PASS
+- **Scope statement**: NO 10.3+ functionality implemented (Stripe still test-mode, webhook endpoint not configured, Resend production not configured, custom domain untouched)
+- **Follow-up work**: Task 10.3 - Stripe live mode (after operator completes the 10.2 checklist)
+
+---
+
 _This file will be updated after each completed task with actual implementation details.
