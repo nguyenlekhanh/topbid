@@ -2803,4 +2803,19 @@ _
 
 ---
 
+### Task 9.10
+
+- **Date**: 2026-08-24
+- **Objective**: Prove the first-party fraud defenses (dependency: Task 8.7) against realistic abuse scenarios with deterministic cross-module tests - banned-bidder identity variants, blocklist management abuse, notification suppression under adversarial retries, capability-token forgery/flooding, fail-closed infrastructure - starting from a read-only audit without inventing any fraud engine
+- **Status**: Completed - audit found NO concrete fraud/security defect. Test coverage + documentation only.
+- **Audit scope**: bid-creation choke point (ban check before all validation; canonical lower(trim(email)) identity; lookup failures throw = fail closed); notification suppression ordering (self_outbid -> unsubscribed -> banned -> attempt gate on every redelivery; exactly-once gating blocks email bombing); blocklist management (Task 8.1 authorization precedes input validation; canonical rows only; every outcome audited); rate limiting rules (login 10/10min IP, shareEvents 30/min IP, unsubscribe 10/min IP, refund 20/hour per admin keyed after authorization); unsubscribe capability tokens (HMAC-SHA256 with server secret - forged well-shaped tokens cannot collide with victim tokens; malformed shapes never touch storage); refund abuse (authorization first + Stripe idempotency + ledger); confirmed no public bid-creation HTTP endpoint exists (consistent with Task 9.3)
+- **Concrete defects found**: NONE. Two non-defect observations documented: POST /api/admin/banned lacks a rate limit but is authorization-gated inside every operation; getClientIp XFF trust is covered by the in-memory limiter's documented best-effort nature on Vercel
+- **Coverage gap addressed**: prior suites test modules in isolation with mocked ban lookups or mocked stores; Task 9.10 runs the REAL email-bans + unsubscribe + outbid-notification modules over an in-memory database implementing exactly the production query chains (eq/maybeSingle, ignoreDuplicates upserts with row counts, counted deletes, ordered select-all)
+- **Scenarios proven (19 tests)**: canonical ban identity matches every casing/whitespace variant from one row; fail-closed lookup failures; invalid emails zero store access; unauthenticated zero-access (writes/reads/audit empty) with authorization preceding input shape; audited ban/unban outcomes with actor identity; malformed addresses rejected for authorized admins; mid-lifecycle ban suppresses redeliveries before consuming attempt slots; guard precedence self_outbid > unsubscribed > banned > gate; exactly-once email cap under unlimited redeliveries; attacker-invented 64-hex tokens record harmless unknown keys that can never suppress a victim; malformed/non-string tokens rejected before storage access; genuine victim self-suppression through own issued link
+- **Files changed**: src/lib/fraud-scenarios.test.ts (created, 19 tests), docs/9.10.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 603/603 PASSED across 39 files (+19 net); typecheck/lint/format:check/build all PASSED
+- **Follow-up work**: Task 9.11 - Error handling review
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

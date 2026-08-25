@@ -1,32 +1,97 @@
 ﻿TASK ID: 9.10
 PHASE: 9
 TITLE: Fraud scenarios
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Prove the first-party fraud defenses (dependency: Task 8.7) against realistic abuse
+scenarios with deterministic cross-module tests - banned-bidder identity variants,
+blocklist management abuse, notification suppression under adversarial retries,
+capability-token forgery/flooding, and fail-closed infrastructure behavior - starting
+from a read-only audit and without inventing any fraud engine.
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+Fraud defense surfaces verified:
+1. BID CREATION CHOKE POINT (8.7): createPendingBid checks isEmailBanned BEFORE all other
+   validation - a banned actor learns nothing about category state; canonical identity
+   lower(trim(email)) makes casing/whitespace variants match; lookup failures THROW so a
+   DB outage can never admit anyone (fail closed).
+2. NOTIFICATION SUPPRESSION ORDERING: sendOutbidNotification enforces self_outbid ->
+   recipient_unsubscribed -> recipient_banned -> beginDeliveryAttempt on EVERY attempt
+   including Stripe redeliveries; exactly-once delivery gating caps event replay at one
+   email (no email-bombing vector).
+3. BLOCKLIST MANAGEMENT (8.7+8.8): banEmail/unbanEmail/listBannedEmails gate through the
+   Task 8.1 boundary FIRST (unauthorized answers before input shape is even inspected),
+   fail closed on errors, write canonical rows only, and audit every outcome with actor
+   identity.
+4. RATE LIMITING (9.2): adminLogin 10/10min per IP, shareEvents 30/min per IP,
+   unsubscribe 10/min per IP, refund 20/hour per admin keyed AFTER authorization.
+5. UNSUBSCRIBE CAPABILITY TOKENS (6.6): HMAC-SHA256(server secret, email) - forged
+   well-shaped tokens cannot collide with a victim's token (secret-derived), malformed
+   shapes never touch storage, victim self-suppression works through their own link.
+6. REFUND ABUSE (8.6+9.2): authorization precedes the per-admin burst cap; Stripe-side
+   idempotency keys + ledger make repeats safe no-ops.
+7. NO PUBLIC BID-CREATION ENDPOINT exists (createCheckoutSession has no HTTP route) -
+   consistent with Task 9.3's documented conclusion.
 
-INPUTS / DEPENDENCIES:
+AUDIT CONCLUSION: NO concrete fraud/security defect found. No production changes made.
+Minor observations (not defects, no action taken):
+- POST /api/admin/banned has no rate limit (every other mutation endpoint does) - it is
+  admin-gated with authorization enforced inside every operation, so an authorized admin
+  flooding their own blocklist is not a fraud vector.
+- getClientIp trusts the first XFF entry - on Vercel the platform controls this header;
+  the in-memory limiter's documented best-effort nature already covers residual risk.
 
-IMPLEMENTATION REQUIREMENTS:
+COVERAGE GAP ADDRESSED:
+Existing suites test each module in isolation with mocked ban lookups (bids.test.ts,
+outbid-notification.test.ts) or mocked stores (email-bans.test.ts). Task 9.10 adds
+src/lib/fraud-scenarios.test.ts running the REAL email-bans + unsubscribe +
+outbid-notification modules over an in-memory database implementing exactly the query
+chains production uses (.select().eq().maybeSingle(), ignoreDuplicates upserts with row
+counts, counted deletes, ordered select-all) - so canonicalization, suppression state,
+delivery gating, audit wiring, and authorization are exercised together end-to-end.
 
-FILES EXPECTED TO CHANGE:
+FRAUD SCENARIOS PROVEN (19 tests):
+1. CANONICAL IDENTITY: one canonical ban matches every casing/whitespace variant;
+   exactly one store row; unrelated addresses unaffected.
+2. FAIL-CLOSED LOOKUPS: ban-state DB failures throw instead of admitting anyone.
+3. INVALID INPUTS: malformed emails resolve not-banned with zero store access.
+4. UNAUTHENTICATED ABUSE: unauthorized callers can neither mutate nor read the
+   blocklist - zero writes, zero reads, zero audit entries.
+5. AUTHORIZATION PRECEDES VALIDATION: unauthorized requests answer 'unauthorized'
+   before input shape is inspected (nothing leaks).
+6. AUDITED ADMIN ACTIONS: every ban/unban outcome (banned/already_banned/unbanned/
+   not_banned) writes an audit entry with action/target/actor; authorized admins cannot
+   insert malformed addresses.
+7. MID-LIFECYCLE BAN: a ban applied between webhook redeliveries suppresses later
+   attempts as recipient_banned BEFORE consuming delivery-attempt slots (attempts stay
+   at 1, total emails stay 1).
+8. GUARD PRECEDENCE: self_outbid wins over ban+unsubscribe; recipient_unsubscribed wins
+   over recipient_banned; suppressed paths never create delivery rows or send mail.
+9. EXACTLY-ONCE CAP: unlimited redeliveries without bans produce exactly one email.
+10. TOKEN FORGERY RESISTANCE: attacker-invented 64-hex tokens record harmless unknown
+    keys and can never suppress a victim (secret-derived tokens cannot collide);
+    malformed tokens are rejected with zero database writes; victims genuinely
+    suppress through their own issued link (idempotent unsubscribed/
+    already_unsubscribed); non-string inputs rejected by shape validation before any
+    storage access.
 
-TEST PLAN:
-
-DEFINITION OF DONE:
-
-IMPLEMENTATION NOTES:
-
-RESULT:
-
-FILES ACTUALLY CHANGED:
+FILES CHANGED:
+- src/lib/fraud-scenarios.test.ts (created, 19 tests)
+- docs/9.10.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 603/603 PASSED across 39 files (+19 net)
+- npm run typecheck / lint / format:check / build: all PASSED
+
+SCOPE BOUNDARY (explicit):
+NO Phase 10+ work. NO fraud engine/scoring/risk systems/third-party providers/queues/
+CAPTCHA. NO production code changes. NO schema/migration changes. Payment, webhook,
+RLS, unsubscribe consent, and admin authorization boundaries untouched.
 
 KNOWN ISSUES:
+None new. The two audit observations above are documented as non-defects.
 
 FOLLOW-UP:
+Phase 9 continues - Task 9.11 (Error handling review).
