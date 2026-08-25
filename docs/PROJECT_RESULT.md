@@ -2833,4 +2833,20 @@ _
 
 ---
 
+### Task 10.1
+
+- **Date**: 2026-08-25
+- **Objective**: Establish and document the production environment configuration required by the existing application - all variables identified from actual code usage, server-only secrets separated from NEXT_PUBLIC_* browser-safe configuration, client-bundle exposure empirically verified - per the plan's Vercel deployment strategy
+- **Status**: Completed - documentation/configuration task; zero code/schema/migration changes
+- **Audit findings**: deployment platform is Vercel per AGENTS.md + PROJECT_PLAN.md Deployment Strategy (dashboard-managed env vars; no vercel.json by convention); next.config.ts intentionally empty; .gitignore ignores `.env*` and `.vercel` with check-ignore confirming .env.local untracked; .env.example already listed all ten variables and now carries SERVER-ONLY/PUBLIC classification comments plus a header referencing docs/10.1.txt
+- **Variable manifest**: 6 server-only (SUPABASE_SERVICE_ROLE_KEY -> supabase-service.ts, STRIPE_SECRET_KEY -> stripe.ts, STRIPE_WEBHOOK_SECRET -> stripe-webhook.ts, RESEND_API_KEY/RESEND_FROM_EMAIL -> resend.ts, UNSUBSCRIBE_SECRET -> unsubscribe.ts) + 4 public (NEXT_PUBLIC_SUPABASE_URL/ANON_KEY/PUBLISHABLE_KEY/APP_URL across supabase.ts, supabase-server.ts, stripe-client.ts, checkout.ts, success page, category metadata/OG, outbid-notification.ts, unsubscribe.ts); RUN_STRIPE_INTEGRATION documented as test-only
+- **Security verification**: post-build scan of ALL browser chunks (.next/static) found ZERO occurrences of any server-only VALUE or variable NAME; browser-facing modules read exclusively NEXT_PUBLIC_* vars; no secrets staged or committed anywhere
+- **Operator-supplied before first production deploy** (documented in docs/10.1.txt, not invented): production Supabase values (database itself = Task 10.2), LIVE Stripe keys + webhook endpoint signing secret (Task 10.3), Resend key + verified sender, fresh >=32-char UNSUBSCRIBE_SECRET, absolute HTTPS NEXT_PUBLIC_APP_URL (custom domain = Task 10.4)
+- **Files changed**: .gitignore (+ `!.env.example` negation), .env.example (annotations only, no values; now versioned for the first time), docs/10.1.txt, PROJECT_PROGRESS.md, PROJECT_RESULT.md
+- **Tests performed**: npm run test 617/617 PASSED; typecheck/lint/format:check/build all PASSED; client-bundle secret scan CLEAN
+- **Scope statement**: NO 10.2+ functionality implemented (no database provisioning, no live Stripe switch, no custom domain, no SEO/analytics/monitoring/QA work)
+- **Follow-up work**: Task 10.2 - Production database
+
+---
+
 _This file will be updated after each completed task with actual implementation details.

@@ -1,32 +1,116 @@
 ﻿TASK ID: 10.1
 PHASE: 10
 TITLE: Production environment
-STATUS: pending
+STATUS: completed
 
 OBJECTIVE:
+Establish and document the production environment configuration required by the
+existing application - every production-required variable identified from actual code
+usage, server-only secrets separated from NEXT_PUBLIC_* browser-safe configuration, and
+secret exposure to client bundles empirically verified - per the plan's Deployment
+Strategy ("Environment variables: Managed in Vercel dashboard").
 
-SCOPE:
+READ-ONLY AUDIT (performed before any changes):
 
-OUT OF SCOPE:
+DEPLOYMENT PLATFORM: Vercel, as established by AGENTS.md (Technology Stack:
+"Deployment: Vercel"; "Vercel deployment prepared") and PROJECT_PLAN.md Deployment
+Strategy (dev = local + previews; production = "Vercel production with live
+Supabase/Stripe"; env vars managed in the Vercel dashboard). No vercel.json exists -
+configuration is dashboard-managed by convention; no new hosting provider introduced.
 
-INPUTS / DEPENDENCIES:
+ENVIRONMENT VARIABLE MANIFEST (from actual process.env usage in src/):
 
-IMPLEMENTATION REQUIREMENTS:
+SERVER-ONLY (no NEXT_PUBLIC_ prefix; read exclusively inside server-only modules):
+| Variable                    | Used by                                   | Production source (operator-supplied) |
+|-----------------------------|-------------------------------------------|---------------------------------------|
+| SUPABASE_SERVICE_ROLE_KEY   | supabase-service.ts (RLS-bypassing client)| Supabase project settings (service_role secret) |
+| STRIPE_SECRET_KEY           | stripe.ts                                 | Stripe dashboard (LIVE mode secret key - Task 10.3) |
+| STRIPE_WEBHOOK_SECRET       | stripe-webhook.ts                         | Stripe webhook endpoint signing secret (whsec_...) |
+| RESEND_API_KEY              | resend.ts                                 | Resend dashboard API key |
+| RESEND_FROM_EMAIL           | resend.ts                                 | Verified Resend sender address |
+| UNSUBSCRIBE_SECRET          | unsubscribe.ts                            | Operator-generated (>=32 chars, e.g. openssl rand -hex 32) |
 
-FILES EXPECTED TO CHANGE:
+PUBLIC / BROWSER-SAFE (NEXT_PUBLIC_*; inlined into client bundles at build time):
+| Variable                        | Used by                                        |
+|---------------------------------|------------------------------------------------|
+| NEXT_PUBLIC_SUPABASE_URL        | supabase.ts, supabase-server.ts, supabase-service.ts |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY   | supabase.ts, supabase-server.ts                |
+| NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY | stripe-client.ts (Stripe.js loader)         |
+| NEXT_PUBLIC_APP_URL             | checkout.ts, success page, category metadata/OG, outbid-notification.ts, unsubscribe.ts |
 
-TEST PLAN:
+Test-only (NOT production): RUN_STRIPE_INTEGRATION (opt-in flag for the guarded
+integration suite).
 
-DEFINITION OF DONE:
+CONFIGURATION AUDIT FINDINGS:
+1. next.config.ts is intentionally empty (framework defaults only) - no runtime env
+   handling beyond Next.js built-ins; nothing to change.
+2. .gitignore ignores `.env*` (line: ".env*") AND `.vercel`; `git check-ignore` confirms
+   .env.local is ignored. No secrets are tracked anywhere in git history of the repo.
+3. .env.example listed all ten variables before this task - but the audit found it was
+   NEVER TRACKED BY GIT: the blanket `.env*` ignore rule excluded it, so clones of this
+   repository received no environment template at all. Fixed minimally with the standard
+   negation convention (`!.env.example` in .gitignore) and committed. The file carries
+   explicit SERVER-ONLY/PUBLIC classification comments and a header pointing at this
+   document for the operator checklist. NO real values present or added (only empty
+   values plus the pre-existing http://localhost:3000 placeholder).
+4. Secret-exposure verification (EMPIRICAL, this build): after `npm run build`, a full
+   scan of .next/static (all browser chunks) found ZERO occurrences of any server-only
+   VALUE (checked Supabase service-role key + Stripe secret key values from local
+   .env.local) and ZERO occurrences of any server-only variable NAME. Public vars are
+   expected to be inlined by design.
+5. Server-only readers are structurally isolated: supabase-service.ts/stripe.ts/
+   resend.ts/unsubscribe.ts/stripe-webhook.ts have no 'use client' importers; the only
+   browser clients (supabase.ts, stripe-client.ts) read exclusively NEXT_PUBLIC_*
+   variables.
+6. NEXT_PUBLIC_APP_URL semantics: localhost default for dev; in production it MUST be
+   set to the absolute production URL because Checkout success/cancel URLs, share URLs,
+   unsubscribe links, canonical metadata, and OG images derive from it.
 
-IMPLEMENTATION NOTES:
+IMPLEMENTED VS OPERATOR-SUPPLIED:
 
-RESULT:
+Implemented by this task (documentation/configuration only):
+- Variable manifest with classification and code-usage mapping (this file)
+- .env.example classification annotations + production-management header
+- Empirical client-bundle leak verification (clean)
+- Conventions confirmed compatible with existing Next.js 16 / Supabase SSR+browser /
+  Stripe SDK / Resend SDK architecture; zero code changes needed
 
-FILES ACTUALLY CHANGED:
+Operator-supplied BEFORE first production deploy (manual, in Vercel Project Settings ->
+Environment Variables, Production environment):
+- NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY: production Supabase project
+  values (production database provisioning itself is Task 10.2)
+- SUPABASE_SERVICE_ROLE_KEY: production service_role secret
+- STRIPE_SECRET_KEY / NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: LIVE-mode keys (Task 10.3);
+  test-mode keys acceptable only for preview environments
+- STRIPE_WEBHOOK_SECRET: signing secret of the production webhook endpoint registered
+  against <APP_URL>/api/webhooks/stripe
+- RESEND_API_KEY / RESEND_FROM_EMAIL: production Resend key + verified sender domain
+- UNSUBSCRIBE_SECRET: fresh production random value (never reuse dev value)
+- NEXT_PUBLIC_APP_URL: absolute production URL (custom domain wiring is Task 10.4)
+
+SECURITY/PRIVACY CONSIDERATIONS:
+- Server-only secrets stay out of client bundles - verified empirically, not assumed.
+- NEXT_PUBLIC_APP_URL must be HTTPS in production (Vercel/managed domains provide TLS).
+- Rotating UNSUBSCRIBE_SECRET invalidates all previously issued unsubscribe tokens/capability
+  links (acceptable operational tradeoff; documented here).
+- No real values were invented, fabricated, committed, or echoed into logs/output.
+
+FILES CHANGED:
+- .gitignore (+ `!.env.example` negation so the template is actually versioned)
+- .env.example (classification comments + production header; no values - now committed)
+- docs/10.1.txt (this file), PROJECT_PROGRESS.md, PROJECT_RESULT.md
 
 TESTS ACTUALLY RUN:
+- npm run test: 617/617 PASSED across 40 files
+- npm run typecheck / lint / format:check / build: all PASSED
+- Client-bundle secret scan over .next/static: CLEAN (values AND names absent)
+- git check-ignore confirms .env.local untracked; no secrets staged/committed
 
-KNOWN ISSUES:
+SCOPE BOUNDARY:
+NO 10.2+ work: production database NOT provisioned (10.2), Stripe NOT switched to live
+(10.3), no custom domain (10.4), no SEO/analytics/error-monitoring/perf/mobile/QA work
+(10.5-10.11). No CI/CD automation, no monitoring platform, no rate limiting/CAPTCHA, no
+code/schema/migration changes.
 
 FOLLOW-UP:
+Task 10.2 - Production database.
