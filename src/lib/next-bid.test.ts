@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * UI redesign task - authoritative next-bid derivation tests.

@@ -1,4 +1,4 @@
-﻿import { createServiceClient } from '@/lib/supabase-service';
+import { createServiceClient } from '@/lib/supabase-service';
 import { validateCategory } from '@/lib/categories';
 
 /**
