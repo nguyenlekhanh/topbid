@@ -45,7 +45,8 @@ const BARE_DOMAIN_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?::\d{1,5})?(?:[/?#]\S*)?$/i;
 
 export type NormalizedProductInput =
-  { ok: true; value: string; kind: 'url' | 'handle' } | { ok: false; reason: 'invalid_product' };
+  | { ok: true; value: string; kind: 'url' | 'handle'; isBareDomain: boolean }
+  | { ok: false; reason: 'invalid_product' };
 
 export function normalizeProductInput(raw: unknown): NormalizedProductInput {
   if (typeof raw !== 'string') {
@@ -62,7 +63,7 @@ export function normalizeProductInput(raw: unknown): NormalizedProductInput {
     const handle = trimmed.toLowerCase();
 
     return HANDLE_PATTERN.test(handle)
-      ? { ok: true, value: handle, kind: 'handle' }
+      ? { ok: true, value: handle, kind: 'handle', isBareDomain: false }
       : { ok: false, reason: 'invalid_product' };
   }
 
@@ -70,7 +71,8 @@ export function normalizeProductInput(raw: unknown): NormalizedProductInput {
   // standard URL validation below applies unchanged. The pattern requires at least one
   // dot-separated label boundary, so single words ("localhost", "just-a-word") and
   // credential-bearing strings are rejected here rather than silently schemed.
-  const candidate = /^https?:\/\//i.test(trimmed)
+  const hadScheme = /^https?:\/\//i.test(trimmed);
+  const candidate = hadScheme
     ? trimmed
     : BARE_DOMAIN_PATTERN.test(trimmed)
       ? `https://${trimmed}`
@@ -100,7 +102,7 @@ export function normalizeProductInput(raw: unknown): NormalizedProductInput {
     return { ok: false, reason: 'invalid_product' };
   }
 
-  return { ok: true, value: parsed.toString(), kind: 'url' };
+  return { ok: true, value: parsed.toString(), kind: 'url', isBareDomain: !hadScheme };
 }
 
 /**

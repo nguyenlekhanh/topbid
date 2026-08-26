@@ -35,6 +35,12 @@ export type LeaderboardEntryData = {
   bidderEmail: string;
   createdAt: string;
   category: { id: string; slug: string; name: string } | null;
+  entryTitle: string | null;
+  entryDescription: string | null;
+  entryCanonicalUrl: string | null;
+  entryImageUrl: string | null;
+  entryFaviconUrl: string | null;
+  entryType: 'url' | 'handle' | 'unknown' | null;
 };
 
 /**
@@ -47,7 +53,9 @@ export async function getLeaderboardEntries(limit = 10): Promise<LeaderboardEntr
 
   const { data, error } = await supabase
     .from('bids')
-    .select('id, amount, bidder_name, bidder_email, created_at, categories (id, slug, name)')
+    .select(
+      'id, amount, bidder_name, bidder_email, created_at, entry_title, entry_description, entry_canonical_url, entry_image_url, entry_favicon_url, entry_type, categories (id, slug, name)'
+    )
     .eq('status', 'paid')
     .order('amount', { ascending: false })
     .order('created_at', { ascending: false })
@@ -63,6 +71,12 @@ export async function getLeaderboardEntries(limit = 10): Promise<LeaderboardEntr
     bidderName: (row.bidder_name as string | null) ?? null,
     bidderEmail: String(row.bidder_email),
     createdAt: String(row.created_at),
+    entryTitle: (row.entry_title as string | null) ?? null,
+    entryDescription: (row.entry_description as string | null) ?? null,
+    entryCanonicalUrl: (row.entry_canonical_url as string | null) ?? null,
+    entryImageUrl: (row.entry_image_url as string | null) ?? null,
+    entryFaviconUrl: (row.entry_favicon_url as string | null) ?? null,
+    entryType: (row.entry_type as 'url' | 'handle' | 'unknown' | null) ?? null,
     category:
       row.categories && !Array.isArray(row.categories)
         ? {
@@ -126,6 +140,12 @@ export type LeaderboardPageEntry = {
   bidderName: string | null;
   createdAt: string;
   category: { id: string; slug: string; name: string } | null;
+  entryTitle: string | null;
+  entryDescription: string | null;
+  entryCanonicalUrl: string | null;
+  entryImageUrl: string | null;
+  entryFaviconUrl: string | null;
+  entryType: 'url' | 'handle' | 'unknown' | null;
 };
 
 /**
@@ -145,7 +165,9 @@ export async function getLeaderboardPage(
 
   const { data, error } = await supabase
     .from('bids')
-    .select('id, amount, bidder_name, created_at, categories (id, slug, name)')
+    .select(
+      'id, amount, bidder_name, created_at, entry_title, entry_description, entry_canonical_url, entry_image_url, entry_favicon_url, entry_type, categories (id, slug, name)'
+    )
     .eq('status', 'paid')
     .order('amount', { ascending: false })
     .order('created_at', { ascending: false })
@@ -164,6 +186,12 @@ export async function getLeaderboardPage(
     amount: Number(row.amount),
     bidderName: (row.bidder_name as string | null) ?? null,
     createdAt: String(row.created_at),
+    entryTitle: (row.entry_title as string | null) ?? null,
+    entryDescription: (row.entry_description as string | null) ?? null,
+    entryCanonicalUrl: (row.entry_canonical_url as string | null) ?? null,
+    entryImageUrl: (row.entry_image_url as string | null) ?? null,
+    entryFaviconUrl: (row.entry_favicon_url as string | null) ?? null,
+    entryType: (row.entry_type as 'url' | 'handle' | 'unknown' | null) ?? null,
     category:
       row.categories && !Array.isArray(row.categories)
         ? {

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createCheckoutSession } from '@/lib/checkout';
 import { resolveNextBid } from '@/lib/next-bid';
 import { normalizeProductInput, syntheticBidderEmail } from '@/lib/product-input';
+import { resolveProductPreview } from '@/lib/product-resolver';
 import { getClientIp, RATE_LIMIT_RULES, rateLimiters } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -57,6 +58,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid_product' }, { status: 400 });
   }
 
+  // Preserve original trimmed input for bare-domain fallback display
+  const originalInput = typeof body.product === 'string' ? body.product.trim() : '';
+
   let derived;
 
   try {
@@ -72,12 +76,50 @@ export async function POST(request: Request) {
     );
   }
 
+  // Prepare entry metadata for persistence
+  let entryTitle: string | null = null;
+  let entryDescription: string | null = null;
+  let entryCanonicalUrl: string | null = null;
+  let entryImageUrl: string | null = null;
+  let entryFaviconUrl: string | null = null;
+  let entryType: 'url' | 'handle' | 'unknown' | null = null;
+
+  if (product.kind === 'url') {
+    // Try to resolve metadata for real URLs
+    const preview = await resolveProductPreview(product.value);
+    if (preview.ok) {
+      entryTitle = preview.preview.title;
+      entryDescription = preview.preview.description;
+      entryCanonicalUrl = preview.preview.canonicalUrl;
+      entryImageUrl = preview.preview.imageUrl;
+      entryFaviconUrl = preview.preview.faviconUrl;
+      entryType = 'url';
+    } else {
+      // Metadata resolution failed - fall back safely
+      // For bare domains, use original input (no https:// prefix) as title
+      entryTitle = product.isBareDomain ? originalInput : product.value;
+      entryDescription = 'Verified public entry.';
+      entryType = 'unknown';
+    }
+  } else if (product.kind === 'handle') {
+    // @handle - no external search, generic public entry
+    entryTitle = product.value;
+    entryDescription = 'Verified public entry.';
+    entryType = 'handle';
+  }
+
   try {
     const session = await createCheckoutSession({
       categorySlug: derived.categorySlug,
       amount: derived.amount,
       bidderEmail: syntheticBidderEmail(product.value),
       bidderName: product.value,
+      entryTitle,
+      entryDescription,
+      entryCanonicalUrl,
+      entryImageUrl,
+      entryFaviconUrl,
+      entryType,
     });
 
     if (!session.valid) {

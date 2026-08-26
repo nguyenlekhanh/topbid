@@ -22,6 +22,12 @@ const PAID_BID = {
   is_highest: true,
   created_at: '2026-08-24T00:00:00Z',
   paid_at: '2026-08-24T00:00:00Z',
+  entry_title: null,
+  entry_description: null,
+  entry_canonical_url: null,
+  entry_image_url: null,
+  entry_favicon_url: null,
+  entry_type: null,
 };
 
 const LOOKUP: BidWithCategory = { bid: PAID_BID, category: CATEGORY };

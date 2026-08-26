@@ -86,6 +86,12 @@ describe('POST /api/bids/checkout (UI redesign task)', () => {
       amount: 10_100,
       bidderEmail: expect.stringMatching(/^noreply\+[0-9a-f]{16}@topbid\.lol$/),
       bidderName: 'https://example.com/product/my-product',
+      entryTitle: 'https://example.com/product/my-product',
+      entryDescription: 'Verified public entry.',
+      entryCanonicalUrl: null,
+      entryImageUrl: null,
+      entryFaviconUrl: null,
+      entryType: 'unknown',
     });
   });
 

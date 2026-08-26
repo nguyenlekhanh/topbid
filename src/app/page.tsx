@@ -29,6 +29,12 @@ export default async function Home() {
       bidderName: entry.bid.bidder_name,
       createdAt: entry.bid.created_at,
       category: entry.category,
+      entryTitle: entry.bid.entry_title,
+      entryDescription: entry.bid.entry_description,
+      entryCanonicalUrl: entry.bid.entry_canonical_url,
+      entryImageUrl: entry.bid.entry_image_url,
+      entryFaviconUrl: entry.bid.entry_favicon_url,
+      entryType: entry.bid.entry_type,
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

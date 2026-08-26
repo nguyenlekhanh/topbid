@@ -15,10 +15,16 @@ export type Bid = {
   is_highest: boolean | null;
   created_at: string;
   paid_at: string | null;
+  entry_title: string | null;
+  entry_description: string | null;
+  entry_canonical_url: string | null;
+  entry_image_url: string | null;
+  entry_favicon_url: string | null;
+  entry_type: 'url' | 'handle' | 'unknown' | null;
 };
 
 const BID_FIELDS =
-  'id, category_id, amount, bidder_email, bidder_name, stripe_session_id, stripe_payment_intent_id, status, is_highest, created_at, paid_at';
+  'id, category_id, amount, bidder_email, bidder_name, stripe_session_id, stripe_payment_intent_id, status, is_highest, created_at, paid_at, entry_title, entry_description, entry_canonical_url, entry_image_url, entry_favicon_url, entry_type';
 
 /**
  * Get the highest paid bid for a category.
@@ -117,6 +123,12 @@ export async function getLeaderboard(
         is_highest: row.is_highest,
         created_at: row.created_at,
         paid_at: row.paid_at,
+        entry_title: row.entry_title,
+        entry_description: row.entry_description,
+        entry_canonical_url: row.entry_canonical_url,
+        entry_image_url: row.entry_image_url,
+        entry_favicon_url: row.entry_favicon_url,
+        entry_type: row.entry_type,
       },
       category: row.categories,
     }))
@@ -361,6 +373,12 @@ export type PendingBidInput = {
   bidderEmail: unknown;
   bidderName?: unknown;
   stripeSessionId?: unknown;
+  entryTitle?: unknown;
+  entryDescription?: unknown;
+  entryCanonicalUrl?: unknown;
+  entryImageUrl?: unknown;
+  entryFaviconUrl?: unknown;
+  entryType?: unknown;
 };
 
 export type CreatePendingBidFailureReason =
@@ -469,6 +487,12 @@ export async function createPendingBid(input: PendingBidInput): Promise<CreatePe
     p_bidder_email: email,
     p_bidder_name: nameResult.name,
     p_stripe_session_id: sessionIdResult.stripeSessionId,
+    p_entry_title: input.entryTitle,
+    p_entry_description: input.entryDescription,
+    p_entry_canonical_url: input.entryCanonicalUrl,
+    p_entry_image_url: input.entryImageUrl,
+    p_entry_favicon_url: input.entryFaviconUrl,
+    p_entry_type: input.entryType,
   });
 
   if (error) {

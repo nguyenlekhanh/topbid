@@ -96,9 +96,25 @@ export default function LeaderboardTable({
                       {rank}
                     </span>
 
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                      {entry.bidderName ?? 'Anonymous bidder'}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {entry.entryTitle ?? entry.bidderName ?? 'Anonymous bidder'}
+                        </span>
+                        {entry.entryType && entry.entryType !== 'unknown' && (
+                          <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {entry.entryType}
+                          </span>
+                        )}
+                      </div>
+                      {(entry.entryDescription || entry.entryCanonicalUrl) && (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {entry.entryDescription}
+                          {entry.entryCanonicalUrl && entry.entryDescription ? ' — ' : ''}
+                          {entry.entryCanonicalUrl}
+                        </div>
+                      )}
+                    </div>
 
                     {entry.category ? (
                       <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground sm:inline">
