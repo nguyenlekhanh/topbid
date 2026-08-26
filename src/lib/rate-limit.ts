@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Fixed-window rate limiting (Task 9.2).
  *
  * Smallest architecture satisfying PROJECT_PLAN.md Task 9.2 without new
@@ -81,6 +81,7 @@ export interface RateLimiter {
  * - refund       : 20 / hour per admin  (money movement bounded per administrator)
  * - bidCheckout  : 10 / minute per IP   (checkout-session creation flood cap)
  * - productResolve: 30 / minute per IP  (external metadata resolution flood cap)
+ * - bidForecast  : 60 / minute per IP   (read-only position-forecast feed)
  */
 export const RATE_LIMIT_RULES = {
   adminLogin: { limit: 10, windowMs: 10 * 60_000 },
@@ -89,6 +90,7 @@ export const RATE_LIMIT_RULES = {
   refund: { limit: 20, windowMs: 60 * 60_000 },
   bidCheckout: { limit: 10, windowMs: 60_000 },
   productResolve: { limit: 30, windowMs: 60_000 },
+  bidForecast: { limit: 60, windowMs: 60_000 },
 } as const;
 
 /** Shared instances used by the route handlers. */
@@ -101,6 +103,7 @@ export const rateLimiters = {
   refund: createRateLimiter(),
   bidCheckout: createRateLimiter(),
   productResolve: createRateLimiter(),
+  bidForecast: createRateLimiter(),
 };
 
 // Track shared instances so tests can deterministically clear window state between
@@ -111,7 +114,8 @@ sharedLimiters.push(
   rateLimiters.unsubscribe,
   rateLimiters.refund,
   rateLimiters.bidCheckout,
-  rateLimiters.productResolve
+  rateLimiters.productResolve,
+  rateLimiters.bidForecast
 );
 
 /** Test/operations hook: clears all tracked windows on the shared limiters. */

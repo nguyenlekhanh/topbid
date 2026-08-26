@@ -4,56 +4,47 @@ import { useEffect, useRef, useState } from 'react';
 
 import { getActiveCategoryOptions, type CategoryOption } from '@/lib/bids-client';
 import { submitBid } from '@/lib/bid-submit';
-import ProductPreviewCard, { type PreviewState } from '@/components/ProductPreviewCard';
 
 /**
- * Centered full-screen bidding console (UI redesign task).
+ * Centered full-screen bidding console.
  *
- * [ Your product url or @handle ] [ category icon ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¾ ] [ Bid ]
+ * [ Your product url or @handle ] [ category icon â–¾ ] [ Bid ]
  *
- * - No manual amount input exists ANYWHERE in this flow: clicking Bid asks the server
- *   (POST /api/bids/checkout) to derive the authoritative amount and return the Stripe
- *   Checkout URL, then navigates. The server/database remain the only amount authority.
- * - The single textbox is the bidder's PUBLIC product identifier (https URL or
- *   @handle). URLs are resolved into a metadata PREVIEW (title/description/image) via
- *   POST /api/products/resolve before checkout; @handles return a typed unsupported
- *   result (no platform is established yet) and keep Bid disabled.
- * - The category icon opens a VERTICAL dropdown of ACTIVE categories (authoritative,
- *   RLS-filtered); selecting one targets that category, leaving it unselected targets
- *   the global leading category per server rules. Outside click / Escape / selection
- *   all close the menu.
+ * - The single textbox is the bidder's PUBLIC entry identifier: a product URL (plain
+ *   or bare domain), an arbitrary domain-like string, or an @handle. All forms are
+ *   valid bid targets - NO external resolution, DNS lookup, or search is required.
+ * - The two-column preview below the input is informational only:
+ *     LEFT  = the accepted public-entry identifier ("Verified public entry." means the
+ *             application accepted it as a valid identifier - nothing more).
+ *     RIGHT = POSITION FORECAST derived deterministically from live database bids
+ *             (same ordering/floor rules as the leaderboard and checkout RPC).
+ * - The forecast never authorizes anything: POST /api/bids/checkout re-derives the
+ *   authoritative amount server-side inside the create_pending_bid row lock, and the
+ *   webhook remains the sole payment authority.
  */
 
-const RESOLVE_DEBOUNCE_MS = 600;
+const FORECAST_DEBOUNCE_MS = 400;
 
-type ApiPreview = {
-  sourceUrl?: unknown;
-  canonicalUrl?: unknown;
-  title?: unknown;
-  description?: unknown;
-  imageUrl?: unknown;
-  faviconUrl?: unknown;
-  siteName?: unknown;
+type Forecast = {
+  nextAmountCents: number;
+  projectedRank: number;
+  totalPaidBids: number;
+  currentTopCents: number | null;
 };
 
-function toPreview(raw: ApiPreview): {
-  sourceUrl: string;
-  canonicalUrl: string;
-  title: string | null;
-  description: string | null;
-  imageUrl: string | null;
-  faviconUrl: string | null;
-  siteName: string | null;
-} {
-  return {
-    sourceUrl: String(raw.sourceUrl),
-    canonicalUrl: String(raw.canonicalUrl),
-    title: typeof raw.title === 'string' ? raw.title : null,
-    description: typeof raw.description === 'string' ? raw.description : null,
-    imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl : null,
-    faviconUrl: typeof raw.faviconUrl === 'string' ? raw.faviconUrl : null,
-    siteName: typeof raw.siteName === 'string' ? raw.siteName : null,
-  };
+type ForecastState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; forecast: Forecast };
+
+function formatUsd(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }
 
 export default function BidConsole() {
@@ -63,69 +54,10 @@ export default function BidConsole() {
   const [options, setOptions] = useState<CategoryOption[] | null>(null);
   const [pending, setPending] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [previewState, setPreviewState] = useState<PreviewState>({ kind: 'idle' });
+  const [forecastState, setForecastState] = useState<ForecastState>({ kind: 'idle' });
   const menuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestInputRef = useRef('');
-
-  // Debounced preview resolution against the typed URL (explicit contract: the server
-  // validates and normalizes; the client renders only whitelisted metadata fields).
-  useEffect(() => {
-    const input = product.trim();
-
-    if (!input) return;
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    // All setState calls happen inside this deferred callback (never synchronously in
-    // the effect body), satisfying the React hooks lint rule.
-    debounceRef.current = setTimeout(async () => {
-      setPreviewState({ kind: 'loading' });
-
-      latestInputRef.current = input;
-
-      try {
-        const response = await fetch('/api/products/resolve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input }),
-        });
-
-        // A newer input took over while this request was in flight - discard it.
-        if (latestInputRef.current !== input) return;
-
-        const body = (await response.json()) as {
-          preview?: Record<string, unknown>;
-          error?: string;
-        };
-
-        if (response.ok && body.preview && typeof body.preview === 'object') {
-          setPreviewState({
-            kind: 'resolved',
-            preview: toPreview(body.preview as ApiPreview),
-          });
-        } else if (body.error === 'unsupported_handle') {
-          setPreviewState({ kind: 'unsupported_handle' });
-        } else if (body.error === 'invalid_product' || body.error === 'invalid_input') {
-          setPreviewState({ kind: 'error', message: 'invalid_input' });
-        } else if (body.error === 'unsafe_url') {
-          setPreviewState({ kind: 'error', message: 'unsafe_url' });
-        } else {
-          setPreviewState({ kind: 'error', message: body.error ?? 'fetch_failed' });
-        }
-      } catch {
-        if (latestInputRef.current === input) {
-          setPreviewState({ kind: 'error', message: 'fetch_failed' });
-        }
-      }
-    }, RESOLVE_DEBOUNCE_MS);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [product]);
+  const latestKeyRef = useRef('');
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -151,6 +83,53 @@ export default function BidConsole() {
     };
   }, [menuOpen]);
 
+  // Debounced position-forecast refresh (read-only feed; purely informational).
+  useEffect(() => {
+    const trimmed = product.trim();
+    const key = selected ? `${selected.slug}|${trimmed}` : `${selected ?? ''}|${trimmed}`;
+
+    if (!trimmed) return;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      if (latestKeyRef.current === key && forecastState.kind !== 'error') return;
+
+      latestKeyRef.current = key;
+      setForecastState({ kind: 'loading' });
+
+      try {
+        const url = new URL('/api/bids/forecast', window.location.origin);
+
+        if (selected) {
+          url.searchParams.set('category', selected.slug);
+        }
+
+        const response = await fetch(url.toString());
+        const body = (await response.json()) as { forecast?: Forecast };
+
+        if (latestKeyRef.current !== key) return;
+
+        if (response.ok && body.forecast) {
+          setForecastState({ kind: 'ready', forecast: body.forecast });
+        } else {
+          setForecastState({ kind: 'error' });
+        }
+      } catch {
+        if (latestKeyRef.current === key) {
+          setForecastState({ kind: 'error' });
+        }
+      }
+    }, FORECAST_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, selected]);
+
   async function toggleMenu() {
     if (menuOpen) {
       setMenuOpen(false);
@@ -171,62 +150,19 @@ export default function BidConsole() {
   async function onBidClick() {
     if (pending) return;
 
-    // Ensure the CURRENT input is resolved before checkout: the preview's canonical
-    // URL becomes the submitted product identifier.
-    let currentState = previewState;
-    const trimmed = product.trim();
+    setErrorText(null);
 
-    if (!trimmed) {
+    if (!product.trim()) {
       setErrorText('Enter your product url or @handle first.');
-      return;
-    }
-
-    if (currentState.kind !== 'resolved') {
-      setPreviewState({ kind: 'loading' });
-      try {
-        const response = await fetch('/api/products/resolve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input: trimmed }),
-        });
-        const body = (await response.json()) as {
-          preview?: Record<string, unknown>;
-          error?: string;
-        };
-
-        if (!response.ok || !body.preview) {
-          setPreviewState({
-            kind: 'error',
-            message: typeof body.error === 'string' ? body.error : 'fetch_failed',
-          });
-          return;
-        }
-
-        const p = body.preview as ApiPreview;
-        currentState = {
-          kind: 'resolved',
-          preview: toPreview(p),
-        };
-        setPreviewState(currentState);
-      } catch {
-        setErrorText('Could not resolve that product URL.');
-        return;
-      }
-    }
-
-    // After the ensure-block, the state is either resolved or still loading; only
-    // a resolved preview may proceed to checkout.
-    const resolvedPreview = currentState.kind === 'resolved' ? currentState.preview : null;
-
-    if (!resolvedPreview) {
-      setErrorText('Resolving is still in progress - try again in a moment.');
       return;
     }
 
     setPending(true);
 
+    // The client submits ONLY identity (+ optional category). The authoritative
+    // amount is derived server-side inside create_pending_bid's row lock.
     const outcome = await submitBid({
-      product: resolvedPreview.canonicalUrl || resolvedPreview.sourceUrl,
+      product,
       categorySlug: selected?.slug ?? null,
     });
 
@@ -237,19 +173,16 @@ export default function BidConsole() {
 
     setPending(false);
     setErrorText(
-      outcome.error === 'banned_email'
-        ? 'This entry is not allowed to bid.'
+      outcome.error === 'invalid_product'
+        ? 'Enter your product url or @handle.'
         : outcome.minimumBid != null
-          ? `The minimum bid is now $${Math.ceil(outcome.minimumBid / 100)}. Please try again.`
+          ? `The minimum bid has moved to $${Math.ceil(outcome.minimumBid / 100)}. Please try again.`
           : 'Could not start checkout. Please try again.'
     );
   }
 
-  const effectivePreview: PreviewState = product.trim() === '' ? { kind: 'idle' } : previewState;
-
-  // Bid unlocks ONLY when the current input has successfully resolved: the
-  // preview's canonical URL is what gets submitted to checkout.
-  const bidDisabled = pending || effectivePreview.kind !== 'resolved';
+  // Empty input derives the idle preview during render - no effect-setState needed.
+  const effectiveForecast: ForecastState = product.trim() === '' ? { kind: 'idle' } : forecastState;
 
   return (
     <section
@@ -320,9 +253,7 @@ export default function BidConsole() {
                     }}
                     className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
                   >
-                    {selected === null
-                      ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Leading category'
-                      : 'Leading category (auto)'}
+                    {selected === null ? 'âœ“ Leading category' : 'Leading category (auto)'}
                   </button>
                 </li>
                 {(options ?? []).map((option) => (
@@ -339,7 +270,7 @@ export default function BidConsole() {
                       }}
                       className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
                     >
-                      {selected?.slug === option.slug ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ ' : ''}
+                      {selected?.slug === option.slug ? 'âœ“ ' : ''}
                       {option.name}
                     </button>
                   </li>
@@ -356,31 +287,77 @@ export default function BidConsole() {
           <button
             type="button"
             onClick={onBidClick}
-            disabled={bidDisabled}
+            disabled={pending}
             className="min-h-11 shrink-0 rounded-lg bg-primary px-8 text-lg font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 motion-safe:active:scale-[0.98] motion-reduce:active:scale-100 sm:min-h-14 sm:px-10"
           >
             {pending ? 'Starting…' : 'Bid'}
           </button>
         </div>
 
-        <div className="mt-3">
-          <ProductPreviewCard state={effectivePreview} />
-        </div>
-
         {errorText ? (
           <p
             id="bid-console-error"
-            className="mt-2 text-center text-xs text-destructive sm:text-left"
+            className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-center text-sm text-destructive sm:text-left"
             role="alert"
           >
             {errorText}
           </p>
-        ) : (
-          <p className="mt-2 text-center text-xs text-muted-foreground sm:text-left">
-            {selected ? `Bidding on: ${selected.name}.` : ''} The next required amount is calculated
-            automatically from the current highest bid.
-          </p>
-        )}
+        ) : null}
+
+        {product.trim() ? (
+          <div
+            className="mt-4 grid w-full grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2"
+            data-testid="entry-preview"
+          >
+            {/* LEFT â€” accepted public entry */}
+            <div className="bg-background px-4 py-3">
+              <div
+                className="truncate text-sm font-semibold text-foreground"
+                data-testid="preview-identifier"
+              >
+                {product.trim()}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">Verified public entry.</div>
+            </div>
+
+            {/* RIGHT â€” position forecast (informational, database-derived) */}
+            <div className="bg-background px-4 py-3">
+              <div className="text-xs font-bold uppercase tracking-wide text-primary">
+                Position forecast
+              </div>
+
+              {effectiveForecast.kind === 'ready' ? (
+                <>
+                  <div className="mt-0.5 text-sm font-semibold text-foreground">
+                    Projected #{effectiveForecast.forecast.projectedRank} of{' '}
+                    {effectiveForecast.forecast.totalPaidBids} on the live board ·{' '}
+                    {effectiveForecast.forecast.currentTopCents === null ||
+                    effectiveForecast.forecast.nextAmountCents <=
+                      effectiveForecast.forecast.currentTopCents
+                      ? `New listing at ${formatUsd(effectiveForecast.forecast.nextAmountCents)}`
+                      : `Raise of $1 from the current ${formatUsd(
+                          effectiveForecast.forecast.currentTopCents
+                        )}`}{' '}
+                    · lifetime {formatUsd(effectiveForecast.forecast.nextAmountCents)}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {effectiveForecast.forecast.projectedRank === 1
+                      ? 'Top of the board'
+                      : `#${effectiveForecast.forecast.projectedRank - 1} currently needs ${formatUsd(
+                          effectiveForecast.forecast.nextAmountCents
+                        )}`}
+                  </div>
+                </>
+              ) : effectiveForecast.kind === 'loading' || effectiveForecast.kind === 'idle' ? (
+                <div className="mt-0.5 text-sm text-muted-foreground">Checking the board…</div>
+              ) : (
+                <div className="mt-0.5 text-sm text-muted-foreground">
+                  Live-board forecast unavailable right now â€” bidding still works.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
