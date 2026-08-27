@@ -67,13 +67,6 @@ export default function RecentBids() {
     });
   }, []);
 
-  const displayEntries = (entries ?? []).map((bid) => ({
-    ...bid,
-    bidderName: bid.bidderName ?? 'Anonymous bidder',
-    category: bid.category?.name ?? 'General',
-    timeAgo: getTimeAgo(bid.createdAt),
-  }));
-
   if (loadFailed && entries === null) {
     return (
       <section
@@ -100,6 +93,13 @@ export default function RecentBids() {
     );
   }
 
+  const displayEntries = (entries ?? []).map((bid) => ({
+    ...bid,
+    bidderName: bid.bidderName ?? 'Anonymous bidder',
+    category: bid.category?.name ?? 'General',
+    timeAgo: getTimeAgo(bid.createdAt),
+  }));
+
   return (
     <section
       className="py-12 sm:py-16 lg:py-20 bg-muted/20 border-y border-border"
@@ -125,44 +125,53 @@ export default function RecentBids() {
             {displayEntries.map((bid) => (
               <li
                 key={bid.id}
-                className="group flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 hover:bg-muted/50 transition-colors duration-200 ease-out focus-within:bg-muted/50 motion-reduce:transition-none"
+                className="group hover:bg-muted/50 transition-colors duration-200 ease-out focus-within:bg-muted/50 motion-reduce:transition-none"
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div
-                    className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
-                    aria-hidden="true"
-                  >
-                    {getInitials(bid.bidderName ?? bid.bidderEmail)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground truncate">{bid.bidderName}</span>
-                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {bid.category ?? 'General'}
-                      </span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <time className="text-xs text-muted-foreground" dateTime={bid.timeAgo}>
-                        {bid.timeAgo}
-                      </time>
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {bid.bidderEmail}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pl-0 sm:pl-4">
-                  <span className="text-lg sm:text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                    {formatCurrency(bid.amount)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"
+                <a
+                  href={`/next/${bid.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 w-full block"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
                       aria-hidden="true"
-                    />
-                    Paid
-                  </span>
-                </div>
+                    >
+                      {getInitials(bid.bidderName ?? bid.bidderEmail)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-foreground truncate">
+                          {bid.bidderName}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {bid.category ?? 'General'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <time className="text-xs text-muted-foreground" dateTime={bid.timeAgo}>
+                          {bid.timeAgo}
+                        </time>
+                      </div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {bid.bidderEmail}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pl-0 sm:pl-4">
+                    <span className="text-lg sm:text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                      {formatCurrency(bid.amount)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"
+                        aria-hidden="true"
+                      />
+                      Paid
+                    </span>
+                  </div>
+                </a>
               </li>
             ))}
           </ul>

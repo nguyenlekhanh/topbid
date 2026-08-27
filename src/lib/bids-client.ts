@@ -95,6 +95,9 @@ export type RecentBidEntryData = {
   bidderEmail: string;
   createdAt: string;
   category: { id: string; slug: string; name: string } | null;
+  entryType: 'url' | 'handle' | 'unknown' | null;
+  entryTitle: string | null;
+  entryCanonicalUrl: string | null;
 };
 
 /**
@@ -107,7 +110,9 @@ export async function getRecentBidEntries(limit = 8): Promise<RecentBidEntryData
 
   const { data, error } = await supabase
     .from('bids')
-    .select('id, amount, bidder_name, bidder_email, created_at, categories (id, slug, name)')
+    .select(
+      'id, amount, bidder_name, bidder_email, created_at, entry_type, entry_title, entry_canonical_url, categories (id, slug, name)'
+    )
     .eq('status', 'paid')
     .order('created_at', { ascending: false })
     .order('amount', { ascending: false })
@@ -123,6 +128,9 @@ export async function getRecentBidEntries(limit = 8): Promise<RecentBidEntryData
     bidderName: (row.bidder_name as string | null) ?? null,
     bidderEmail: String(row.bidder_email),
     createdAt: String(row.created_at),
+    entryType: (row.entry_type as 'url' | 'handle' | 'unknown' | null) ?? null,
+    entryTitle: (row.entry_title as string | null) ?? null,
+    entryCanonicalUrl: (row.entry_canonical_url as string | null) ?? null,
     category:
       row.categories && !Array.isArray(row.categories)
         ? {

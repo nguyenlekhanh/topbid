@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { getLeaderboardPage, type LeaderboardPageEntry } from '@/lib/bids-client';
+import BidIcon from '@/components/BidIcon';
 
 /**
  * Paginated authoritative leaderboard for the console UX (UI redesign task).
@@ -82,49 +83,63 @@ export default function LeaderboardTable({
                 const rank = page.offset + index + 1;
 
                 return (
-                  <li key={entry.id} className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
-                    <span
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        rank === 1
-                          ? 'bg-warning text-warning-foreground'
-                          : rank <= 3
-                            ? 'bg-primary/15 text-primary'
-                            : 'bg-muted text-muted-foreground'
-                      }`}
-                      aria-label={`Rank ${rank}`}
+                  <li key={entry.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <a
+                      href={`/next/${entry.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 w-full block"
                     >
-                      {rank}
-                    </span>
+                      <span
+                        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          rank === 1
+                            ? 'bg-warning text-warning-foreground'
+                            : rank <= 3
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-muted text-muted-foreground'
+                        }`}
+                        aria-label={`Rank ${rank}`}
+                      >
+                        {rank}
+                      </span>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {entry.entryTitle ?? entry.bidderName ?? 'Anonymous bidder'}
-                        </span>
-                        {entry.entryType && entry.entryType !== 'unknown' && (
-                          <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {entry.entryType}
+                      <BidIcon
+                        entryFaviconUrl={entry.entryFaviconUrl}
+                        entryImageUrl={entry.entryImageUrl}
+                        entryType={entry.entryType}
+                        size={24}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {entry.entryTitle ?? entry.bidderName ?? 'Anonymous bidder'}
                           </span>
+                          {entry.entryType && entry.entryType !== 'unknown' && (
+                            <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {entry.entryType}
+                            </span>
+                          )}
+                        </div>
+                        {(entry.entryDescription || entry.entryCanonicalUrl) && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {entry.entryDescription}
+                            {entry.entryCanonicalUrl && entry.entryDescription ? ' — ' : ''}
+                            {entry.entryCanonicalUrl}
+                          </div>
                         )}
                       </div>
-                      {(entry.entryDescription || entry.entryCanonicalUrl) && (
-                        <div className="truncate text-xs text-muted-foreground">
-                          {entry.entryDescription}
-                          {entry.entryCanonicalUrl && entry.entryDescription ? ' — ' : ''}
-                          {entry.entryCanonicalUrl}
-                        </div>
-                      )}
-                    </div>
 
-                    {entry.category ? (
-                      <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground sm:inline">
-                        {entry.category.name}
+                      {entry.category ? (
+                        <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground sm:inline">
+                          {entry.category.name}
+                        </span>
+                      ) : null}
+
+                      <span className="shrink-0 font-semibold text-primary">
+                        {formatCurrency(entry.amount)}
                       </span>
-                    ) : null}
-
-                    <span className="shrink-0 font-semibold text-primary">
-                      {formatCurrency(entry.amount)}
-                    </span>
+                    </a>
                   </li>
                 );
               })}
