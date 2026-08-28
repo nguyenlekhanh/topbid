@@ -69,7 +69,12 @@ describe('BidConsole structure (UI redesign task)', () => {
   });
 
   it('offers an explicit unselected option targeting the global leader', () => {
-    expect(CONSOLE_SOURCE).toContain('Leading category');
+    // The "ALL" option is now in NavbarCategories, not BidConsole
+    const NAV_SOURCE = readFileSync(
+      join(process.cwd(), 'src', 'components', 'NavbarCategories.tsx'),
+      'utf8'
+    );
+    expect(NAV_SOURCE).toContain('ALL');
   });
 });
 

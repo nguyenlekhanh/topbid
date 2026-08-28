@@ -8,7 +8,7 @@ import { submitBid } from '@/lib/bid-submit';
 /**
  * Centered full-screen bidding console.
  *
- * [ Your product url or @handle ] [ category icon â–¾ ] [ Bid ]
+ * [ Your product url or @handle ] [ category icon ▾ ] [ Bid ]
  *
  * - The single textbox is the bidder's PUBLIC entry identifier: a product URL (plain
  *   or bare domain), an arbitrary domain-like string, or an @handle. All forms are
@@ -174,7 +174,7 @@ export default function BidConsole() {
     setPending(false);
     setErrorText(
       outcome.error === 'invalid_product'
-        ? 'Enter your product url or @handle.'
+        ? 'Enter your product url or @handle first.'
         : outcome.minimumBid != null
           ? `The minimum bid has moved to $${Math.ceil(outcome.minimumBid / 100)}. Please try again.`
           : 'Could not start checkout. Please try again.'
@@ -244,18 +244,6 @@ export default function BidConsole() {
                 aria-label="Categories"
                 className="absolute right-0 z-30 mt-2 max-h-72 w-full min-w-[12rem] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg focus-visible:outline-none sm:left-0 sm:right-auto sm:w-64"
               >
-                <li role="option" aria-selected={selected === null}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelected(null);
-                      setMenuOpen(false);
-                    }}
-                    className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
-                  >
-                    {selected === null ? 'âœ“ Leading category' : 'Leading category (auto)'}
-                  </button>
-                </li>
                 {(options ?? []).map((option) => (
                   <li
                     key={option.slug}
@@ -270,7 +258,7 @@ export default function BidConsole() {
                       }}
                       className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
                     >
-                      {selected?.slug === option.slug ? 'âœ“ ' : ''}
+                      {selected?.slug === option.slug ? '✓ ' : ''}
                       {option.name}
                     </button>
                   </li>
@@ -309,7 +297,7 @@ export default function BidConsole() {
             className="mt-4 grid w-full grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2"
             data-testid="entry-preview"
           >
-            {/* LEFT â€” accepted public entry */}
+            {/* LEFT — accepted public entry */}
             <div className="bg-background px-4 py-3">
               <div
                 className="truncate text-sm font-semibold text-foreground"
@@ -320,7 +308,7 @@ export default function BidConsole() {
               <div className="mt-0.5 text-xs text-muted-foreground">Verified public entry.</div>
             </div>
 
-            {/* RIGHT â€” position forecast (informational, database-derived) */}
+            {/* RIGHT — position forecast (informational, database-derived) */}
             <div className="bg-background px-4 py-3">
               <div className="text-xs font-bold uppercase tracking-wide text-primary">
                 Position forecast
@@ -337,7 +325,7 @@ export default function BidConsole() {
                       ? `New listing at ${formatUsd(effectiveForecast.forecast.nextAmountCents)}`
                       : `Raise of $1 from the current ${formatUsd(
                           effectiveForecast.forecast.currentTopCents
-                        )}`}{' '}
+                        )}`}
                     · lifetime {formatUsd(effectiveForecast.forecast.nextAmountCents)}
                   </div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
@@ -352,7 +340,7 @@ export default function BidConsole() {
                 <div className="mt-0.5 text-sm text-muted-foreground">Checking the board…</div>
               ) : (
                 <div className="mt-0.5 text-sm text-muted-foreground">
-                  Live-board forecast unavailable right now â€” bidding still works.
+                  Live-board forecast unavailable right now — bidding still works.
                 </div>
               )}
             </div>

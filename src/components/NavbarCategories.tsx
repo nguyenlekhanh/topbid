@@ -1,30 +1,32 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 import { getActiveCategoryOptions, type CategoryOption } from '@/lib/bids-client';
-import { buildCategoryUrl } from '@/lib/share-url';
 
 /**
- * Navbar "Categories" navigation (UI redesign follow-up).
+ * Navbar "Categories" navigation with homepage filtering.
  *
- * Previously a dead link to "/" (and the mobile menu carried a dead "/leaderboard"
- * target). This component makes category navigation REAL using only existing
- * architecture:
+ * This component provides the top-right Category menu that controls
+ * the homepage Top Bids filtering.
+ *
  * - options come from the RLS-safe active-categories query (bids-client)
- * - each entry navigates through the canonical URL helper buildCategoryUrl
- *   (NEXT_PUBLIC_APP_URL + percent-encoded /categories/<slug>) - no duplicate routing
- * - closes on selection, outside pointer press, and Escape; trigger is a real button
- *   with aria-expanded/aria-haspopup and 44px touch targets
- *
- * variant="desktop" renders an inline dropdown under the trigger;
- * variant="mobile" renders the option links full-width inside the mobile menu panel.
+ * - "ALL" is added as the first option for showing all categories
+ * - clicking a category navigates to /?category=<slug> for filtering
+ * - "ALL" navigates to / (no filter)
+ * - uses window.location.href for full page navigation/reload
+ * - shows the currently selected category based on URL
  */
 export default function NavbarCategories({ variant }: { variant: 'desktop' | 'mobile' }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<CategoryOption[] | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+
+  // Get the current category from URL query params
+  const currentCategory = searchParams.get('category');
+  const selectedCategory = currentCategory ?? 'all';
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +69,18 @@ export default function NavbarCategories({ variant }: { variant: 'desktop' | 'mo
     }
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/+$/, '');
+  function handleCategorySelect(slug: string) {
+    if (slug === 'all') {
+      // eslint-disable-next-line react-hooks/immutability, @next/next/no-location-assign-relative-destination
+      window.location.href = '/';
+    } else {
+      // eslint-disable-next-line react-hooks/immutability, @next/next/no-location-assign-relative-destination
+      window.location.href = `/?category=${encodeURIComponent(slug)}`;
+    }
+  }
+
+  // Build options with ALL as first option
+  const allOptions = [{ slug: 'all', name: 'ALL' }, ...(options ?? [])];
 
   if (variant === 'mobile') {
     return (
@@ -92,15 +105,22 @@ export default function NavbarCategories({ variant }: { variant: 'desktop' | 'mo
         </button>
         {open ? (
           <div id="mobile-categories-list" className="flex flex-col gap-1 pl-3">
-            {(options ?? []).map((option) => (
-              <Link
+            {allOptions.map((option) => (
+              <button
                 key={option.slug}
-                href={buildCategoryUrl(appUrl, option.slug)}
-                onClick={() => setOpen(false)}
-                className="inline-flex min-h-11 items-center rounded-md px-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                type="button"
+                onClick={() => {
+                  handleCategorySelect(option.slug);
+                }}
+                className={`inline-flex min-h-11 items-center rounded-md px-3 text-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  selectedCategory === option.slug
+                    ? 'text-foreground font-medium'
+                    : 'text-muted-foreground'
+                }`}
               >
+                {selectedCategory === option.slug ? '✓ ' : ''}
                 {option.name}
-              </Link>
+              </button>
             ))}
             {options !== null && options.length === 0 ? (
               <span className="px-3 py-2 text-sm text-muted-foreground">No categories yet.</span>
@@ -135,16 +155,23 @@ export default function NavbarCategories({ variant }: { variant: 'desktop' | 'mo
       {open ? (
         <div className="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-background py-1 shadow-lg">
           <ul role="menu" aria-label="Categories">
-            {(options ?? []).map((option) => (
+            {allOptions.map((option) => (
               <li key={option.slug} role="none">
-                <Link
+                <button
                   role="menuitem"
-                  href={buildCategoryUrl(appUrl, option.slug)}
-                  onClick={() => setOpen(false)}
-                  className="inline-flex min-h-11 w-full items-center px-4 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
+                  type="button"
+                  onClick={() => {
+                    handleCategorySelect(option.slug);
+                  }}
+                  className={`inline-flex min-h-11 w-full items-center px-4 text-sm ${
+                    selectedCategory === option.slug
+                      ? 'text-foreground font-medium bg-muted'
+                      : 'text-foreground hover:bg-muted'
+                  } focus-visible:outline-none focus-visible:bg-muted`}
                 >
+                  {selectedCategory === option.slug ? '✓ ' : ''}
                   {option.name}
-                </Link>
+                </button>
               </li>
             ))}
             {options !== null && options.length === 0 ? (

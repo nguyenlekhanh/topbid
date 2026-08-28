@@ -48,8 +48,10 @@ type ClaimState = {
 
 export default function LeaderboardTable({
   initialEntries,
+  categorySlug,
 }: {
   initialEntries: LeaderboardPageEntry[];
+  categorySlug?: string;
 }) {
   const [page, setPage] = useState<PageState>({
     entries: initialEntries,
@@ -65,7 +67,7 @@ export default function LeaderboardTable({
     setPending(true);
 
     try {
-      const result = await getLeaderboardPage(offset, LEADERBOARD_PAGE_SIZE);
+      const result = await getLeaderboardPage(offset, LEADERBOARD_PAGE_SIZE, categorySlug);
 
       setPage({ entries: result.entries, offset, hasMore: result.hasMore });
     } catch (error) {

@@ -30,9 +30,9 @@ describe('navbar categories navigation (follow-up)', () => {
     expect(NAV_SOURCE).toContain("from '@/lib/bids-client'");
   });
 
-  it('navigates through the canonical category URL helper (single source of truth)', () => {
-    expect(NAV_SOURCE).toContain("from '@/lib/share-url'");
-    expect(NAV_SOURCE).toContain('buildCategoryUrl(appUrl, option.slug)');
+  it('navigates to homepage with category filter using window.location.href', () => {
+    expect(NAV_SOURCE).toContain("window.location.href = '/'");
+    expect(NAV_SOURCE).toContain('window.location.href = `/?category=${encodeURIComponent(slug)}`');
   });
 
   it('has accessible trigger semantics and dismiss behaviors', () => {

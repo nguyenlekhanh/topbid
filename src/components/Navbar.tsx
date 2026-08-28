@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 
 import NavbarCategories from '@/components/NavbarCategories';
@@ -23,7 +23,9 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex md:items-center md:gap-6">
-            <NavbarCategories variant="desktop" />
+            <Suspense fallback={<div className="w-24" />}>
+              <NavbarCategories variant="desktop" />
+            </Suspense>
             <Link
               href="/#leaderboard-heading"
               className="relative text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md px-2 py-1 after:absolute after:bottom-0 after:left-2 after:right-2 after:h-px after:bg-foreground after:scale-x-0 after:transition-transform after:duration-200 hover:after:scale-x-100 motion-reduce:after:transition-none"
@@ -82,7 +84,9 @@ export default function Navbar() {
             className="md:hidden py-4 border-t border-border motion-safe:animate-[slideDown_200ms_ease-out] motion-reduce:animate-none"
           >
             <div className="flex flex-col gap-2">
-              <NavbarCategories variant="mobile" />
+              <Suspense fallback={<div className="w-full" />}>
+                <NavbarCategories variant="mobile" />
+              </Suspense>
               <Link
                 href="/#leaderboard-heading"
                 onClick={() => setMobileMenuOpen(false)}
