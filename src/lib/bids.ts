@@ -82,12 +82,14 @@ const LEADERBOARD_CATEGORY_FIELDS = 'id, slug, name';
  * - Ordered amount DESC, then created_at DESC as a deterministic tie-breaker
  * - Embeds the related category (id, slug, name) via the FK relationship
  * - Optional limit (default 10); returns [] when no paid bids exist
+ * - Optional categorySlug to filter by category
  * - Server-side only (uses supabase-server anon client, respects RLS)
  */
 export async function getLeaderboard(
-  options: { limit?: number } = {}
+  options: { limit?: number; categorySlug?: string } = {}
 ): Promise<LeaderboardEntry[]> {
   const requestedLimit = options.limit;
+  const categorySlug = options.categorySlug;
 
   const limit =
     typeof requestedLimit === 'number' && Number.isFinite(requestedLimit) && requestedLimit > 0
@@ -96,13 +98,19 @@ export async function getLeaderboard(
 
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('bids')
     .select(`${BID_FIELDS}, categories (${LEADERBOARD_CATEGORY_FIELDS})`)
     .eq('status', 'paid')
     .order('amount', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  if (categorySlug) {
+    query = query.eq('categories.slug', categorySlug);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to fetch leaderboard: ${error.message}`);

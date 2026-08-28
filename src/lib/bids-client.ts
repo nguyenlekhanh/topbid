@@ -161,17 +161,19 @@ export type LeaderboardPageEntry = {
  * Same authoritative ordering as getLeaderboardEntries (amount DESC, created_at DESC
  * tie-breaker) with server-side range slicing - never an unbounded fetch. bidder_email
  * is deliberately NOT selected: the public leaderboard must not transport it.
+ * Optional categorySlug to filter by category.
  */
 export async function getLeaderboardPage(
   offset: number,
-  limit: number
+  limit: number,
+  categorySlug?: string
 ): Promise<{
   entries: LeaderboardPageEntry[];
   hasMore: boolean;
 }> {
   const supabase = createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('bids')
     .select(
       'id, amount, bidder_name, created_at, entry_title, entry_description, entry_canonical_url, entry_image_url, entry_favicon_url, entry_type, categories (id, slug, name)'
@@ -180,6 +182,12 @@ export async function getLeaderboardPage(
     .order('amount', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
+
+  if (categorySlug) {
+    query = query.eq('categories.slug', categorySlug);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to fetch leaderboard page: ${error.message}`);
