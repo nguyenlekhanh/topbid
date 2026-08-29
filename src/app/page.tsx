@@ -4,6 +4,15 @@ import RecentBids from '@/components/RecentBids';
 import { getLeaderboard } from '@/lib/bids';
 import type { LeaderboardPageEntry } from '@/lib/bids-client';
 
+function formatCurrency(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
 /**
  * Homepage (UI redesign task): full-screen centered bidding console with the
  * paginated authoritative leaderboard below it.
@@ -26,12 +35,15 @@ export default async function Home({
   const selectedCategory = categorySlug ?? null;
 
   let initialEntries: LeaderboardPageEntry[] = [];
+  let topBidAmount = 0;
 
   try {
     const leaderboard = await getLeaderboard({
       limit: LEADERBOARD_PAGE_SIZE,
       categorySlug: selectedCategory ?? undefined,
     });
+
+    topBidAmount = leaderboard.length > 0 ? leaderboard[0].bid.amount : 0;
 
     initialEntries = leaderboard.map((entry) => ({
       id: entry.bid.id,
@@ -54,6 +66,19 @@ export default async function Home({
 
   return (
     <>
+      {topBidAmount > 0 && (
+        <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 mb-8">
+          <div className="rounded-xl border border-border bg-background p-4 sm:p-6">
+            <p className="text-center text-lg font-medium text-foreground">
+              Claim #1 for {formatCurrency(topBidAmount)}
+            </p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              New spots start at $1. Paying less than the #1 price still puts you on the board at
+              whatever place that bid can take.
+            </p>
+          </div>
+        </div>
+      )}
       <BidConsole />
       <LeaderboardTable
         initialEntries={initialEntries}
