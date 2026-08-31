@@ -186,7 +186,7 @@ export default function BidConsole() {
 
   return (
     <section
-      className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16"
+      className="flex flex-col items-center justify-center px-4 py-0"
       aria-labelledby="bid-console-heading"
     >
       <h1 id="bid-console-heading" className="sr-only">
@@ -214,63 +214,96 @@ export default function BidConsole() {
           />
 
           <div className="relative sm:shrink-0" ref={menuRef}>
-            <button
-              type="button"
-              onClick={toggleMenu}
-              aria-expanded={menuOpen}
-              aria-haspopup="listbox"
-              aria-label={selected ? `Category: ${selected.name}` : 'Choose a category'}
-              className="inline-flex min-h-11 min-w-11 w-full items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-            </button>
+  <button
+    type="button"
+    onClick={toggleMenu}
+    aria-expanded={menuOpen}
+    aria-haspopup="listbox"
+    aria-label={
+      selected ? `Category: ${selected.name}` : 'Choose a category'
+    }
+    className="inline-flex min-h-11 w-full min-w-[12rem] items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-64"
+  >
+    <span className="flex items-center gap-2 truncate">
+      <svg
+        className="h-5 w-5 shrink-0 text-muted-foreground"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
+      </svg>
 
-            {menuOpen ? (
-              <ul
-                role="listbox"
-                aria-label="Categories"
-                className="absolute right-0 z-30 mt-2 max-h-72 w-full min-w-[12rem] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg focus-visible:outline-none sm:left-0 sm:right-auto sm:w-64"
-              >
-                {(options ?? []).map((option) => (
-                  <li
-                    key={option.slug}
-                    role="option"
-                    aria-selected={selected?.slug === option.slug}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelected(option);
-                        setMenuOpen(false);
-                      }}
-                      className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
-                    >
-                      {selected?.slug === option.slug ? '✓ ' : ''}
-                      {option.name}
-                    </button>
-                  </li>
-                ))}
-                {options !== null && options.length === 0 ? (
-                  <li role="presentation" className="px-4 py-3 text-sm text-muted-foreground">
-                    No active categories yet.
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
-          </div>
+      <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+        {selected ? selected.name : 'Choose Your Categories'}
+      </span>
+    </span>
+
+    <svg
+      className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+        menuOpen ? 'rotate-180' : ''
+      }`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="m6 9 6 6 6-6"
+      />
+    </svg>
+  </button>
+
+  {menuOpen ? (
+    <ul
+      role="listbox"
+      aria-label="Categories"
+      className="absolute right-0 z-30 mt-2 max-h-72 w-full min-w-[12rem] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg focus-visible:outline-none sm:left-0 sm:right-auto sm:w-64"
+    >
+      {(options ?? []).map((option) => (
+        <li
+          key={option.slug}
+          role="option"
+          aria-selected={selected?.slug === option.slug}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSelected(option);
+              setMenuOpen(false);
+            }}
+            className="inline-flex min-h-11 w-full items-center px-4 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+          >
+            <span className="mr-2 w-4">
+              {selected?.slug === option.slug ? '✓' : ''}
+            </span>
+
+            {option.name}
+          </button>
+        </li>
+      ))}
+
+      {options !== null && options.length === 0 ? (
+        <li
+          role="presentation"
+          className="px-4 py-3 text-sm text-muted-foreground"
+        >
+          No active categories yet.
+        </li>
+      ) : null}
+    </ul>
+  ) : null}
+</div>
+
 
           <button
             type="button"

@@ -1,0 +1,10 @@
+STOP REASONING. EDIT THE FILE NOW.
+
+Reduce the vertical gap between Bid Console, Top Bidders, and Recent Bids.
+
+Change ONLY the relevant Tailwind spacing classes.
+Do not add new functionality.
+Do not modify logic.
+do not commit push.
+
+Make the edit now.

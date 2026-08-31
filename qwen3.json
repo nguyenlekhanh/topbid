@@ -1,0 +1,7 @@
+{
+  "openai/Qwen3-8B-Q4_K_M.gguf": {
+    "max_tokens": 40960,
+    "input_cost_per_token": 0,
+    "output_cost_per_token": 0
+  }
+}

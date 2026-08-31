@@ -1,0 +1,8 @@
+{
+  "openai/Qwen2.5-14B-Instruct-Q4_K_M.gguf": {
+    "max_input_tokens": 30000,
+    "max_output_tokens": 3000,
+    "input_cost_per_token": 0,
+    "output_cost_per_token": 0
+  }
+}
